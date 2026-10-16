@@ -1,0 +1,12 @@
+{
+  "name": "mhr-roguelike-research",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Read-only REFramework Lua probe for Monster Hunter Rise mod research",
+  "scripts": {
+    "check": "node scripts/check-lua.js"
+  },
+  "devDependencies": {
+    "luaparse": "^0.3.1"
+  }
+}

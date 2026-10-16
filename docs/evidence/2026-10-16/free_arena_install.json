@@ -1,0 +1,8 @@
+{
+    "backend": "REFramework Lua",
+    "base": 101,
+    "id": 900101,
+    "installed": true,
+    "map": 10,
+    "time_limit": 0
+}

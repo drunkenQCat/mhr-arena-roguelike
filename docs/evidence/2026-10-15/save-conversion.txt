@@ -1,0 +1,5 @@
+PASS data00-1.bin: source checksum + exact payload round trip; 266844 bytes
+PASS data001Slot.bin: source checksum + exact payload round trip; 1843164 bytes
+PASS SS1_data001Slot.bin: source checksum + exact payload round trip; 266844 bytes
+PASS SS1_data002Slot.bin: source checksum + exact payload round trip; 266844 bytes
+PASS SS1_data302Slot.bin: source checksum + exact payload round trip; 266844 bytes

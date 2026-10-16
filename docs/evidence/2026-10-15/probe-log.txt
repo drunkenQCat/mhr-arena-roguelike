@@ -1,0 +1,10 @@
+[2026-10-15 08:47:37.217] [REFramework] [error] [Module.cpp:470] Failed to copy DLL file: ��������
+[2026-10-15 08:47:38.571] [REFramework] [error] [IntegrityCheckBypass]: Could not find stack destroyer!
+[2026-10-15 08:47:43.193] [REFramework] [error] Failed to get type info: unknown exception
+[2026-10-15 08:47:43.193] [REFramework] [error] [Streamline] Failed to get sl.dlss_g.dll module handle
+[2026-10-15 08:47:45.480] [REFramework] [error] Failed to find TypeInfoNone
+[2026-10-15 08:47:47.623] [REFramework] [info] RogueProbe: script loaded; game=mhrise; runtime=Lua 5.4
+[2026-10-15 08:49:36.625] [REFramework] [error] Present failed: 87a0001
+[2026-10-15 08:50:29.538] [REFramework] [error] Present failed: 87a0001
+[2026-10-15 08:50:41.848] [REFramework] [error] Present failed: 87a0001
+[2026-10-15 08:53:07.780] [REFramework] [error] Present failed: 87a0001

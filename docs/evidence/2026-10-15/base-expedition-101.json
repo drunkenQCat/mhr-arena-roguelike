@@ -1,0 +1,236 @@
+{
+  "enemy": {
+    "_AttackTbl": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_BossMulti": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_Difficulty": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_EmsSetNo": 2,
+    "_IndividualType": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_InitSetName": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "_OtherTbl": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_PartsTbl": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_QuestNo": 101,
+    "_RouteNo": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_Scale": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+    ],
+    "_ScaleTbl": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_StaminaTbl": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_SubType": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_VitalTbl": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_ZakoAttack": 2,
+    "_ZakoMulti": 0,
+    "_ZakoOther": 1,
+    "_ZakoParts": 17,
+    "_ZakoVital": 14
+  },
+  "id": 101,
+  "normal": {
+    "_AutoMatchHR": 0,
+    "_BaseTime": 11,
+    "_BattleBGMType": 0,
+    "_BossEmType": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_BossSetCondition": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_BossSetParam": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "_ClearBGMType": 0,
+    "_DbgClient": "依頼主",
+    "_DbgContent": "※大型モンスターのセットは未対応。",
+    "_DbgName": "大社跡の探索ツアー",
+    "_EnemyLv": 0,
+    "_FenceActiveSec": 0,
+    "_FenceDefaultActive": false,
+    "_FenceDefaultWaitSec": 0,
+    "_FenceReloadSec": 0,
+    "_Icon": [
+      114,
+      999,
+      999,
+      999,
+      999
+    ],
+    "_InitExtraEmNum": 0,
+    "_IsFromNpc": false,
+    "_IsSwapExitMarionette": false,
+    "_IsTutorial": false,
+    "_IsUsePillar": [
+      false,
+      false,
+      false
+    ],
+    "_MapNo": 1,
+    "_OrderType": [
+      0,
+      0
+    ],
+    "_QuestLife": 3,
+    "_QuestLv": 0,
+    "_QuestNo": 101,
+    "_QuestType": 32,
+    "_RemMoney": 0,
+    "_RemRankPoint": 0,
+    "_RemVillagePoint": 0,
+    "_SupplyTbl": 1,
+    "_SwapEmRate": [
+      0,
+      0
+    ],
+    "_SwapExecType": 0,
+    "_SwapExitTime": [
+      0,
+      0
+    ],
+    "_SwapSetCondition": [
+      0,
+      0
+    ],
+    "_SwapSetParam": [
+      0,
+      0
+    ],
+    "_SwapStopParam": 0,
+    "_SwapStopType": 0,
+    "_TargetType": [
+      0,
+      0
+    ],
+    "_TgtEmType": [
+      0,
+      0
+    ],
+    "_TgtItemId": [
+      67108864,
+      67108864
+    ],
+    "_TgtNum": [
+      0,
+      0
+    ],
+    "_TimeLimit": 0,
+    "_TimeVariation": 3
+  }
+}
