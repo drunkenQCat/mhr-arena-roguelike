@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node scripts/build-config.js && tstl",
     "dev": "node scripts/build-config.js && tstl --watch",
-    "typecheck": "tstl --noEmit",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "node scripts/check-lua.js"
   },
