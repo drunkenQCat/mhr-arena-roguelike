@@ -1,12 +1,21 @@
 {
   "name": "mhr-roguelike-research",
   "private": true,
-  "version": "0.1.0",
-  "description": "Read-only REFramework Lua probe for Monster Hunter Rise mod research",
+  "version": "0.2.0",
+  "description": "MHRise arena roguelike mod — TypeScript core compiled to REFramework Lua via TypeScriptToLua",
   "scripts": {
+    "build": "tstl",
+    "dev": "tstl --watch",
+    "typecheck": "tstl --noEmit",
+    "test": "vitest run",
     "check": "node scripts/check-lua.js"
   },
   "devDependencies": {
-    "luaparse": "^0.3.1"
+    "@typescript-to-lua/language-extensions": "^1.19.0",
+    "lua-types": "^2.13.1",
+    "typescript": "6.0.2",
+    "typescript-to-lua": "^1.37.1",
+    "luaparse": "^0.3.1",
+    "vitest": "^2.1.0"
   }
 }
