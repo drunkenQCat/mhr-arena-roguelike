@@ -10,6 +10,8 @@ export class Rng {
   constructor(seed?: number) {
     // 0 会让 mulberry32 退化为常量序列，强制非零
     this.state = (seed === undefined ? (Date.now() | 0) : seed | 0) || 0x9e3779b9;
+    // 空转预热：让相邻种子的首个取值进一步去相关（廉价保险）。同 seed 仍产生同序列。
+    for (let i = 0; i < 10; i++) this.nextUint();
   }
 
   /** [0, 0xffffffff) 的无符号整数。 */
@@ -20,9 +22,10 @@ export class Rng {
     return ((t ^ (t >>> 14)) >>> 0);
   }
 
-  /** [0, n) 的整数（等价 C# Random.Next(n)）。 */
+  /** [0, n) 的整数（等价 C# Random.Next(n)）。
+   * 注意必须先归一化到 [0,1) 再缩放：整数 u 直接 (u*n)%n 恒为 0。 */
   int(n: number): number {
-    return Math.floor(this.nextUint() * n) % n;
+    return Math.floor((this.nextUint() / 4294967296) * n);
   }
 
   /** 就地 Fisher-Yates 洗牌（TSTL/Lua table 语义友好）。 */
