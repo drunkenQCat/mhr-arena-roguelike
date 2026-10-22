@@ -12,6 +12,7 @@ const mapFields = (src, pairs) => Object.fromEntries(pairs.split(' ').map(pair =
   return [key, structuredClone(src[field])];
 }));
 const normal = mapFields(n, 'QuestType:_QuestType QuestLevel:_QuestLv EnemyLevel:_EnemyLv Map:_MapNo BaseTime:_BaseTime TimeVariation:_TimeVariation TimeLimit:_TimeLimit Carts:_QuestLife QuestConditions:_OrderType TargetTypes:_TargetType TargetMonsters:_TgtEmType TargetItemIds:_TgtItemId TargetAmounts:_TgtNum ExtraMonsterCount:_InitExtraEmNum SwapExitRide:_IsSwapExitMarionette SwapFrequencies:_SwapEmRate SwapConditions:_SwapSetCondition SwapParams:_SwapSetParam SwapExitTimes:_SwapExitTime SwapStopType:_SwapStopType SwapStopParam:_SwapStopParam SwapExecType:_SwapExecType SupplyTable:_SupplyTbl Icons:_Icon Tutorial:_IsTutorial FromNpc:_IsFromNpc AutoMatchHR:_AutoMatchHR BattleBGMType:_BattleBGMType ClearBGMType:_ClearBGMType');
+normal.QuestType = 32; // TOUR: shown in the game's FreeSide quest category.
 normal.Monsters = n._BossEmType.map((id, i) => ({Id:id, SpawnCondition:n._BossSetCondition[i], SpawnParam:n._BossSetParam[i]}));
 normal.Reward = mapFields(n, 'Zenny:_RemMoney Points:_RemVillagePoint HRP:_RemRankPoint');
 normal.ArenaParam = mapFields(n, 'FenceDefaultActive:_FenceDefaultActive FenceUptime:_FenceActiveSec FenceInitialDelay:_FenceDefaultWaitSec FenceCooldown:_FenceReloadSec Pillars:_IsUsePillar');
@@ -25,7 +26,7 @@ const enemy = {
 enemy.SmallMonsters.SpawnType = 0;
 const quest = {
   QuestID:900101,
-  QuestText:{DebugName:'Free Arena', DebugClient:'Arena Research', DebugDescription:'Empty arena expedition', FallbackLanguage:'ENG', QuestInfo:[
+  QuestText:{DebugName:'Free Arena', DebugClient:'Arena Research', DebugDescription:'Empty arena quest', FallbackLanguage:'ENG', QuestInfo:[
     {Language:'ENG', Name:'Free Arena', Client:'Arena Research', Description:'Explore the empty arena with your own equipment.\nNo time limit or hunting objective.\nUse Complete Quest in the menu to return.', Target:'Explore freely; return from the quest menu', Fail:'No expedition failure'},
     {Language:'ZHS', Name:'自由竞技场', Client:'竞技场管理员', Description:'携带自己的装备，自由探索空场。\n无时间限制、无狩猎目标。\n通过菜单中的完成任务返回。', Target:'自由探索；通过任务菜单返回', Fail:'探索任务不会失败'}
   ]}, QuestData:normal, EnemyData:enemy, RampageData:null
@@ -37,4 +38,4 @@ fs.mkdirSync('reframework/quests', {recursive:true});
 fs.writeFileSync('reframework/quests/q900101.json', JSON.stringify(quest, null, 2)+'\n');
 fs.mkdirSync('docs/evidence/2026-10-15', {recursive:true});
 fs.writeFileSync('docs/evidence/2026-10-15/base-expedition-101.json', JSON.stringify(base, null, 2)+'\n');
-console.log('Built q900101: village 1-star expedition, arena map 10, empty, untimed');
+console.log('Built q900101: FreeSide TOUR, arena map 10, empty, untimed');

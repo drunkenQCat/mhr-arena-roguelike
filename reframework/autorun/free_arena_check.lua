@@ -22,7 +22,7 @@ re.on_frame(function()
         for i = 0, monsters:get_size() - 1 do assert(monsters:call("Get", i) == 0) end
         json.dump_file("free_arena_status.json", {
             installed=true, id=900101, map=10, time_limit=0,
-            rank="village 1-star expedition", monsters=0,
+            rank="village FreeSide tour", quest_type=32, monsters=0,
             departure_verified=false, return_verified=false
         })
         log.info("FreeArenaCheck: PASS quest 900101 registered; map=10 type=32 time=0 monsters=0")

@@ -1,6 +1,7 @@
--- Free Arena: an independent village expedition derived from the live template.
--- Only quest catalogue objects are changed. No save, inventory or player edits.
+-- Free Arena: a FreeSide quest in the game's own quest counter.
+-- No REFramework UI, synthetic confirmation, or player-input hooks.
 local ID, BASE = 900101, 101
+local QUEST_TYPE_TOUR = 32
 local marker = "MHRResearch_FreeArena_v1"
 local retained, installed, stopped, ticks = {}, false, false, 0
 local status = "Waiting for the quest catalogue"
@@ -39,7 +40,7 @@ local function install()
     local source = qm:call("getQuestData(System.Int32)", BASE)
     local normal = clone_fields(source:call("get_RawNormal"))
     local enemy = clone_fields(source:call("get_RawEnemy"))
-    assert(normal:get_field("_QuestType") == 32, "Base is not an expedition")
+    assert(normal:get_field("_QuestType") == QUEST_TYPE_TOUR, "Base is not a FreeSide expedition")
     assert(normal:get_field("_TimeLimit") == 0, "Base is not untimed")
     normal:set_field("_QuestNo", ID)
     normal:set_field("_MapNo", 10)
@@ -74,17 +75,20 @@ local function install()
     end)
     sdk.hook(list_method, function() end, function(retval)
         local list = sdk.to_managed_object(retval)
-        -- Only add beside the original village expedition, never to other ranks.
+        -- Original tour 101 is in the village FreeSide list. Add only there.
         if installed and list and list:call("Contains", BASE) and not list:call("Contains", ID) then
             list:call("Add", ID)
-            log.info("FreeArena: added 900101 beside expedition 101")
+            log.info("FreeArena: added 900101 to the FreeSide quest list")
         end
         return retval
     end)
     dict:call("set_Item", ID, quest)
-    status = "Installed 900101 / Map 10 / village expedition / no time limit"
+    status = "Installed 900101 / FreeSide TOUR / Map 10 / no time limit"
     log.info("FreeArena: " .. status)
-    json.dump_file("free_arena_install.json", {installed=true, backend="REFramework Lua", id=ID, map=10, base=BASE, time_limit=0})
+    json.dump_file("free_arena_install.json", {
+        installed=true, backend="REFramework Lua", id=ID, base=BASE,
+        menu="FreeSide", quest_type=QUEST_TYPE_TOUR, map=10, time_limit=0
+    })
     return true
 end
 re.on_frame(function()
@@ -99,11 +103,4 @@ re.on_frame(function()
         json.dump_file("free_arena_install.json", {installed=false,error=status})
     end
 end)
-re.on_draw_ui(function()
-    if imgui.tree_node("Free Arena") then
-        imgui.text(status)
-        imgui.text("Village counter > Expedition Tour > Free Arena")
-        imgui.text("Finish expedition from the quest menu, then quit normally.")
-        imgui.tree_pop()
-    end
-end)
+

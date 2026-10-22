@@ -3,7 +3,7 @@
   "QuestText": {
     "DebugName": "Free Arena",
     "DebugClient": "Arena Research",
-    "DebugDescription": "Empty arena expedition",
+    "DebugDescription": "Empty arena quest",
     "FallbackLanguage": "ENG",
     "QuestInfo": [
       {
