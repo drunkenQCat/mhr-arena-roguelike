@@ -23,7 +23,8 @@
     "src/**/*.test.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/**/*.test.ts"
   ],
   "tstl": {
     "luaTarget": "5.4",

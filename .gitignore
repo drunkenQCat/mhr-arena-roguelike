@@ -3,3 +3,5 @@ reframework/logs/
 *.dmp
 
 .local/
+src/game/default_config.ts
+

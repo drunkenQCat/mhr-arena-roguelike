@@ -4,8 +4,8 @@
   "version": "0.2.0",
   "description": "MHRise arena roguelike mod — TypeScript core compiled to REFramework Lua via TypeScriptToLua",
   "scripts": {
-    "build": "tstl",
-    "dev": "tstl --watch",
+    "build": "node scripts/build-config.js && tstl",
+    "dev": "node scripts/build-config.js && tstl --watch",
     "typecheck": "tstl --noEmit",
     "test": "vitest run",
     "check": "node scripts/check-lua.js"

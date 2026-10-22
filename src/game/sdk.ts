@@ -6,30 +6,36 @@
  * 仅本文件可见、TSTL 编译时原样保留标识符、不产生任何运行时代码。
  * 其他文件（包括 src/core）引用这些全局会直接编译失败。
  *
+ * @noSelf：REFramework 全局是点调用语义（log.info("x")），
+ * 注解让 TSTL 生成点调用而不是 Lua 冒号调用（后者会把宿主表当 self 传入，
+ * 实机必错）。REManagedObject 系保持冒号语义（obj:get_field(...)）。
+ *
  * 用法均经本仓库 free_arena.lua 与 AutoQuest 研究代码实机验证。
  */
 
-/* ---------- REFramework 全局（Lua 侧原样保留） ---------- */
-
-declare const log: {
+/** @noSelf */
+interface RefLog {
   info(msg: string): void;
   warn(msg: string): void;
   error(msg: string): void;
   debug(msg: string): void;
-};
+}
 
-declare const json: {
+/** @noSelf */
+interface RefJson {
   load_file(path: string): unknown;
   dump_file(path: string, data: unknown, pretty?: boolean): boolean;
-};
+}
 
-declare const re: {
+/** @noSelf */
+interface RefRe {
   on_frame(cb: () => void): void;
   on_draw_ui(cb: () => void): void;
   on_script_reset(cb: () => void): void;
-};
+}
 
-declare const imgui: {
+/** @noSelf */
+interface RefImgui {
   text(text: string): void;
   text_disabled(text: string): void;
   text_colored(r: number, g: number, b: number, a: number, text: string): void;
@@ -39,13 +45,15 @@ declare const imgui: {
   same_line(): void;
   tree_node(label: string): boolean;
   tree_pop(): void;
-};
+}
 
-declare const thread: {
+/** @noSelf */
+interface RefThread {
   get_hook_storage(): Record<string, unknown>;
-};
+}
 
-declare const sdk: {
+/** @noSelf */
+interface RefSdk {
   get_managed_singleton(name: string): REManagedObject | null;
   find_type_definition(name: string): RETypeDefinition | null;
   create_instance(typeName: string, simplify?: boolean): REManagedObject | null;
@@ -58,9 +66,16 @@ declare const sdk: {
   to_managed_object(value: unknown): REManagedObject;
   to_ptr(value: unknown): unknown;
   to_int64(value: unknown): number;
-};
+}
 
-/* ---------- RE Engine 类型（最小面） ---------- */
+declare const log: RefLog;
+declare const json: RefJson;
+declare const re: RefRe;
+declare const imgui: RefImgui;
+declare const thread: RefThread;
+declare const sdk: RefSdk;
+
+/* ---------- RE Engine 类型（最小面，冒号语义） ---------- */
 
 export interface REManagedObject {
   get_field(name: string): unknown;
@@ -108,8 +123,10 @@ export function retain<T extends REManagedObject>(obj: T, pool: REManagedObject[
 export const hookMethod = sdk.hook;
 export const toManagedObject = sdk.to_managed_object;
 export const toPtr = sdk.to_ptr;
+export const toInt64 = sdk.to_int64;
 export const createManagedString = sdk.create_managed_string;
 export const createInstance = sdk.create_instance;
+export const findTypeDefinition = sdk.find_type_definition;
 
 export const reframework = {
   onFrame: re.on_frame,

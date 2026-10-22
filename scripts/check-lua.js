@@ -24,7 +24,7 @@ let failed = false;
 for (const file of luaFiles) {
     try {
         const source = fs.readFileSync(file, "utf8");
-        luaparse.parse(source, { luaVersion: "5.1", locations: true });
+        luaparse.parse(source, { luaVersion: "5.3", locations: true });
         console.log(`PASS ${path.relative(projectRoot, file)}`);
     } catch (error) {
         failed = true;
