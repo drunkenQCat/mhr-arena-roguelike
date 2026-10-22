@@ -1,0 +1,318 @@
+{
+  "Rathian": {
+    "id": 1,
+    "cn": "雌火龙"
+  },
+  "Rathalos": {
+    "id": 2,
+    "cn": "火龙"
+  },
+  "Khezu": {
+    "id": 3,
+    "cn": "电龙"
+  },
+  "Basarios": {
+    "id": 4,
+    "cn": "岩龙"
+  },
+  "Diablos": {
+    "id": 7,
+    "cn": "角龙"
+  },
+  "Daimyo Hermitaur": {
+    "id": 19,
+    "cn": "盾蟹"
+  },
+  "Shogun Ceanataur": {
+    "id": 20,
+    "cn": "镰蟹"
+  },
+  "Rajang": {
+    "id": 23,
+    "cn": "金狮子"
+  },
+  "Kushala Daora": {
+    "id": 24,
+    "cn": "钢龙"
+  },
+  "Chameleos": {
+    "id": 25,
+    "cn": "霞龙"
+  },
+  "Teostra": {
+    "id": 27,
+    "cn": "炎王龙"
+  },
+  "Tigrex": {
+    "id": 32,
+    "cn": "轰龙"
+  },
+  "Nargacuga": {
+    "id": 37,
+    "cn": "迅龙"
+  },
+  "Barioth": {
+    "id": 42,
+    "cn": "冰牙龙"
+  },
+  "Barroth": {
+    "id": 44,
+    "cn": "土砂龙"
+  },
+  "Royal Ludroth": {
+    "id": 47,
+    "cn": "水兽"
+  },
+  "Great Baggi": {
+    "id": 54,
+    "cn": "眠狗龙王"
+  },
+  "Zinogre": {
+    "id": 57,
+    "cn": "雷狼龙"
+  },
+  "Amatsu": {
+    "id": 58,
+    "cn": "岚龙"
+  },
+  "Great Wroggi": {
+    "id": 59,
+    "cn": "毒狗龙王"
+  },
+  "Arzuros": {
+    "id": 60,
+    "cn": "青熊兽"
+  },
+  "Lagombi": {
+    "id": 61,
+    "cn": "白兔兽"
+  },
+  "Volvidon": {
+    "id": 62,
+    "cn": "赤甲兽"
+  },
+  "Gore Magala": {
+    "id": 71,
+    "cn": "黑蚀龙"
+  },
+  "Shagaru Magala": {
+    "id": 72,
+    "cn": "天廻龙"
+  },
+  "Seregios": {
+    "id": 77,
+    "cn": "千刃龙"
+  },
+  "Astalos": {
+    "id": 81,
+    "cn": "电甲虫"
+  },
+  "Mizutsune": {
+    "id": 82,
+    "cn": "泡狐龙"
+  },
+  "Magnamalo": {
+    "id": 89,
+    "cn": "怨虎龙"
+  },
+  "Bishaten": {
+    "id": 90,
+    "cn": "天狗兽"
+  },
+  "Aknosom": {
+    "id": 91,
+    "cn": "伞鸟"
+  },
+  "Tetranadon": {
+    "id": 92,
+    "cn": "河童蛙"
+  },
+  "Somnacanth": {
+    "id": 93,
+    "cn": "人鱼龙"
+  },
+  "Rakna-Kadaki": {
+    "id": 94,
+    "cn": "妃蜘蛛"
+  },
+  "Almudron": {
+    "id": 95,
+    "cn": "泥翁龙"
+  },
+  "Wind Serpent Ibushi": {
+    "id": 96,
+    "cn": "风神龙"
+  },
+  "Goss Harag": {
+    "id": 97,
+    "cn": "雪鬼兽"
+  },
+  "Great Izuchi": {
+    "id": 98,
+    "cn": "镰鼬龙王"
+  },
+  "Thunder Serpent Narwa": {
+    "id": 99,
+    "cn": "雷神龙"
+  },
+  "Anjanath": {
+    "id": 100,
+    "cn": "蛮颚龙"
+  },
+  "Pukei-Pukei": {
+    "id": 102,
+    "cn": "毒妖鸟"
+  },
+  "Kulu-Ya-Ku": {
+    "id": 107,
+    "cn": "搔鸟"
+  },
+  "Jyuratodus": {
+    "id": 108,
+    "cn": "泥鱼龙"
+  },
+  "Tobi-Kadachi": {
+    "id": 109,
+    "cn": "飞雷龙"
+  },
+  "Bazelgeuse": {
+    "id": 118,
+    "cn": "爆鳞龙"
+  },
+  "Velkhana": {
+    "id": 124,
+    "cn": "冰呪龙"
+  },
+  "Toadversary": {
+    "id": 131,
+    "cn": "Toadversary"
+  },
+  "Malzeno": {
+    "id": 132,
+    "cn": "爵银龙"
+  },
+  "Lunagaron": {
+    "id": 133,
+    "cn": "月迅龙"
+  },
+  "Garangolm": {
+    "id": 134,
+    "cn": "刚缠兽"
+  },
+  "Gaismagorm": {
+    "id": 135,
+    "cn": "冥渊龙"
+  },
+  "Espinas": {
+    "id": 136,
+    "cn": "棘龙"
+  },
+  "Blood Orange Bishaten": {
+    "id": 346,
+    "cn": "血橙天狗兽"
+  },
+  "Aurora Somnacanth": {
+    "id": 349,
+    "cn": "冰印人鱼龙"
+  },
+  "Pyre Rakna-Kadaki": {
+    "id": 350,
+    "cn": "炽妃蜘蛛"
+  },
+  "Magma Almudron": {
+    "id": 351,
+    "cn": "熔岩泥翁龙"
+  },
+  "Flaming Espinas": {
+    "id": 392,
+    "cn": "红莲棘龙"
+  },
+  "Gold Rathian": {
+    "id": 513,
+    "cn": "金火龙"
+  },
+  "Silver Rathalos": {
+    "id": 514,
+    "cn": "银火龙"
+  },
+  "Lucent Nargacuga": {
+    "id": 549,
+    "cn": "月羽迅龙"
+  },
+  "Violet Mizutsune": {
+    "id": 594,
+    "cn": "白银泡狐龙"
+  },
+  "Furious Rajang": {
+    "id": 1303,
+    "cn": "激昂金狮子"
+  },
+  "Chaotic Gore Magala": {
+    "id": 1351,
+    "cn": "混沌黑蚀龙"
+  },
+  "Crimson Glow Valstrax": {
+    "id": 1366,
+    "cn": "天彗龙"
+  },
+  "Scorned Magnamalo": {
+    "id": 1369,
+    "cn": "嗟怨怨虎龙"
+  },
+  "Narwa the Allmother": {
+    "id": 1379,
+    "cn": "百龙雷神龙"
+  },
+  "Seething Bazelgeuse": {
+    "id": 1398,
+    "cn": "积怨爆鳞龙"
+  },
+  "Primordial Malzeno": {
+    "id": 1412,
+    "cn": "原初爵银龙"
+  },
+  "Apex Rathian": {
+    "id": 1793,
+    "cn": "百龙渊源雌火龙"
+  },
+  "Apex Rathalos": {
+    "id": 1794,
+    "cn": "百龙渊源火龙"
+  },
+  "Apex Diablos": {
+    "id": 1799,
+    "cn": "百龙渊源角龙"
+  },
+  "Apex Zinogre": {
+    "id": 1849,
+    "cn": "百龙渊源雷狼龙"
+  },
+  "Apex Arzuros": {
+    "id": 1852,
+    "cn": "百龙渊源青熊兽"
+  },
+  "Apex Mizutsune": {
+    "id": 1874,
+    "cn": "百龙渊源泡狐龙"
+  },
+  "Risen Kushala Daora": {
+    "id": 2072,
+    "cn": "傀异克服钢龙"
+  },
+  "Risen Chameleos": {
+    "id": 2073,
+    "cn": "傀异克服霞龙"
+  },
+  "Risen Teostra": {
+    "id": 2075,
+    "cn": "傀异克服炎王龙"
+  },
+  "Risen Shagaru Magala": {
+    "id": 2120,
+    "cn": "傀异克服天廻龙"
+  },
+  "Risen Crimson Glow Valstrax": {
+    "id": 2134,
+    "cn": "傀异克服天彗龙"
+  }
+}

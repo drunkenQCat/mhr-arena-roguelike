@@ -1,0 +1,631 @@
+{
+  "//": "MHRise 斗技场 Roguelike 数值配置 —— 唯一真源。承自 MHW 版 V1.3 定稿；怪物池已换 Rise 阵容（名字对应 data/monster_ids.json）。构建期内嵌为默认配置，运行时可被游戏目录 mhw_rogue_config.json 覆盖以便热调。",
+  "StartPt": 150,
+  "MaxCarts": 3,
+  "CartRestorePrice": 400,
+  "CartRestoreLimit": 1,
+  "ChoiceCount": 3,
+  "Quest": {
+    "Id": 900101,
+    "BaseId": 101,
+    "MapNo": 10
+  },
+  "Scaling": {
+    "HpBase": 0.75,
+    "HpPerLayer": 0.05,
+    "HpCap": 2.0,
+    "DmgBase": 1.0,
+    "DmgPerLayer": 0.03,
+    "DmgCap": 1.8,
+    "DualCompensation": 0.7,
+    "UltimateHpFactor": 1.1,
+    "Mp2Hp": 1.4,
+    "Mp34Hp": 1.8,
+    "Mp34Dmg": 1.1
+  },
+  "Reward": {
+    "WeakBase": 80,
+    "StrongBase": 120,
+    "AdvBase": 160,
+    "UltimateBase": 220
+  },
+  "TypeRewardMul": {
+    "A": 1.0,
+    "B": 1.1,
+    "C": 1.3,
+    "D": 1.5,
+    "AU": 1.7
+  },
+  "ArmorOptions": [
+    "骨套（均衡）",
+    "铁套（攻高防低）"
+  ],
+  "UnlockChain": [
+    {
+      "Monster": "冥渊龙",
+      "RequiresKilling": "爵银龙"
+    }
+  ],
+  "Pools": [
+    {
+      "From": 1,
+      "To": 5,
+      "Tier": "low",
+      "Weak": [
+        "镰鼬龙王",
+        "毒妖鸟",
+        "搔鸟",
+        "伞鸟",
+        "河童蛙",
+        "青熊兽"
+      ],
+      "Strong": null,
+      "Ultimate": null,
+      "Types": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "From": 6,
+      "To": 10,
+      "Tier": "mid",
+      "Weak": [
+        "泥鱼龙",
+        "飞雷龙",
+        "人鱼龙",
+        "土砂龙"
+      ],
+      "Strong": [
+        "火龙",
+        "雷狼龙",
+        "迅龙",
+        "怨虎龙",
+        "轰龙"
+      ],
+      "Ultimate": null,
+      "Types": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    {
+      "From": 11,
+      "To": 15,
+      "Tier": "adv",
+      "Weak": [
+        "泥鱼龙",
+        "飞雷龙",
+        "人鱼龙",
+        "土砂龙"
+      ],
+      "Strong": [
+        "角龙",
+        "冰牙龙",
+        "千刃龙",
+        "轰龙",
+        "怨虎龙",
+        "金狮子"
+      ],
+      "Ultimate": null,
+      "Types": [
+        "A",
+        "C",
+        "D"
+      ]
+    },
+    {
+      "From": 16,
+      "To": 999,
+      "Tier": "ultimate",
+      "Weak": [
+        "泥鱼龙",
+        "飞雷龙",
+        "人鱼龙",
+        "土砂龙"
+      ],
+      "Strong": [
+        "角龙",
+        "冰牙龙",
+        "千刃龙",
+        "轰龙",
+        "怨虎龙",
+        "金狮子"
+      ],
+      "Ultimate": [
+        "百龙渊源雷狼龙",
+        "百龙渊源角龙",
+        "百龙渊源火龙",
+        "百龙渊源泡狐龙",
+        "天彗龙",
+        "爵银龙",
+        "冥渊龙"
+      ],
+      "Types": [
+        "A"
+      ]
+    }
+  ],
+  "Shop": [
+    {
+      "Id": "potion",
+      "Name": "回复药",
+      "Category": "基础补给",
+      "Price": 10,
+      "Cap": 10,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "mega_potion",
+      "Name": "大回复药",
+      "Category": "基础补给",
+      "Price": 25,
+      "Cap": 10,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "honey",
+      "Name": "蜂蜜",
+      "Category": "基础补给",
+      "Price": 15,
+      "Cap": 10,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "fishscale",
+      "Name": "磨刀鱼鳞",
+      "Category": "基础补给",
+      "Price": 30,
+      "Cap": 5,
+      "Mode": "perUnit",
+      "Desc": "高速磨刀消耗品；基础砥石免费无限"
+    },
+    {
+      "Id": "secret",
+      "Name": "秘药",
+      "Category": "高阶药品",
+      "Price": 80,
+      "Cap": 2,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "ancient",
+      "Name": "远古秘药",
+      "Category": "高阶药品",
+      "Price": 140,
+      "Cap": 1,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "dust_life",
+      "Name": "生命粉尘",
+      "Category": "高阶药品",
+      "Price": 45,
+      "Cap": 4,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "dust_life_l",
+      "Name": "大生命粉尘",
+      "Category": "高阶药品",
+      "Price": 90,
+      "Cap": 2,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "dust_atk",
+      "Name": "鬼人粉尘",
+      "Category": "高阶药品",
+      "Price": 70,
+      "Cap": 3,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "dust_def",
+      "Name": "硬化粉尘",
+      "Category": "高阶药品",
+      "Price": 70,
+      "Cap": 3,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "trap_pit",
+      "Name": "落穴陷阱",
+      "Category": "战术道具",
+      "Price": 60,
+      "Cap": 2,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "trap_shock",
+      "Name": "麻痹陷阱",
+      "Category": "战术道具",
+      "Price": 70,
+      "Cap": 2,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "flash",
+      "Name": "闪光弹",
+      "Category": "战术道具",
+      "Price": 50,
+      "Cap": 3,
+      "Mode": "perUnit",
+      "Desc": "一次购买3个"
+    },
+    {
+      "Id": "seed_any",
+      "Name": "种子类（忍耐/硬化/鬼人）",
+      "Category": "战术道具",
+      "Price": 30,
+      "Cap": 5,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "ammo_n1",
+      "Name": "通常弹1",
+      "Category": "弹药",
+      "Price": 8,
+      "Cap": 60,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_n2",
+      "Name": "通常弹2",
+      "Category": "弹药",
+      "Price": 18,
+      "Cap": 50,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_n3",
+      "Name": "通常弹3",
+      "Category": "弹药",
+      "Price": 25,
+      "Cap": 30,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_p2",
+      "Name": "贯通弹2",
+      "Category": "弹药",
+      "Price": 30,
+      "Cap": 30,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_p3",
+      "Name": "贯通弹3",
+      "Category": "弹药",
+      "Price": 38,
+      "Cap": 20,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_s2",
+      "Name": "散弹2",
+      "Category": "弹药",
+      "Price": 30,
+      "Cap": 30,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_s3",
+      "Name": "散弹3",
+      "Category": "弹药",
+      "Price": 38,
+      "Cap": 20,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_c2",
+      "Name": "彻甲榴弹2",
+      "Category": "弹药",
+      "Price": 45,
+      "Cap": 19,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_c3",
+      "Name": "彻甲榴弹3",
+      "Category": "弹药",
+      "Price": 55,
+      "Cap": 12,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_cl2",
+      "Name": "扩散弹2",
+      "Category": "弹药",
+      "Price": 50,
+      "Cap": 12,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_cl3",
+      "Name": "扩散弹3",
+      "Category": "弹药",
+      "Price": 60,
+      "Cap": 8,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_slic",
+      "Name": "斩裂弹",
+      "Category": "弹药",
+      "Price": 35,
+      "Cap": 30,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_fire",
+      "Name": "火炎弹",
+      "Category": "弹药",
+      "Price": 22,
+      "Cap": 60,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_water",
+      "Name": "水冷弹",
+      "Category": "弹药",
+      "Price": 22,
+      "Cap": 60,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_thunder",
+      "Name": "电击弹",
+      "Category": "弹药",
+      "Price": 22,
+      "Cap": 60,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_ice",
+      "Name": "冰结弹",
+      "Category": "弹药",
+      "Price": 22,
+      "Cap": 60,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_para",
+      "Name": "麻痹弹",
+      "Category": "弹药",
+      "Price": 40,
+      "Cap": 12,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_sleep",
+      "Name": "睡眠弹",
+      "Category": "弹药",
+      "Price": 40,
+      "Cap": 12,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_poison",
+      "Name": "毒弹",
+      "Category": "弹药",
+      "Price": 35,
+      "Cap": 12,
+      "Mode": "fill"
+    },
+    {
+      "Id": "ammo_tranq",
+      "Name": "捕获用麻醉弹",
+      "Category": "弹药",
+      "Price": 28,
+      "Cap": 8,
+      "Mode": "fill"
+    },
+    {
+      "Id": "bottle_pow",
+      "Name": "弓强击瓶",
+      "Category": "弹药",
+      "Price": 32,
+      "Cap": 50,
+      "Mode": "fill"
+    },
+    {
+      "Id": "bottle_close",
+      "Name": "弓接击瓶",
+      "Category": "弹药",
+      "Price": 28,
+      "Cap": 50,
+      "Mode": "fill"
+    },
+    {
+      "Id": "bottle_status",
+      "Name": "弓异常瓶（麻/眠/毒）",
+      "Category": "弹药",
+      "Price": 35,
+      "Cap": 30,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_husk",
+      "Name": "空心果",
+      "Category": "调和素材",
+      "Price": 8,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_nitro",
+      "Name": "硝化结晶",
+      "Category": "调和素材",
+      "Price": 12,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_powder",
+      "Name": "火药粉",
+      "Category": "调和素材",
+      "Price": 12,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_burst",
+      "Name": "爆裂果",
+      "Category": "调和素材",
+      "Price": 10,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_herb_sleep",
+      "Name": "睡眠草",
+      "Category": "调和素材",
+      "Price": 10,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_mush_para",
+      "Name": "麻痹蘑菇",
+      "Category": "调和素材",
+      "Price": 10,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_mush_poison",
+      "Name": "毒蘑菇",
+      "Category": "调和素材",
+      "Price": 10,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_fire",
+      "Name": "火炎结晶",
+      "Category": "调和素材",
+      "Price": 12,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_water",
+      "Name": "水结晶",
+      "Category": "调和素材",
+      "Price": 12,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_thunder",
+      "Name": "雷光虫",
+      "Category": "调和素材",
+      "Price": 12,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_ice",
+      "Name": "冰结晶",
+      "Category": "调和素材",
+      "Price": 12,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_bottle",
+      "Name": "空瓶",
+      "Category": "调和素材",
+      "Price": 8,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_pow_fruit",
+      "Name": "强击果实",
+      "Category": "调和素材",
+      "Price": 14,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "mat_slic_fruit",
+      "Name": "斩裂果实",
+      "Category": "调和素材",
+      "Price": 15,
+      "Cap": 99,
+      "Mode": "fill"
+    },
+    {
+      "Id": "cart_restore",
+      "Name": "猫车恢复",
+      "Category": "翻盘服务",
+      "Price": 400,
+      "Cap": 0,
+      "Mode": "service",
+      "Desc": "清除1次猫车记录，整局仅限1次",
+      "GlobalLimit": 1
+    },
+    {
+      "Id": "buff_atk",
+      "Name": "单轮攻击UP",
+      "Category": "翻盘服务",
+      "Price": 80,
+      "Cap": 0,
+      "Mode": "service",
+      "Desc": "仅下一场狩猎生效"
+    },
+    {
+      "Id": "buff_def",
+      "Name": "单轮防御UP",
+      "Category": "翻盘服务",
+      "Price": 80,
+      "Cap": 0,
+      "Mode": "service",
+      "Desc": "仅下一场狩猎生效"
+    },
+    {
+      "Id": "buff_crit",
+      "Name": "单轮会心UP",
+      "Category": "翻盘服务",
+      "Price": 100,
+      "Cap": 0,
+      "Mode": "service",
+      "Desc": "仅下一场狩猎生效"
+    },
+    {
+      "Id": "gacha_1",
+      "Name": "初级装备抽取",
+      "Category": "翻盘服务",
+      "Price": 120,
+      "Cap": 0,
+      "Mode": "service"
+    },
+    {
+      "Id": "gacha_2",
+      "Name": "中级装备抽取",
+      "Category": "翻盘服务",
+      "Price": 250,
+      "Cap": 0,
+      "Mode": "service"
+    },
+    {
+      "Id": "gacha_3",
+      "Name": "高级装备抽取",
+      "Category": "翻盘服务",
+      "Price": 450,
+      "Cap": 0,
+      "Mode": "service"
+    },
+    {
+      "Id": "gacha_4",
+      "Name": "顶级装备抽取",
+      "Category": "翻盘服务",
+      "Price": 700,
+      "Cap": 0,
+      "Mode": "service"
+    }
+  ]
+}
