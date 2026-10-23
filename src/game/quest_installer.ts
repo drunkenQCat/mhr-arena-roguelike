@@ -158,7 +158,7 @@ export class QuestInstaller {
     // 任务列表：仅在含基础任务 101 的 FreeSide 列表里追加 900101
     const listMethod = qm.get_type_definition().get_method("makeQuestNoList");
     if (!listMethod) throw new Error("Missing quest list API");
-    hookMethod(listMethod, undefined, (retval) => {
+    hookMethod(listMethod, () => {}, (retval) => {
       const list = toManagedObject(retval);
       if (
         this.installed &&

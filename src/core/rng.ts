@@ -23,7 +23,7 @@ export class Rng {
 
   constructor(seed?: number) {
     // 0 会让 mulberry32 退化为常量序列，强制非零
-    this.state = (seed === undefined ? (Date.now() | 0) : seed | 0) || 0x9e3779b9;
+    this.state = (seed === undefined ? Math.floor(Math.random() * 4294967296) : seed) || 0x9e3779b9;
     // 空转预热：让相邻种子的首个取值进一步去相关（廉价保险）。同 seed 仍产生同序列。
     for (let i = 0; i < 10; i++) this.nextUint();
   }

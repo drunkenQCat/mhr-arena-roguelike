@@ -35,7 +35,13 @@ local function install()
     if not dict or not dict:call("ContainsKey", BASE) then return false end
     if dict:call("ContainsKey", ID) then
         local existing = dict:call("get_Item", ID):call("get_RawNormal")
-        assert(existing:get_field("_DbgName") == marker, "Quest ID collision: 900101")
+        local name = existing:get_field("_DbgName")
+        assert((name == marker or name == "MhwRogue_FreeArena_v1")
+            and existing:get_field("_QuestType") == QUEST_TYPE_TOUR
+            and existing:get_field("_MapNo") == 10
+            and existing:get_field("_TimeLimit") == 0, "Quest ID collision: 900101")
+        log.info("FreeArena: adopted existing quest 900101 (" .. tostring(name) .. ")")
+        return true
     end
     local source = qm:call("getQuestData(System.Int32)", BASE)
     local normal = clone_fields(source:call("get_RawNormal"))

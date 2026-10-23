@@ -101,7 +101,9 @@ export function baseReward(reward: RewardSpec, tier: string): number {
 
 /** 运行时配置校验：缺字段立即失败，不允许半配置进游戏。 */
 export function validateConfig(raw: unknown): RogueConfig {
-  const c = raw as Partial<RogueConfig>;
+  // The shared JSON retains the C# PascalCase schema. Normalize at the boundary,
+  // including runtime overrides; reward type identifiers (A/B/C/D/AU) are keys.
+  const c = normalizeConfigKeys(raw) as Partial<RogueConfig>;
   const fail = (what: string): never => {
     throw new Error(`rogue_config 缺失或非法: ${what}`);
   };
@@ -117,5 +119,17 @@ export function validateConfig(raw: unknown): RogueConfig {
   if (!Array.isArray(c.pools) || c.pools.length === 0) fail("pools");
   if (!Array.isArray(c.shop) || c.shop.length === 0) fail("shop");
   if (!c.quest || typeof c.quest.id !== "number") fail("quest");
-  return raw as RogueConfig;
+  return c as RogueConfig;
+}
+
+function normalizeConfigKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizeConfigKeys);
+  if (value === null || typeof value !== "object") return value;
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(value)) {
+    const normalized = ["A", "B", "C", "D", "AU"].includes(key)
+      ? key : key.charAt(0).toLowerCase() + key.slice(1);
+    result[normalized] = normalizeConfigKeys((value as Record<string, unknown>)[key]);
+  }
+  return result;
 }

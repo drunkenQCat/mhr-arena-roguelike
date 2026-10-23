@@ -19,7 +19,7 @@ reframework/ autorun/ 编译产物 + free_arena 研究脚本（历史记录，�
 ```bash
 npm ci
 npm run typecheck   # tsc strict（含 noUncheckedIndexedAccess）
-npm test            # vitest：14 条（xUnit 11 条语义移植 + Rise 新增）
+npm test            # vitest：16 条（Core 语义 + Rise 解锁链 + 真实配置回归）
 npm run check       # luaparse 语法校验 reframework/ 下全部 .lua
 npm run build       # 生成 src/game/default_config.ts 并打包 mhw_rogue.lua
 ```
@@ -33,9 +33,13 @@ npm run build       # 生成 src/game/default_config.ts 并打包 mhw_rogue.lua
 热调数值：把 `data/rogue_config.json` 改名 `mhw_rogue_config.json`
 放到游戏目录即可覆盖内嵌配置。运行时日志/报告在游戏的 `reframework` 目录。
 
-## 现状（M1 移植完成，待实机验证）
+## 现状（M1 启动与 HUD 已实机验证，关卡待验）
 
-- 已完成：Core 逻辑移植（14/14 测试）、任务安装器（采纳或安装）、ImGui HUD、
+2026-10-23 已实机复现并修复配置字段大小写、Lua 缺少 Date、hook 回调签名与
+新旧安装器兼容问题。游戏内手动 HUD 循环已推进至第 2 层，最终产物启动与任务采纳通过。
+详见 [实机测试记录](docs/runtime-2026-10-23.md)。实际进出斗技场、运行时刷怪仍未验证。
+
+- 已完成：Core 逻辑移植（16/16 测试）、任务安装器（采纳或安装）、ImGui HUD、
   配置热覆盖、三关验收（typecheck/test/check）全绿。
 - 已知未解（沿自 free_arena 记录）：空斗技场会刷出一只 Arzuros，
   TOUR 任务运行时刷怪行为未定——M2 波次系统的第一道题。
