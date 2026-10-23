@@ -24,7 +24,7 @@ interface RefLog {
 /** @noSelf */
 interface RefJson {
   load_file(path: string): unknown;
-  dump_file(path: string, data: unknown, pretty?: boolean): boolean;
+  dump_file(path: string, data: unknown, indent?: number): boolean;
 }
 
 /** @noSelf */
@@ -54,14 +54,15 @@ interface RefThread {
 
 /** @noSelf */
 interface RefSdk {
+  readonly PreHookResult: { readonly CALL_ORIGINAL: number; readonly SKIP_ORIGINAL: number };
   get_managed_singleton(name: string): REManagedObject | null;
   find_type_definition(name: string): RETypeDefinition | null;
   create_instance(typeName: string, simplify?: boolean): REManagedObject | null;
   create_managed_string(value: string): REManagedObject;
   hook(
     method: REMethodDefinition,
-    pre?: (args: unknown[]) => number | void,
-    post?: (retval: unknown) => unknown,
+    pre?: (this: void, args: Record<number, unknown>) => number | void,
+    post?: (this: void, retval: unknown) => unknown,
   ): void;
   to_managed_object(value: unknown): REManagedObject;
   to_ptr(value: unknown): unknown;
@@ -100,7 +101,7 @@ export interface REMethodDefinition {
   get_name(): string;
 }
 
-export const PRE_HOOK = { CALL_ORIGINAL: 0, SKIP_ORIGINAL: 1 } as const;
+export const PRE_HOOK = sdk.PreHookResult;
 
 /* ---------- 类型化封装（游戏层唯一入口） ---------- */
 

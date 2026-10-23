@@ -1,5 +1,5 @@
 {
-  "//": "MHRise 斗技场 Roguelike 数值配置 —— 唯一真源。承自 MHW 版 V1.3 定稿；怪物池已换 Rise 阵容（名字对应 data/monster_ids.json）。构建期内嵌为默认配置，运行时可被游戏目录 mhw_rogue_config.json 覆盖以便热调。",
+  "//": "MHRise arena roguelike config — single source of truth. Pools use English monster names (in-game imgui is Latin-only on REFramework v1.5.9); CN names live in data/monster_ids.json. Build embeds this as default; a game-dir mhw_rogue_config.json overrides at runtime.",
   "StartPt": 150,
   "MaxCarts": 3,
   "CartRestorePrice": 400,
@@ -37,13 +37,13 @@
     "AU": 1.7
   },
   "ArmorOptions": [
-    "骨套（均衡）",
-    "铁套（攻高防低）"
+    "Bone set (balanced)",
+    "Iron set (glass cannon)"
   ],
   "UnlockChain": [
     {
-      "Monster": "冥渊龙",
-      "RequiresKilling": "爵银龙"
+      "Monster": "Gaismagorm",
+      "RequiresKilling": "Malzeno"
     }
   ],
   "Pools": [
@@ -52,12 +52,12 @@
       "To": 5,
       "Tier": "low",
       "Weak": [
-        "镰鼬龙王",
-        "毒妖鸟",
-        "搔鸟",
-        "伞鸟",
-        "河童蛙",
-        "青熊兽"
+        "Great Izuchi",
+        "Pukei-Pukei",
+        "Kulu-Ya-Ku",
+        "Aknosom",
+        "Tetranadon",
+        "Arzuros"
       ],
       "Strong": null,
       "Ultimate": null,
@@ -71,17 +71,17 @@
       "To": 10,
       "Tier": "mid",
       "Weak": [
-        "泥鱼龙",
-        "飞雷龙",
-        "人鱼龙",
-        "土砂龙"
+        "Jyuratodus",
+        "Tobi-Kadachi",
+        "Somnacanth",
+        "Barroth"
       ],
       "Strong": [
-        "火龙",
-        "雷狼龙",
-        "迅龙",
-        "怨虎龙",
-        "轰龙"
+        "Rathalos",
+        "Zinogre",
+        "Nargacuga",
+        "Magnamalo",
+        "Tigrex"
       ],
       "Ultimate": null,
       "Types": [
@@ -95,18 +95,18 @@
       "To": 15,
       "Tier": "adv",
       "Weak": [
-        "泥鱼龙",
-        "飞雷龙",
-        "人鱼龙",
-        "土砂龙"
+        "Jyuratodus",
+        "Tobi-Kadachi",
+        "Somnacanth",
+        "Barroth"
       ],
       "Strong": [
-        "角龙",
-        "冰牙龙",
-        "千刃龙",
-        "轰龙",
-        "怨虎龙",
-        "金狮子"
+        "Diablos",
+        "Barioth",
+        "Seregios",
+        "Tigrex",
+        "Magnamalo",
+        "Rajang"
       ],
       "Ultimate": null,
       "Types": [
@@ -120,27 +120,27 @@
       "To": 999,
       "Tier": "ultimate",
       "Weak": [
-        "泥鱼龙",
-        "飞雷龙",
-        "人鱼龙",
-        "土砂龙"
+        "Jyuratodus",
+        "Tobi-Kadachi",
+        "Somnacanth",
+        "Barroth"
       ],
       "Strong": [
-        "角龙",
-        "冰牙龙",
-        "千刃龙",
-        "轰龙",
-        "怨虎龙",
-        "金狮子"
+        "Diablos",
+        "Barioth",
+        "Seregios",
+        "Tigrex",
+        "Magnamalo",
+        "Rajang"
       ],
       "Ultimate": [
-        "百龙渊源雷狼龙",
-        "百龙渊源角龙",
-        "百龙渊源火龙",
-        "百龙渊源泡狐龙",
-        "天彗龙",
-        "爵银龙",
-        "冥渊龙"
+        "Apex Zinogre",
+        "Apex Diablos",
+        "Apex Rathalos",
+        "Apex Mizutsune",
+        "Valstrax",
+        "Malzeno",
+        "Gaismagorm"
       ],
       "Types": [
         "A"
