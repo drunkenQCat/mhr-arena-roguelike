@@ -18,11 +18,13 @@ reframework/ autorun/ 编译产物 + free_arena 研究脚本（历史记录，�
 
 `sdk-dump/Enums_Internal.hpp` 是 REFramework 自动导出的引擎 RTTI 枚举全量快照
 （游戏 16.0.2.0 已停更，一次 dump 永久有效，换版本时重拷并重跑 `npm run gen`）。
-`scripts/gen-enums.js` 按**引用闭环**生成 `src/game/gen/enums/`（一枚举一文件）：
-源码 import 的 + `data/gen_allowlist.txt` 列名的才会生成——TSTL 的 luaBundle
-会打包编译集内全部文件，全量生成 1418 个枚举会把 bundle 撑到 820KB，闭环后只有 64KB。
-后续阶段（见 docs/research-spawn-and-ui.md）：运行时字段/方法探测 → 生成带类型的
-游戏对象包装，最终替代手写的 `unknown` 断言。
+`scripts/gen-enums.js` 按**引用闭环**生成 `src/game/gen/enums/`（一枚举一文件）；
+`scripts/gen-types.js` 读 `sdk-dump/sdk_types.json`（`reframework/autorun-probe/sdk_type_probe.lua`
+的一次性实机探测产物：237 个 snow.* 类型的字段偏移/类型/方法签名）生成带精确
+get_field/call 重载的类型接口。两条生成链都是**引用闭环**：源码 import 的 +
+`data/gen_allowlist.txt` 列名的才会生成——TSTL 的 luaBundle 会打包编译集内
+全部文件，全量生成 1418 个枚举会把 bundle 撑到 820KB，闭环后只有 ~64-104KB。
+字段名拼错、返回值错用现在都是 tsc 编译期错误（installer 已消费生成类型）。
 
 ## 命令
 

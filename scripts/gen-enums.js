@@ -33,8 +33,8 @@ for (const f of fs.readdirSync(path.join(root, "src")).flatMap((d) => walkTs(pat
 }
 if (fs.existsSync(allowFile)) {
   for (const line of fs.readFileSync(allowFile, "utf8").split(/\r?\n/)) {
-    const name = line.replace(/\/\/.*$/, "").trim();
-    if (name) wanted.add(name);
+    const raw = line.replace(/\/\/.*$/, "").trim();
+    if (raw) wanted.add(raw.replace(/[.:]/g, "_")); // 点分原名或 flat 名统一 flat 化
   }
 }
 function walkTs(dir) {

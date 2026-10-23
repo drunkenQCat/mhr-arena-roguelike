@@ -6,6 +6,10 @@
 
 import type { RogueConfig } from "../core/config";
 import { snow_quest_QuestType } from "./gen/enums/snow_quest_QuestType";
+import type { snow_QuestManager } from "./gen/types/snow_QuestManager";
+import type { snow_quest_QuestData } from "./gen/types/snow_quest_QuestData";
+import type { snow_quest_NormalQuestData_Param } from "./gen/types/snow_quest_NormalQuestData_Param";
+import type { snow_quest_NormalQuestDataForEnemy_Param } from "./gen/types/snow_quest_NormalQuestDataForEnemy_Param";
 import {
   createInstance,
   createManagedString,
@@ -88,7 +92,7 @@ export class QuestInstaller {
   }
 
   private install(): boolean {
-    const qm = questManager();
+    const qm = questManager() as unknown as snow_QuestManager | null;
     if (!qm) return false;
     const dict = qm.get_field("_QuestDataDictionary") as REManagedObject | null;
     if (!dict || !dict.call("ContainsKey", this.cfg.quest.baseId)) return false;
@@ -96,7 +100,7 @@ export class QuestInstaller {
     const id = this.cfg.quest.id;
     if (dict.call("ContainsKey", id)) {
       // 已存在：free_arena 或本脚本的历史安装 → 校验语义一致后采纳
-      const existing = toManagedObject(dict.call("get_Item", id)).call("get_RawNormal") as REManagedObject;
+      const existing = toManagedObject(dict.call("get_Item", id)).call("get_RawNormal") as unknown as snow_quest_NormalQuestData_Param;
       const dbgName = existing.get_field("_DbgName");
       const familiar =
         (dbgName === MARKER || dbgName === "MHRResearch_FreeArena_v1") &&
@@ -112,9 +116,9 @@ export class QuestInstaller {
       return true;
     }
 
-    const source = qm.call("getQuestData(System.Int32)", this.cfg.quest.baseId) as REManagedObject;
-    const normal = this.cloneFields(toManagedObject(source.call("get_RawNormal")));
-    const enemy = this.cloneFields(toManagedObject(source.call("get_RawEnemy")));
+    const source = qm.call("getQuestData(System.Int32)", this.cfg.quest.baseId) as unknown as snow_quest_QuestData;
+    const normal = this.cloneFields(source.call("get_RawNormal")) as unknown as snow_quest_NormalQuestData_Param;
+    const enemy = this.cloneFields(source.call("get_RawEnemy")) as unknown as snow_quest_NormalQuestDataForEnemy_Param;
     if (normal.get_field("_QuestType") !== QUEST_TYPE_TOUR) throw new Error("Base is not a FreeSide expedition");
     if (normal.get_field("_TimeLimit") !== 0) throw new Error("Base is not untimed");
     normal.set_field("_QuestNo", id);
