@@ -14,6 +14,16 @@ data/        数值唯一真源：rogue_config.json + monster_ids.json
 reframework/ autorun/ 编译产物 + free_arena 研究脚本（历史记录，勿删）
 ```
 
+## SDK 自动生成
+
+`sdk-dump/Enums_Internal.hpp` 是 REFramework 自动导出的引擎 RTTI 枚举全量快照
+（游戏 16.0.2.0 已停更，一次 dump 永久有效，换版本时重拷并重跑 `npm run gen`）。
+`scripts/gen-enums.js` 按**引用闭环**生成 `src/game/gen/enums/`（一枚举一文件）：
+源码 import 的 + `data/gen_allowlist.txt` 列名的才会生成——TSTL 的 luaBundle
+会打包编译集内全部文件，全量生成 1418 个枚举会把 bundle 撑到 820KB，闭环后只有 64KB。
+后续阶段（见 docs/research-spawn-and-ui.md）：运行时字段/方法探测 → 生成带类型的
+游戏对象包装，最终替代手写的 `unknown` 断言。
+
 ## 命令
 
 ```bash
@@ -21,7 +31,7 @@ npm ci
 npm run typecheck   # tsc strict（含 noUncheckedIndexedAccess）
 npm test            # vitest：16 条（Core 语义 + Rise 解锁链 + 真实配置回归）
 npm run check       # luaparse 语法校验 reframework/ 下全部 .lua
-npm run build       # 生成配置 → 打包 mhw_rogue.lua → 自动部署进游戏目录
+npm run build       # 生成 SDK 枚举 → 生成配置 → 打包 mhw_rogue.lua → 自动部署进游戏目录
 npm run deploy      # 仅部署（自动探测游戏目录；内容相同则跳过）
 npm run dev         # watch 模式（改完想部署再手动跑 npm run deploy）
 ```

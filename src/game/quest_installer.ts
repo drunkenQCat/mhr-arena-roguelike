@@ -5,6 +5,7 @@
  */
 
 import type { RogueConfig } from "../core/config";
+import { snow_quest_QuestType } from "./gen/enums/snow_quest_QuestType";
 import {
   createInstance,
   createManagedString,
@@ -22,7 +23,7 @@ import {
   type REManagedObject,
 } from "./sdk";
 
-const QUEST_TYPE_TOUR = 32;
+const QUEST_TYPE_TOUR: number = snow_quest_QuestType.TOUR;
 const MARKER = "MhwRogue_FreeArena_v1";
 
 const LABELS: Record<number, string> = {
