@@ -21,13 +21,17 @@ npm ci
 npm run typecheck   # tsc strict（含 noUncheckedIndexedAccess）
 npm test            # vitest：16 条（Core 语义 + Rise 解锁链 + 真实配置回归）
 npm run check       # luaparse 语法校验 reframework/ 下全部 .lua
-npm run build       # 生成 src/game/default_config.ts 并打包 mhw_rogue.lua
+npm run build       # 生成配置 → 打包 mhw_rogue.lua → 自动部署进游戏目录
+npm run deploy      # 仅部署（自动探测游戏目录；内容相同则跳过）
+npm run dev         # watch 模式（改完想部署再手动跑 npm run deploy）
 ```
 
 ## 安装（游戏）
 
-关闭游戏后，把 `reframework/autorun/mhw_rogue.lua` 放入游戏的
-`reframework/autorun/`。任务 900101「斗技场肉鸽」会注册到
+`npm run build` 一条龙：构建后自动拷贝到游戏目录（探测顺序：命令行参数 >
+`MHR_GAME_DIR` 环境变量 > Steam libraryfolders.vdf 扫描 > 默认安装路径）。
+游戏运行中也允许部署：REFramework 监视 autorun 自动热重载；UI 没变就重启游戏。
+手动安装：把 `reframework/autorun/mhw_rogue.lua` 放入游戏的同路径。任务 900101「斗技场肉鸽」会注册到
 集会所/村庄 → 探索任务（FreeSide）列表，复用 free_arena 原型的注册机制；
 若 free_arena.lua 同场运行，安装器会自动采纳其已注册的同名任务而不冲突。
 热调数值：把 `data/rogue_config.json` 改名 `mhw_rogue_config.json`
