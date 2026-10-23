@@ -74,7 +74,7 @@ describe("RunCore（C# MhwRogue.Tests 语义移植）", () => {
     expect(c.buy("secret").ok).toBe(true); // 150-80=70
     const r2 = c.buy("secret"); // 需要 80，只有 70
     expect(r2.ok).toBe(false);
-    expect(r2.message).toContain("PT不足");
+    expect(r2.message).toContain("Not enough PT");
   });
 
   it("fill 模式一次补满，再买被上限拦截", () => {
@@ -83,7 +83,7 @@ describe("RunCore（C# MhwRogue.Tests 语义移植）", () => {
     expect(c.state.wallet.bag[0]).toMatchObject({ id: "ammo_n1", count: 60 });
     const again = c.buy("ammo_n1");
     expect(again.ok).toBe(false);
-    expect(again.message).toContain("上限");
+    expect(again.message).toContain("carry limit");
   });
 
   it("service 不进背包且可重复购买", () => {
@@ -184,7 +184,7 @@ describe("Rise 新增语义", () => {
     c.killWave();
     c.cart();
     c.returnToCamp();
-    expect(c.cartRestore().message).toContain("PT不足"); // 400PT > 150
+    expect(c.cartRestore().message).toContain("Not enough PT"); // 400PT > 150
     c.state.wallet.pt = 1000;
     expect(c.cartRestore().ok).toBe(true);
     expect(c.state.cartsLeft).toBe(3);
