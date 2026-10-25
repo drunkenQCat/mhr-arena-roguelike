@@ -14,6 +14,16 @@ local SEEDS = {
     "snow.gui.GuiItemBoxWindow",
     "snow.stage.StageManager",
     "snow.inventory.InventoryManager",
+    "snow.data.ItemPouch",
+    "snow.data.ItemBox",
+    "snow.data.ItemCount",
+    "snow.data.ContentsIdSystem.ItemId",
+    "snow.data.ContentsIdSystem",
+    "snow.data.DataManager",
+    "snow.data.ItemInventoryData",
+    "snow.data.ItemSet",
+    "snow.data.FacilityDataManager",
+    "snow.inventory.InventoryData",
 }
 local MAX_TYPES = 120
 local MAX_METHODS_PER_NAME = 6

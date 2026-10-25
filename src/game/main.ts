@@ -7,6 +7,7 @@ import { drawHud } from "./hud";
 import { loadConfig } from "./load_config";
 import { NativeRuntime } from "./native_runtime";
 import { QuestInstaller } from "./quest_installer";
+import { ShopWindow } from "./shop_window";
 import { clockSeconds, reframework, rejson, relog } from "./sdk";
 
 try {
@@ -27,7 +28,8 @@ try {
       runtime.report("frame-error", session.message);
     }
   });
-  reframework.onDrawUi(() => drawHud(session, runtime));
+  const shopWindow = new ShopWindow(session.core);
+reframework.onDrawUi(() => drawHud(session, runtime, shopWindow));
   reframework.onScriptReset(() => runtime.shutdown());
   rejson.dump_file("mhw_rogue_boot.json", { ok: true, version: 2,
     quest: config.quest, route: session.route, startedAt: clockSeconds(), runtimeVerified: false }, 2);

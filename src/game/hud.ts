@@ -1,10 +1,11 @@
 import type { Result } from "../core/run_core";
 import type { RunSession } from "../core/run_session";
 import type { NativeRuntime } from "./native_runtime";
+import { ShopWindow } from "./shop_window";
 import { imguiApi } from "./sdk";
 
 /** Real event-driven M2 controls. No simulated clear / next-layer buttons. */
-export function drawHud(session: RunSession, runtime: NativeRuntime): void {
+export function drawHud(session: RunSession, runtime: NativeRuntime, shop: ShopWindow): void {
   if (!imguiApi.tree_node("MHR Arena Roguelike - M2")) return;
   const core = session.core;
   const state = core.state;
@@ -22,6 +23,10 @@ export function drawHud(session: RunSession, runtime: NativeRuntime): void {
     imguiApi.text(`Route: ${session.route} / Spawn: ${session.settings.spawnMode}`);
     imguiApi.text(session.message);
     if (state.activeWave) imguiApi.text(`Wave: ${state.activeWave.label}`);
+    if (["Village", "Prep", "Choosing"].includes(session.stage)) {
+      imguiApi.separator();
+      shop.draw();
+    }
     imguiApi.separator();
     if (["Idle", "Finished", "Fault"].includes(session.stage)) {
       for (const armor of core.armorOptions()) {
