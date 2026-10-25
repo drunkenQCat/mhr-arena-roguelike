@@ -88,3 +88,23 @@ RSZ 中还找到了 `GuiItemShopBuyYNFsmAction`、`GuiItemShopBuyYNAgainFsmActio
 - [Bolt 原生菜单仓库](https://github.com/Bolt-Scripts/MHR-InGame-ModMenu-API)：`reframework/autorun/ModOptionsMenu/ModMenuApi.lua` 中 `PromptMsg/PromptYN`；配套 `OptionsMenu.lua` 中原生列表及输入 hook。研究副本在忽略目录 `.local/native-gui-study/`。
 - [REFramework 方法反射](https://cursey.github.io/reframework-book/api/types/REMethodDefinition.html) 与 [类型反射](https://cursey.github.io/reframework-book/api/types/RETypeDefinition.html)：完整重载、参数与父类型遍历。
 - [Waester 原 gist](https://gist.github.com/Waester/7d6e080d1f4695feb683d997132f872b)：仅用于修正先前的引用含义。
+
+
+## 实机探针结果（2026-10-25，玩家操作）
+
+- `activateOnly(4)` **只激活场景不接管玩家**：商店画面出现，但玩家仍可移动、可与 NPC 对话
+  （"像是另一个图层"）。接管行为属于商店自己的 FSM——`openItemShop()/isOpenItemShop()` 已在
+  元数据中确认存在，"activateOnly 拉场景 → openItemShop 进 FSM"是下一轮实验的候选组合拳，
+  有望脱离阳炎 NPC 凭空开商店。
+- `setOpenYNInfo` 的 5 参数签名已过时，真实签名为 8 参数（+QuestData, Guid, float）——
+  Y/N 按钮实验因此报错，但签名本身已入证据库。
+- **`setOpenSelectWindow` 有近乎量身定做的重载**（headText:String, selectText:String[],
+  isDecideSeCancel:Boolean[], ..., QuestData, Guid），`getSelectWindowResult() -> (Result, Int32)`
+  ——原生三选一/商品列表组件可用性大增，QuestData/Guid 能否传 null 待试。
+- 元数据导出：17 个类型全量字段/方法（含 ItemShop FSM、DataInventory、DisplayItemData），
+  存 reframework/data/rogue_native_gui_metadata.json（探针已从游戏目录撤下，仓库留档）。
+
+### M3 UI 定案
+
+商品列表/购买操作 = ImGui 自绘（数据全控）；确认弹窗/三选一 = 原生 select window（观感原生）；
+原生商店 FSM 接管 = 后续可选实验，不阻塞主线。
