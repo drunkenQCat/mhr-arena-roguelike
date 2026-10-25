@@ -1,0 +1,33 @@
+{
+  "detail": {
+    "error": "Native settlement began unexpectedly; no automatic next wave",
+    "plan": {
+      "baseId": 603,
+      "layer": 2,
+      "mapNo": 10,
+      "monsterIds": [
+        107,
+        92
+      ],
+      "questId": 900102,
+      "sequential": true,
+      "token": 7,
+      "wave": {
+        "dmgMul": 1.03,
+        "hpMul": 0.56,
+        "index": 1,
+        "label": "Dual weak: Kulu-Ya-Ku + Tetranadon",
+        "monsters": [
+          "Kulu-Ya-Ku",
+          "Tetranadon"
+        ],
+        "rewardMul": 1.1,
+        "rewardPt": 123,
+        "tier": "weak",
+        "typeTag": "Dual weak"
+      }
+    }
+  },
+  "event": "runtime-error",
+  "time": 1792927600
+}

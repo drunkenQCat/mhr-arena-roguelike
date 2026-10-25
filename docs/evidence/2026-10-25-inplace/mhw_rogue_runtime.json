@@ -1,0 +1,908 @@
+{
+  "events": [
+    {
+      "detail": {
+        "online": "disabled",
+        "scope": 900102
+      },
+      "event": "runtime-hooks-installed",
+      "time": 1792917982
+    },
+    {
+      "detail": {
+        "enabled": true
+      },
+      "event": "test-invincible",
+      "time": 1792918611
+    },
+    {
+      "detail": {
+        "hpBefore": 6251.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1792918646
+    },
+    {
+      "detail": {
+        "hpBefore": 6040.0,
+        "nativeDeathsOnly": true,
+        "uid": 100
+      },
+      "event": "test-kill",
+      "time": 1792918757
+    },
+    {
+      "detail": {
+        "enabled": false
+      },
+      "event": "test-invincible",
+      "time": 1792919379
+    },
+    {
+      "detail": {
+        "experimentalInPlace": false,
+        "plan": {
+          "baseId": 603,
+          "layer": 1,
+          "mapNo": 10,
+          "monsterIds": [
+            98,
+            107
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 1,
+          "wave": {
+            "dmgMul": 1.0,
+            "hpMul": 0.525,
+            "index": 0,
+            "label": "Dual weak: Great Izuchi + Kulu-Ya-Ku",
+            "monsters": [
+              "Great Izuchi",
+              "Kulu-Ya-Ku"
+            ],
+            "rewardMul": 1.1,
+            "rewardPt": 123,
+            "tier": "weak",
+            "typeTag": "Dual weak"
+          }
+        },
+        "route": "reentry"
+      },
+      "event": "wave-published",
+      "time": 1792926129
+    },
+    {
+      "detail": {
+        "kind": "hp",
+        "multiplier": 0.525,
+        "original": 2.140000104904175,
+        "result": 1.1235000550746919,
+        "token": 1
+      },
+      "event": "rate-applied",
+      "time": 1792926132
+    },
+    {
+      "detail": {
+        "camp": {
+          "x": -3.205841991871239e-08,
+          "y": 50.29914474487305,
+          "z": 46.91426086425781
+        },
+        "roster": [
+          0
+        ],
+        "unique": -769510391
+      },
+      "event": "quest-entered",
+      "time": 1792926133
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 1,
+        "typeId": 98,
+        "uid": 0
+      },
+      "event": "monster-observed",
+      "time": 1792926133
+    },
+    {
+      "detail": {
+        "enabled": true
+      },
+      "event": "test-invincible",
+      "time": 1792926139
+    },
+    {
+      "detail": {
+        "hpBefore": 3210.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1792926181
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 1,
+        "typeId": 107,
+        "uid": 100
+      },
+      "event": "monster-observed",
+      "time": 1792926183
+    },
+    {
+      "detail": {
+        "seconds": 1,
+        "withinTenSeconds": true
+      },
+      "event": "sequential-spawn",
+      "time": 1792926183
+    },
+    {
+      "detail": {
+        "hpBefore": 3677.0,
+        "nativeDeathsOnly": true,
+        "uid": 100
+      },
+      "event": "test-kill",
+      "time": 1792926198
+    },
+    {
+      "detail": {
+        "resolved": [
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 98,
+            "uid": 0
+          },
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 107,
+            "uid": 100
+          }
+        ],
+        "reward": 123,
+        "token": 1
+      },
+      "event": "wave-cleared",
+      "time": 1792926199
+    },
+    {
+      "detail": {
+        "token": 1
+      },
+      "event": "camp-gathered",
+      "time": 1792926242
+    },
+    {
+      "detail": {
+        "experimentalInPlace": false,
+        "plan": {
+          "baseId": 603,
+          "layer": 2,
+          "mapNo": 10,
+          "monsterIds": [
+            107,
+            92
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 2,
+          "wave": {
+            "dmgMul": 1.03,
+            "hpMul": 0.56,
+            "index": 2,
+            "label": "Dual weak: Kulu-Ya-Ku + Tetranadon",
+            "monsters": [
+              "Kulu-Ya-Ku",
+              "Tetranadon"
+            ],
+            "rewardMul": 1.1,
+            "rewardPt": 123,
+            "tier": "weak",
+            "typeTag": "Dual weak"
+          }
+        },
+        "route": "reentry"
+      },
+      "event": "wave-published",
+      "time": 1792926349
+    },
+    {
+      "detail": {
+        "kind": "hp",
+        "multiplier": 0.56,
+        "original": 2.140000104904175,
+        "result": 1.198400058746338,
+        "token": 2
+      },
+      "event": "rate-applied",
+      "time": 1792926351
+    },
+    {
+      "detail": {
+        "camp": {
+          "x": -3.205841991871239e-08,
+          "y": 50.29914474487305,
+          "z": 46.91426086425781
+        },
+        "roster": [
+          0
+        ],
+        "unique": 252556200
+      },
+      "event": "quest-entered",
+      "time": 1792926352
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 2,
+        "typeId": 107,
+        "uid": 0
+      },
+      "event": "monster-observed",
+      "time": 1792926352
+    },
+    {
+      "detail": {
+        "kind": "attack",
+        "multiplier": 1.03,
+        "original": 6.099999904632568,
+        "result": 6.282999901771546,
+        "token": 2
+      },
+      "event": "rate-applied",
+      "time": 1792926385
+    },
+    {
+      "detail": {
+        "hpBefore": 2757.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1792926536
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 2,
+        "typeId": 92,
+        "uid": 100
+      },
+      "event": "monster-observed",
+      "time": 1792926537
+    },
+    {
+      "detail": {
+        "seconds": 0,
+        "withinTenSeconds": true
+      },
+      "event": "sequential-spawn",
+      "time": 1792926537
+    },
+    {
+      "detail": {
+        "hpBefore": 5393.0,
+        "nativeDeathsOnly": true,
+        "uid": 100
+      },
+      "event": "test-kill",
+      "time": 1792926543
+    },
+    {
+      "detail": {
+        "hpBefore": 0.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1792926543
+    },
+    {
+      "detail": {
+        "resolved": [
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 107,
+            "uid": 0
+          },
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 92,
+            "uid": 100
+          }
+        ],
+        "reward": 123,
+        "token": 2
+      },
+      "event": "wave-cleared",
+      "time": 1792926544
+    },
+    {
+      "detail": {
+        "token": 2
+      },
+      "event": "camp-gathered",
+      "time": 1792926619
+    },
+    {
+      "detail": {
+        "experimentalInPlace": false,
+        "plan": {
+          "baseId": 603,
+          "layer": 3,
+          "mapNo": 10,
+          "monsterIds": [
+            92,
+            92
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 3,
+          "wave": {
+            "dmgMul": 1.06,
+            "hpMul": 0.595,
+            "index": 1,
+            "label": "Dual weak: Tetranadon + Tetranadon",
+            "monsters": [
+              "Tetranadon",
+              "Tetranadon"
+            ],
+            "rewardMul": 1.1,
+            "rewardPt": 123,
+            "tier": "weak",
+            "typeTag": "Dual weak"
+          }
+        },
+        "route": "reentry"
+      },
+      "event": "wave-published",
+      "time": 1792926718
+    },
+    {
+      "detail": {
+        "kind": "hp",
+        "multiplier": 0.595,
+        "original": 2.140000104904175,
+        "result": 1.273300062417984,
+        "token": 3
+      },
+      "event": "rate-applied",
+      "time": 1792926721
+    },
+    {
+      "detail": {
+        "camp": {
+          "x": -3.205841991871239e-08,
+          "y": 50.29914474487305,
+          "z": 46.91426086425781
+        },
+        "roster": [
+          0
+        ],
+        "unique": 1729640131
+      },
+      "event": "quest-entered",
+      "time": 1792926722
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 3,
+        "typeId": 92,
+        "uid": 0
+      },
+      "event": "monster-observed",
+      "time": 1792926722
+    },
+    {
+      "detail": {
+        "hpBefore": 5730.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1792926736
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 3,
+        "typeId": 92,
+        "uid": 100
+      },
+      "event": "monster-observed",
+      "time": 1792926737
+    },
+    {
+      "detail": {
+        "seconds": 0,
+        "withinTenSeconds": true
+      },
+      "event": "sequential-spawn",
+      "time": 1792926737
+    },
+    {
+      "detail": {
+        "hpBefore": 0.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1792926742
+    },
+    {
+      "detail": {
+        "hpBefore": 5730.0,
+        "nativeDeathsOnly": true,
+        "uid": 100
+      },
+      "event": "test-kill",
+      "time": 1792926742
+    },
+    {
+      "detail": {
+        "resolved": [
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 92,
+            "uid": 0
+          },
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 92,
+            "uid": 100
+          }
+        ],
+        "reward": 123,
+        "token": 3
+      },
+      "event": "wave-cleared",
+      "time": 1792926743
+    },
+    {
+      "detail": {
+        "token": 3
+      },
+      "event": "camp-gathered",
+      "time": 1792926766
+    },
+    {
+      "detail": {
+        "enabled": false
+      },
+      "event": "test-invincible",
+      "time": 1792926878
+    },
+    {
+      "detail": {
+        "experimentalInPlace": false,
+        "plan": {
+          "baseId": 603,
+          "layer": 1,
+          "mapNo": 10,
+          "monsterIds": [
+            98,
+            54
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 4,
+          "wave": {
+            "dmgMul": 1,
+            "hpMul": 1,
+            "index": 0,
+            "label": "M2a: Great Izuchi -> Great Baggi",
+            "monsters": [
+              "Great Izuchi",
+              "Great Baggi"
+            ],
+            "rewardMul": 0,
+            "rewardPt": 0,
+            "tier": "weak",
+            "typeTag": "M2a sequential spike"
+          }
+        },
+        "route": "reentry"
+      },
+      "event": "wave-published",
+      "time": 1792926883
+    },
+    {
+      "detail": {
+        "camp": {
+          "x": -3.205841991871239e-08,
+          "y": 50.29914474487305,
+          "z": 46.91426086425781
+        },
+        "roster": [
+          0
+        ],
+        "unique": 1807896382
+      },
+      "event": "quest-entered",
+      "time": 1792926887
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 4,
+        "typeId": 98,
+        "uid": 0
+      },
+      "event": "monster-observed",
+      "time": 1792926887
+    },
+    {
+      "detail": {
+        "hpBefore": 6271.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1792926936
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 4,
+        "typeId": 54,
+        "uid": 100
+      },
+      "event": "monster-observed",
+      "time": 1792926937
+    },
+    {
+      "detail": {
+        "seconds": 0,
+        "withinTenSeconds": true
+      },
+      "event": "sequential-spawn",
+      "time": 1792926937
+    },
+    {
+      "detail": {
+        "hpBefore": 0.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1792926944
+    },
+    {
+      "detail": {
+        "hpBefore": 6420.0,
+        "nativeDeathsOnly": true,
+        "uid": 100
+      },
+      "event": "test-kill",
+      "time": 1792926944
+    },
+    {
+      "detail": {
+        "resolved": [
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 98,
+            "uid": 0
+          },
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 54,
+            "uid": 100
+          }
+        ],
+        "reward": 0,
+        "token": 4
+      },
+      "event": "wave-cleared",
+      "time": 1792926945
+    },
+    {
+      "detail": {
+        "token": 4
+      },
+      "event": "camp-gathered",
+      "time": 1792926979
+    },
+    {
+      "detail": {
+        "experimentalInPlace": false,
+        "plan": {
+          "baseId": 603,
+          "layer": 1,
+          "mapNo": 10,
+          "monsterIds": [
+            98,
+            60
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 5,
+          "wave": {
+            "dmgMul": 1.0,
+            "hpMul": 0.525,
+            "index": 1,
+            "label": "Dual weak: Great Izuchi + Arzuros",
+            "monsters": [
+              "Great Izuchi",
+              "Arzuros"
+            ],
+            "rewardMul": 1.1,
+            "rewardPt": 123,
+            "tier": "weak",
+            "typeTag": "Dual weak"
+          }
+        },
+        "route": "inPlace"
+      },
+      "event": "wave-published",
+      "time": 1792927098
+    },
+    {
+      "detail": {
+        "kind": "hp",
+        "multiplier": 0.525,
+        "original": 2.140000104904175,
+        "result": 1.1235000550746919,
+        "token": 5
+      },
+      "event": "rate-applied",
+      "time": 1792927100
+    },
+    {
+      "detail": {
+        "camp": {
+          "x": -3.205841991871239e-08,
+          "y": 50.29914474487305,
+          "z": 46.91426086425781
+        },
+        "roster": [
+          0
+        ],
+        "unique": 226733071
+      },
+      "event": "quest-entered",
+      "time": 1792927101
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 5,
+        "typeId": 98,
+        "uid": 0
+      },
+      "event": "monster-observed",
+      "time": 1792927101
+    },
+    {
+      "detail": {
+        "experimentalInPlace": false,
+        "plan": {
+          "baseId": 603,
+          "layer": 1,
+          "mapNo": 10,
+          "monsterIds": [
+            98
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 6,
+          "wave": {
+            "dmgMul": 1.0,
+            "hpMul": 0.75,
+            "index": 1,
+            "label": "Single: Great Izuchi",
+            "monsters": [
+              "Great Izuchi"
+            ],
+            "rewardMul": 1,
+            "rewardPt": 80,
+            "tier": "weak",
+            "typeTag": "Single"
+          }
+        },
+        "route": "inPlace"
+      },
+      "event": "wave-published",
+      "time": 1792927488
+    },
+    {
+      "detail": {
+        "kind": "hp",
+        "multiplier": 0.75,
+        "original": 2.140000104904175,
+        "result": 1.605000078678131,
+        "token": 6
+      },
+      "event": "rate-applied",
+      "time": 1792927490
+    },
+    {
+      "detail": {
+        "camp": {
+          "x": -3.205841991871239e-08,
+          "y": 50.29914474487305,
+          "z": 46.91426086425781
+        },
+        "roster": [
+          0
+        ],
+        "unique": -415132605
+      },
+      "event": "quest-entered",
+      "time": 1792927491
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 6,
+        "typeId": 98,
+        "uid": 0
+      },
+      "event": "monster-observed",
+      "time": 1792927492
+    },
+    {
+      "detail": {
+        "hpBefore": 4722.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1792927523
+    },
+    {
+      "detail": {
+        "resolved": [
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 98,
+            "uid": 0
+          }
+        ],
+        "reward": 80,
+        "token": 6
+      },
+      "event": "wave-cleared",
+      "time": 1792927524
+    },
+    {
+      "detail": {
+        "token": 6
+      },
+      "event": "camp-gathered",
+      "time": 1792927546
+    },
+    {
+      "detail": {
+        "experimentalInPlace": true,
+        "plan": {
+          "baseId": 603,
+          "layer": 2,
+          "mapNo": 10,
+          "monsterIds": [
+            107,
+            92
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 7,
+          "wave": {
+            "dmgMul": 1.03,
+            "hpMul": 0.56,
+            "index": 1,
+            "label": "Dual weak: Kulu-Ya-Ku + Tetranadon",
+            "monsters": [
+              "Kulu-Ya-Ku",
+              "Tetranadon"
+            ],
+            "rewardMul": 1.1,
+            "rewardPt": 123,
+            "tier": "weak",
+            "typeTag": "Dual weak"
+          }
+        },
+        "route": "inPlace"
+      },
+      "event": "wave-published",
+      "time": 1792927566
+    },
+    {
+      "detail": {
+        "error": "Native settlement began unexpectedly; no automatic next wave",
+        "plan": {
+          "baseId": 603,
+          "layer": 2,
+          "mapNo": 10,
+          "monsterIds": [
+            107,
+            92
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 7,
+          "wave": {
+            "dmgMul": 1.03,
+            "hpMul": 0.56,
+            "index": 1,
+            "label": "Dual weak: Kulu-Ya-Ku + Tetranadon",
+            "monsters": [
+              "Kulu-Ya-Ku",
+              "Tetranadon"
+            ],
+            "rewardMul": 1.1,
+            "rewardPt": 123,
+            "tier": "weak",
+            "typeTag": "Dual weak"
+          }
+        }
+      },
+      "event": "runtime-error",
+      "time": 1792927600
+    }
+  ],
+  "last": {
+    "detail": {
+      "error": "Native settlement began unexpectedly; no automatic next wave",
+      "plan": {
+        "baseId": 603,
+        "layer": 2,
+        "mapNo": 10,
+        "monsterIds": [
+          107,
+          92
+        ],
+        "questId": 900102,
+        "sequential": true,
+        "token": 7,
+        "wave": {
+          "dmgMul": 1.03,
+          "hpMul": 0.56,
+          "index": 1,
+          "label": "Dual weak: Kulu-Ya-Ku + Tetranadon",
+          "monsters": [
+            "Kulu-Ya-Ku",
+            "Tetranadon"
+          ],
+          "rewardMul": 1.1,
+          "rewardPt": 123,
+          "tier": "weak",
+          "typeTag": "Dual weak"
+        }
+      }
+    },
+    "event": "runtime-error",
+    "time": 1792927600
+  },
+  "ready": true,
+  "status": "In-place table published for layer 2 (spawn behavior unverified) / counter: Idle",
+  "version": 2
+}
