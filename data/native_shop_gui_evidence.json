@@ -1,0 +1,550 @@
+{
+  "evidenceLevel": "offline metadata / community source, not runtime verification",
+  "snapshotSha256": "ac39d4b0b624a8283a60f9af44500b1a0b0a9bb21d57384e067f86cf9095fe53",
+  "types": {
+    "snow.gui.GuiManager": {
+      "methods": [
+        {
+          "name": "get_refGuiOptionWindow",
+          "overloads": 1,
+          "params": null,
+          "ret": "snow.gui.GuiOptionWindow",
+          "static": false
+        },
+        {
+          "name": "setOpenInfo",
+          "overloads": 3,
+          "params": [
+            {
+              "name": "msgId",
+              "type": "System.Guid"
+            },
+            {
+              "name": "msgCode",
+              "type": "System.String"
+            },
+            {
+              "name": "t",
+              "type": "snow.gui.GuiCommonInfoBase.Type"
+            },
+            {
+              "name": "seg",
+              "type": "snow.gui.SnowGuiCommonUtility.Segment"
+            },
+            {
+              "name": "isOpenSe",
+              "type": "System.Boolean"
+            }
+          ],
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "closeInfo",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "updateInfoWindow",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Boolean",
+          "static": false
+        },
+        {
+          "name": "setOpenYNInfo",
+          "overloads": 2,
+          "params": [
+            {
+              "name": "msgID",
+              "type": "System.Guid"
+            },
+            {
+              "name": "state",
+              "type": "snow.gui.GuiManager.YNInfoUIState"
+            },
+            {
+              "name": "seg",
+              "type": "snow.gui.SnowGuiCommonUtility.Segment"
+            },
+            {
+              "name": "isOpenSe",
+              "type": "System.Boolean"
+            },
+            {
+              "name": "isArabicFormat",
+              "type": "System.Boolean"
+            },
+            {
+              "name": "data",
+              "type": "snow.quest.QuestData"
+            }
+          ],
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "closeYNInfo",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "isOpenYNInfo",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Boolean",
+          "static": false
+        },
+        {
+          "name": "updateYNInfoWindow",
+          "overloads": 1,
+          "params": [
+            {
+              "name": "dec_tgid",
+              "type": "System.UInt32"
+            }
+          ],
+          "ret": "snow.gui.GuiManager.YNInfoResult",
+          "static": false
+        },
+        {
+          "name": "setOpenSelectWindow",
+          "overloads": 2,
+          "params": [
+            {
+              "name": "headText",
+              "type": "System.String"
+            },
+            {
+              "name": "selectText",
+              "type": "System.String[]"
+            },
+            {
+              "name": "isDecideSeCancel",
+              "type": "System.Boolean[]"
+            },
+            {
+              "name": "isOpenSe",
+              "type": "System.Boolean"
+            },
+            {
+              "name": "selectIndex",
+              "type": "System.Int32"
+            },
+            {
+              "name": "data",
+              "type": "snow.quest.QuestData"
+            },
+            {
+              "name": "headId",
+              "type": "System.Guid"
+            }
+          ],
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "closeSelectWindow",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "isOpenSelectInfo",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Boolean",
+          "static": false
+        },
+        {
+          "name": "getSelectWindowResult",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.ValueTuple`2<snow.gui.GuiCommonSelectWindow.Result,System.Int32>",
+          "static": false
+        }
+      ],
+      "fields": [
+        {
+          "name": "<refGuiResultPayOff>k__BackingField",
+          "offset": 1072,
+          "static": false,
+          "type": "snow.gui.GuiResultPayOff"
+        }
+      ]
+    },
+    "snow.gui.fsm.itemshop.GuiItemShopFsmManager": {
+      "methods": [
+        {
+          "name": "get_ItemShopState",
+          "overloads": 1,
+          "params": null,
+          "ret": "snow.gui.fsm.itemshop.GuiItemShopFsmManager.ItemShopStateType",
+          "static": false
+        },
+        {
+          "name": "get_ItemShopBuyMenuState",
+          "overloads": 1,
+          "params": null,
+          "ret": "snow.gui.fsm.itemshop.GuiItemShopFsmManager.ItemShopBuyMenuStateType",
+          "static": false
+        },
+        {
+          "name": "get_ItemShopSellMenuState",
+          "overloads": 1,
+          "params": null,
+          "ret": "snow.gui.fsm.itemshop.GuiItemShopFsmManager.ItemShopSellMenuStateType",
+          "static": false
+        },
+        {
+          "name": "get_ItemShopMakaAlchemyState",
+          "overloads": 1,
+          "params": null,
+          "ret": "snow.gui.fsm.itemshop.GuiItemShopFsmManager.ItemShopMakaAlchemyStateType",
+          "static": false
+        },
+        {
+          "name": "get_ItemShopAmiiboMenuState",
+          "overloads": 1,
+          "params": null,
+          "ret": "snow.gui.fsm.itemshop.GuiItemShopFsmManager.ItemShopAmiiboMenuStateType",
+          "static": false
+        },
+        {
+          "name": "get_NumCursor",
+          "overloads": 1,
+          "params": null,
+          "ret": "snow.gui.SnowGuiCommonUtility.NumCursor",
+          "static": false
+        },
+        {
+          "name": "get_BuyItemListAll",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Collections.Generic.List`1<snow.data.DisplayItemData>",
+          "static": false
+        },
+        {
+          "name": "set_BuyItemListAll",
+          "overloads": 1,
+          "params": [
+            {
+              "name": "value",
+              "type": "System.Collections.Generic.List`1<snow.data.DisplayItemData>"
+            }
+          ],
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "get_BuyItemListToPlayer",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Collections.Generic.List`1<snow.data.DisplayItemData>",
+          "static": false
+        },
+        {
+          "name": "set_BuyItemListToPlayer",
+          "overloads": 1,
+          "params": [
+            {
+              "name": "value",
+              "type": "System.Collections.Generic.List`1<snow.data.DisplayItemData>"
+            }
+          ],
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "get_BuyItemListToEnemy",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Collections.Generic.List`1<snow.data.DisplayItemData>",
+          "static": false
+        },
+        {
+          "name": "set_BuyItemListToEnemy",
+          "overloads": 1,
+          "params": [
+            {
+              "name": "value",
+              "type": "System.Collections.Generic.List`1<snow.data.DisplayItemData>"
+            }
+          ],
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "get_BuyItemListOther",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Collections.Generic.List`1<snow.data.DisplayItemData>",
+          "static": false
+        },
+        {
+          "name": "set_BuyItemListOther",
+          "overloads": 1,
+          "params": [
+            {
+              "name": "value",
+              "type": "System.Collections.Generic.List`1<snow.data.DisplayItemData>"
+            }
+          ],
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "awake",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "start",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "openItemShop",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "openItemShopParts",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Void",
+          "static": false
+        },
+        {
+          "name": "getBuyItemList",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Collections.Generic.List`1<snow.data.DisplayItemData>",
+          "static": false
+        },
+        {
+          "name": "getSelectedBuyItem",
+          "overloads": 1,
+          "params": null,
+          "ret": "snow.data.DisplayItemData",
+          "static": false
+        },
+        {
+          "name": "makeItemShopBuyMenuList",
+          "overloads": 1,
+          "params": null,
+          "ret": "System.Void",
+          "static": false
+        }
+      ],
+      "fields": [
+        {
+          "name": "ItemShopTopSubMenuListForBuy",
+          "offset": 0,
+          "static": true,
+          "type": "snow.gui.fsm.itemshop.GuiItemShopFsmManager.ItemShopTopSubMenuType[]"
+        },
+        {
+          "name": "ItemShopBuySubMenuMsgList",
+          "offset": 48,
+          "static": false,
+          "type": "System.Guid[]"
+        },
+        {
+          "name": "<ItemShopBuyMenuState>k__BackingField",
+          "offset": 116,
+          "static": false,
+          "type": "snow.gui.fsm.itemshop.GuiItemShopFsmManager.ItemShopBuyMenuStateType"
+        },
+        {
+          "name": "<BuyMenuListCursor>k__BackingField",
+          "offset": 152,
+          "static": false,
+          "type": "snow.gui.SnowGuiCommonUtility.MenuListCursor"
+        },
+        {
+          "name": "<BuyTabCursor>k__BackingField",
+          "offset": 160,
+          "static": false,
+          "type": "snow.gui.SnowGuiCommonUtility.PageCursor"
+        },
+        {
+          "name": "<NumCursor>k__BackingField",
+          "offset": 192,
+          "static": false,
+          "type": "snow.gui.SnowGuiCommonUtility.NumCursor"
+        },
+        {
+          "name": "<BuyFilterIconMouseCtrl>k__BackingField",
+          "offset": 208,
+          "static": false,
+          "type": "snow.gui.SnowGuiCommonUtility.MouseBasisCtrl"
+        },
+        {
+          "name": "<MakaAlchemyMaterialNumCursor>k__BackingField",
+          "offset": 272,
+          "static": false,
+          "type": "snow.gui.SnowGuiCommonUtility.NumCursor"
+        },
+        {
+          "name": "<BuyItemListAll>k__BackingField",
+          "offset": 304,
+          "static": false,
+          "type": "System.Collections.Generic.List`1<snow.data.DisplayItemData>"
+        },
+        {
+          "name": "<BuyItemListToPlayer>k__BackingField",
+          "offset": 312,
+          "static": false,
+          "type": "System.Collections.Generic.List`1<snow.data.DisplayItemData>"
+        },
+        {
+          "name": "<BuyItemListToEnemy>k__BackingField",
+          "offset": 320,
+          "static": false,
+          "type": "System.Collections.Generic.List`1<snow.data.DisplayItemData>"
+        },
+        {
+          "name": "<BuyItemListOther>k__BackingField",
+          "offset": 328,
+          "static": false,
+          "type": "System.Collections.Generic.List`1<snow.data.DisplayItemData>"
+        }
+      ]
+    }
+  },
+  "enums": {
+    "snow::LobbyFacilityUIManager::SceneId": {
+      "QuestCounter": 0,
+      "QuestBoard": 1,
+      "ItemBox": 2,
+      "OtomoBoard": 3,
+      "ItemShop": 4,
+      "Smithy": 5,
+      "PostMan": 6,
+      "Kitchen": 7,
+      "KitchenTable": 8,
+      "OtomoHire": 9,
+      "TrainingCounter": 10,
+      "OtomoSmithy": 11,
+      "RoomService": 12,
+      "NpcQuestOrder": 13,
+      "TradeCenter": 14,
+      "NpcRequestMenu": 15,
+      "ArenaCounter": 16,
+      "OtomoParkGuide": 17,
+      "OtomoSpyUnit": 18,
+      "FacilityJumpVillage": 19,
+      "FacilityDialog": 20,
+      "LaboratoryCounter": 21,
+      "QuestCounterMr": 22,
+      "QuestBoardMr": 23,
+      "PointShop": 24,
+      "Max": 25,
+      "None": 26
+    },
+    "snow::gui::GuiManager::YNInfoResult": {
+      "Yes": 0,
+      "No": 1,
+      "None": 2
+    },
+    "snow::gui::GuiManager::YNInfoUIState": {
+      "SELECT_YES": 0,
+      "SELECT_NO": 1,
+      "Max": 2
+    },
+    "snow::gui::GuiCommonSelectWindow::Result": {
+      "None": 0,
+      "Decide": 1,
+      "Cancel": 2
+    },
+    "snow::gui::SnowGuiCommonUtility::Segment": {
+      "None": 0,
+      "Filter": 1,
+      "Default": 2,
+      "FadeTitleDemo": 9,
+      "Title": 10,
+      "UpdateInfo": 11,
+      "HeadMessage_OtLower": 10,
+      "HeadMessage_OtUpper": 13,
+      "HeadMessage_OtherPlLower": 14,
+      "HeadMessage_OtherPlUpper": 17,
+      "HeadMessageNPC": 18,
+      "AccessSelect": 18,
+      "Damage": 20,
+      "HeadMessagePL": 21,
+      "EventDemoUnderUIFade": 25,
+      "TimeLimit": 26,
+      "Hud_Frost_MR": 29,
+      "TalkWindow": 30,
+      "Facility": 30,
+      "Facility2": 31,
+      "Facility3": 32,
+      "Hud": 30,
+      "EventDemoUI": 30,
+      "ArenaCounter": 33,
+      "MonsterList": 39,
+      "Controls": 39,
+      "TreasureNote": 39,
+      "KeyAssign": 40,
+      "SystemMessage": 40,
+      "StartMenu": 40,
+      "ItemDetailWindow": 41,
+      "HudKeyboardShortcut": 42,
+      "DetailMapIconList": 41,
+      "BulletWindow": 41,
+      "SkillWindow": 41,
+      "WaveInfo": 45,
+      "HyakuryuAnnunce": 45,
+      "PhotoAlbum": 46,
+      "Tutorial": 47,
+      "Loading": 48,
+      "InputWindow": 48,
+      "OnInputWindow": 49,
+      "ShaderCompile": 49,
+      "Dialog": 50,
+      "OnDialog": 51,
+      "FadeDemo": 51,
+      "Fade": 55,
+      "Pause": 56,
+      "TitleOption": 56,
+      "EventSkipNowPause": 57,
+      "TitleOptionInfo": 57,
+      "SaveCheck": 58,
+      "ErrorDialog": 59,
+      "MouseCursor": 60,
+      "Max": 61
+    }
+  },
+  "rszCandidateTypes": [
+    "snow.gui.fsm.itemshop.GuiItemShopMakaAlchemyTalismanTakeOutAllSell",
+    "snow.gui.fsm.itemshop.GuiItemShopBuyYNAgainFsmAction",
+    "snow.gui.fsm.itemshop.GuiItemBoxOpenDecoConfirmSellFsmAction",
+    "snow.gui.fsm.itemshop.GuiItemShopBuyYNFsmAction",
+    "snow.gui.fsm.itemshop.GuiItemShopFsmSellMenuNumAction",
+    "snow.gui.fsm.itemshop.GuiItemShopSellYNFsmAction",
+    "snow.gui.fsm.itemshop.GuiItemShopSellInventorySortYNFsmAction",
+    "snow.gui.fsm.itemshop.GuiItemShopFsmBuyMenuNumAction",
+    "snow.gui.fsm.itemshop.GuiItemShopFsmSellMenuAction",
+    "snow.gui.fsm.itemshop.GuiItemShopFsmBuyMenuAction"
+  ],
+  "missingFromSelectiveSdkDump": [
+    "snow.LobbyFacilityUIManager",
+    "snow.data.DataManager",
+    "snow.data.ItemInventoryData",
+    "snow.data.DisplayItemData",
+    "snow.gui.GuiCommonSelectWindow",
+    "snow.gui.GuiCommonYNInfoWindow"
+  ]
+}
