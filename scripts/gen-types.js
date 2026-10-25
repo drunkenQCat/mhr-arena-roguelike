@@ -54,7 +54,7 @@ function generateTypes(dump, knownEnums = new Set()) {
     const flat = flatName(full);
     const lines = [`export interface ${flat} extends REManagedObject {`];
 
-    // ---- get_field：按精确字段名重载，末尾 string 兜底返回 unknown ----
+    // Exact field overloads; never replaces the inherited unchecked getter.
     const fieldNames = new Set();
     for (const f of t.fields || []) {
       if (f.static || fieldNames.has(f.name)) continue;
@@ -62,7 +62,8 @@ function generateTypes(dump, knownEnums = new Set()) {
       lines.push(`  /** offset=${f.offset} type=${f.type} */`);
       lines.push(`  get_field(name: ${JSON.stringify(f.name)}): ${mapType(f.type, known, knownEnums)};`);
     }
-    lines.push(`  get_field(name: string): unknown;`);
+    // Override inherited unchecked methods; dynamic reflection must opt in explicitly.
+    lines.push(`  get_field(name: never): never;`);
 
     // ---- set_field：下划线可写字段生成精确重载 ----
     for (const f of t.fields || []) {
@@ -71,7 +72,7 @@ function generateTypes(dump, knownEnums = new Set()) {
       if (tsType === "unknown") continue;
       lines.push(`  set_field(name: ${JSON.stringify(f.name)}, value: ${tsType}): void;`);
     }
-    lines.push(`  set_field(name: string, value: unknown): void;`);
+    lines.push(`  set_field(name: never, value: never): never;`);
 
     // ---- call：同名方法取首个签名（dump 侧已按名合并，overloads 计数保留在注释）----
     const seenNames = new Set();
@@ -83,7 +84,7 @@ function generateTypes(dump, knownEnums = new Set()) {
       lines.push(`  /** -> ${meth.ret}${multi} */`);
       lines.push(`  call(name: ${JSON.stringify(meth.name)}${params ? ", " + params : ""}): ${mapType(meth.ret, known, knownEnums)};`);
     }
-    lines.push(`  call(name: string, ...args: unknown[]): unknown;`);
+    lines.push(`  call(name: never, ...args: never[]): never;`);
     lines.push(`}`);
 
     const content = [

@@ -4,13 +4,16 @@
   "version": "0.2.0",
   "description": "MHRise arena roguelike mod — TypeScript core compiled to REFramework Lua via TypeScriptToLua; npm run build builds AND deploys to the game",
   "scripts": {
-    "build": "node scripts/gen-enums.js && node scripts/gen-types.js && node scripts/build-config.js && tstl && node scripts/deploy.js",
-    "build:nocopy": "node scripts/build-config.js && tstl",
+    "build": "npm run build:nocopy && node scripts/deploy.js",
+    "build:nocopy": "npm run gen && node scripts/build-config.js && tstl && node scripts/finalize-bundle.js",
     "dev": "node scripts/build-config.js && tstl --watch",
     "deploy": "node scripts/deploy.js",
     "typecheck": "tsc --noEmit",
+    "pretypecheck": "npm run gen && node scripts/build-config.js",
+    "pretest": "npm run gen && node scripts/build-config.js",
     "test": "vitest run",
     "check": "node scripts/check-lua.js",
+    "check:runtime": "python scripts/check-lua-runtime.py",
     "gen": "node scripts/gen-enums.js && node scripts/gen-types.js"
   },
   "devDependencies": {

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import path from "node:path";
+import ts from "typescript";
 import { finalize, flatName, generateTypes, mapType } from "./gen-types";
 
 const miniDump = {
@@ -53,7 +55,7 @@ describe("gen-types（Stage 2 代码生成）", () => {
     );
     expect(questData.content).toContain('get_field(name: "_QuestOrderMax"): number;');
     expect(questData.content).not.toContain("SomeStatic"); // 静态字段不生成实例重载
-    expect(questData.content).toContain("get_field(name: string): unknown;");
+    expect(questData.content).toContain("get_field(name: never): never;");
     expect(questData.content).toContain('call(name: "getQuestData(System.Int32)", arg0: number): snow_quest_QuestData;');
     expect(questData.content).toContain("共 3 个重载");
   });
@@ -78,5 +80,68 @@ describe("gen-types（Stage 2 代码生成）", () => {
   it("flatName：命名空间扁平化", () => {
     expect(flatName("snow.quest.QuestData")).toBe("snow_quest_QuestData");
     expect(flatName("snow::gui::GuiManager")).toBe("snow_gui_GuiManager");
+  });
+});
+
+describe("generated SDK compiler checks", () => {
+  it("rejects wrong field names, values and method arguments, with an explicit raw escape", () => {
+    const root = path.resolve(".local/virtual-sdk-test");
+    const entry = path.join(root, "gen/types/check.ts");
+    const virtualFiles = new Map<string, string>();
+    virtualFiles.set(path.join(root, "sdk.ts"), `
+      export interface REManagedObject {
+        get_field(name: string): unknown;
+        set_field(name: string, value: unknown): void;
+        call(name: string, ...args: unknown[]): unknown;
+      }
+      export function unsafeGameObject(obj: REManagedObject): REManagedObject { return obj; }
+    `);
+    for (const file of generateTypes(miniDump, new Set(["snow_quest_QuestType"])).files) {
+      virtualFiles.set(path.join(root, "gen/types", file.name), finalize(file.content, file.flat));
+    }
+    virtualFiles.set(entry, `
+      import type { snow_quest_QuestData } from "./snow_quest_QuestData";
+      import type { snow_quest_NormalQuestData_Param } from "./snow_quest_NormalQuestData_Param";
+      import { unsafeGameObject } from "../../sdk";
+      declare const q: snow_quest_QuestData;
+      declare const normal: snow_quest_NormalQuestData_Param;
+      const count: number = q.get_field("_QuestOrderMax");
+      q.set_field("_QuestOrderMax", 42);
+      q.call("getQuestData(System.Int32)", 101);
+      // @ts-expect-error wrong field value
+      q.set_field("_QuestOrderMax", "not a number");
+      // @ts-expect-error unknown field
+      q.set_field("_Typo", 42);
+      // @ts-expect-error unknown getter
+      q.get_field("_Typo");
+      // @ts-expect-error wrong method argument
+      q.call("getQuestData(System.Int32)", "not a number");
+      // @ts-expect-error wrong argument count
+      q.call("getQuestData(System.Int32)");
+      // @ts-expect-error unknown method
+      q.call("notInDump");
+      // @ts-expect-error no inherited fallback on types without methods
+      normal.call("notInDump");
+      unsafeGameObject(q).call("verifiedMissingSignature", 123);
+    `);
+    const options: ts.CompilerOptions = {
+      strict: true, noEmit: true, skipLibCheck: true,
+      target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.CommonJS,
+      ignoreDeprecations: "6.0",
+    };
+    const host = ts.createCompilerHost(options);
+    const getSourceFile = host.getSourceFile.bind(host);
+    const fileExists = host.fileExists.bind(host);
+    const directoryExists = host.directoryExists!.bind(host);
+    host.fileExists = (file) => virtualFiles.has(path.resolve(file)) || fileExists(file);
+    host.directoryExists = (dir) => [...virtualFiles.keys()].some((file) =>
+      file.startsWith(path.resolve(dir) + path.sep)) || directoryExists(dir);
+    host.getSourceFile = (file, languageVersion, ...rest) => {
+      const content = virtualFiles.get(path.resolve(file));
+      return content === undefined ? getSourceFile(file, languageVersion, ...rest)
+        : ts.createSourceFile(file, content, languageVersion, true);
+    };
+    const diagnostics = ts.getPreEmitDiagnostics(ts.createProgram([entry], options, host));
+    expect(diagnostics.map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n"))).toEqual([]);
   });
 });
