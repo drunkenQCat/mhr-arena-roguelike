@@ -1,0 +1,54 @@
+{
+  "events": [
+    {
+      "detail": {
+        "online": "disabled",
+        "scope": 900102
+      },
+      "event": "runtime-hooks-installed",
+      "time": 1792917982
+    },
+    {
+      "detail": {
+        "enabled": true
+      },
+      "event": "test-invincible",
+      "time": 1792918611
+    },
+    {
+      "detail": {
+        "hpBefore": 6251.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1792918646
+    },
+    {
+      "detail": {
+        "hpBefore": 6040.0,
+        "nativeDeathsOnly": true,
+        "uid": 100
+      },
+      "event": "test-kill",
+      "time": 1792918757
+    },
+    {
+      "detail": {
+        "enabled": false
+      },
+      "event": "test-invincible",
+      "time": 1792919379
+    }
+  ],
+  "last": {
+    "detail": {
+      "enabled": false
+    },
+    "event": "test-invincible",
+    "time": 1792919379
+  },
+  "ready": true,
+  "status": "Quest 900102: layer 1, monsters 98 / 54 / counter: Idle",
+  "version": 2
+}
