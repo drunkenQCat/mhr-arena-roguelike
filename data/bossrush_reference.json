@@ -1,0 +1,1003 @@
+{
+  "source": ".local/arena_catalog.json (installed Rise 16.0.2.0)",
+  "catalogCount": 78,
+  "bossrushCount": 14,
+  "base": {
+    "enemy": {
+      "_AttackTbl": [
+        98,
+        98,
+        102,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_BossMulti": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_Difficulty": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_EmsSetNo": 0,
+      "_IndividualType": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_InitSetName": [
+        "A",
+        "A",
+        "A",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "_OtherTbl": [
+        57,
+        57,
+        57,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_PartsTbl": [
+        90,
+        90,
+        90,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_QuestNo": 603,
+      "_RouteNo": [
+        10,
+        10,
+        10,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_Scale": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "_ScaleTbl": [
+        10,
+        3,
+        4,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_StaminaTbl": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_SubType": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_VitalTbl": [
+        68,
+        68,
+        80,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_ZakoAttack": 45,
+      "_ZakoMulti": 0,
+      "_ZakoOther": 5,
+      "_ZakoParts": 32,
+      "_ZakoVital": 38
+    },
+    "id": 603,
+    "normal": {
+      "_AutoMatchHR": 0,
+      "_BaseTime": 11,
+      "_BattleBGMType": 0,
+      "_BossEmType": [
+        23,
+        118,
+        89,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_BossSetCondition": [
+        1,
+        7,
+        12,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_BossSetParam": [
+        0,
+        65,
+        50,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_ClearBGMType": 0,
+      "_DbgClient": "依頼主",
+      "_DbgContent": "※ステージ、登場モンスターは全て仮となります。",
+      "_DbgName": "NPC依頼：上位相当　大連続　ラージャン→バゼル→マガド",
+      "_EnemyLv": 2,
+      "_FenceActiveSec": 60,
+      "_FenceDefaultActive": false,
+      "_FenceDefaultWaitSec": 0,
+      "_FenceReloadSec": 20,
+      "_Icon": [
+        5,
+        38,
+        22,
+        999,
+        999
+      ],
+      "_InitExtraEmNum": 0,
+      "_IsFromNpc": true,
+      "_IsSwapExitMarionette": false,
+      "_IsTutorial": false,
+      "_IsUsePillar": [
+        true,
+        true,
+        true
+      ],
+      "_MapNo": 10,
+      "_OrderType": [
+        0,
+        0
+      ],
+      "_QuestLife": 3,
+      "_QuestLv": 5,
+      "_QuestNo": 603,
+      "_QuestType": 8,
+      "_RemMoney": 17640,
+      "_RemRankPoint": 1690,
+      "_RemVillagePoint": 360,
+      "_SupplyTbl": 603,
+      "_SwapEmRate": [
+        0,
+        0
+      ],
+      "_SwapExecType": 0,
+      "_SwapExitTime": [
+        0,
+        0
+      ],
+      "_SwapSetCondition": [
+        0,
+        0
+      ],
+      "_SwapSetParam": [
+        0,
+        0
+      ],
+      "_SwapStopParam": 0,
+      "_SwapStopType": 0,
+      "_TargetType": [
+        5,
+        0
+      ],
+      "_TgtEmType": [
+        0,
+        0
+      ],
+      "_TgtItemId": [
+        67108864,
+        67108864
+      ],
+      "_TgtNum": [
+        3,
+        0
+      ],
+      "_TimeLimit": 50,
+      "_TimeVariation": 3
+    }
+  },
+  "tour": {
+    "enemy": {
+      "_AttackTbl": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_BossMulti": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_Difficulty": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_EmsSetNo": 2,
+      "_IndividualType": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_InitSetName": [
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "_OtherTbl": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_PartsTbl": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_QuestNo": 101,
+      "_RouteNo": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_Scale": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "_ScaleTbl": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_StaminaTbl": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_SubType": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_VitalTbl": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_ZakoAttack": 2,
+      "_ZakoMulti": 0,
+      "_ZakoOther": 1,
+      "_ZakoParts": 17,
+      "_ZakoVital": 14
+    },
+    "id": 101,
+    "normal": {
+      "_AutoMatchHR": 0,
+      "_BaseTime": 11,
+      "_BattleBGMType": 0,
+      "_BossEmType": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_BossSetCondition": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_BossSetParam": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "_ClearBGMType": 0,
+      "_DbgClient": "依頼主",
+      "_DbgContent": "※大型モンスターのセットは未対応。",
+      "_DbgName": "大社跡の探索ツアー",
+      "_EnemyLv": 0,
+      "_FenceActiveSec": 0,
+      "_FenceDefaultActive": false,
+      "_FenceDefaultWaitSec": 0,
+      "_FenceReloadSec": 0,
+      "_Icon": [
+        114,
+        999,
+        999,
+        999,
+        999
+      ],
+      "_InitExtraEmNum": 0,
+      "_IsFromNpc": false,
+      "_IsSwapExitMarionette": false,
+      "_IsTutorial": false,
+      "_IsUsePillar": [
+        false,
+        false,
+        false
+      ],
+      "_MapNo": 1,
+      "_OrderType": [
+        0,
+        0
+      ],
+      "_QuestLife": 3,
+      "_QuestLv": 0,
+      "_QuestNo": 101,
+      "_QuestType": 32,
+      "_RemMoney": 0,
+      "_RemRankPoint": 0,
+      "_RemVillagePoint": 0,
+      "_SupplyTbl": 1,
+      "_SwapEmRate": [
+        0,
+        0
+      ],
+      "_SwapExecType": 0,
+      "_SwapExitTime": [
+        0,
+        0
+      ],
+      "_SwapSetCondition": [
+        0,
+        0
+      ],
+      "_SwapSetParam": [
+        0,
+        0
+      ],
+      "_SwapStopParam": 0,
+      "_SwapStopType": 0,
+      "_TargetType": [
+        0,
+        0
+      ],
+      "_TgtEmType": [
+        0,
+        0
+      ],
+      "_TgtItemId": [
+        67108864,
+        67108864
+      ],
+      "_TgtNum": [
+        0,
+        0
+      ],
+      "_TimeLimit": 0,
+      "_TimeVariation": 3
+    }
+  },
+  "differences": {
+    "normal": [
+      "_BossEmType",
+      "_BossSetCondition",
+      "_BossSetParam",
+      "_DbgContent",
+      "_DbgName",
+      "_EnemyLv",
+      "_FenceActiveSec",
+      "_FenceReloadSec",
+      "_Icon",
+      "_IsFromNpc",
+      "_IsUsePillar",
+      "_MapNo",
+      "_QuestLv",
+      "_QuestNo",
+      "_QuestType",
+      "_RemMoney",
+      "_RemRankPoint",
+      "_RemVillagePoint",
+      "_SupplyTbl",
+      "_TargetType",
+      "_TgtNum",
+      "_TimeLimit"
+    ],
+    "enemy": [
+      "_AttackTbl",
+      "_EmsSetNo",
+      "_InitSetName",
+      "_OtherTbl",
+      "_PartsTbl",
+      "_QuestNo",
+      "_RouteNo",
+      "_ScaleTbl",
+      "_StaminaTbl",
+      "_VitalTbl",
+      "_ZakoAttack",
+      "_ZakoOther",
+      "_ZakoParts",
+      "_ZakoVital"
+    ]
+  },
+  "samples": [
+    {
+      "id": 415,
+      "map": 10,
+      "bosses": [
+        60,
+        92,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        7,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        40,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 603,
+      "map": 10,
+      "bosses": [
+        23,
+        118,
+        89,
+        0,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        7,
+        12,
+        0,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        65,
+        50,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 10317,
+      "map": 10,
+      "bosses": [
+        44,
+        109,
+        89,
+        0,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        7,
+        12,
+        0,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        40,
+        40,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 10618,
+      "map": 10,
+      "bosses": [
+        100,
+        82,
+        57,
+        0,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        7,
+        12,
+        0,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        40,
+        40,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 10720,
+      "map": 10,
+      "bosses": [
+        109,
+        37,
+        32,
+        0,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        1,
+        12,
+        0,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        0,
+        40,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 315209,
+      "map": 10,
+      "bosses": [
+        98,
+        54,
+        59,
+        0,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        1,
+        3,
+        0,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 315625,
+      "map": 10,
+      "bosses": [
+        32,
+        71,
+        81,
+        89,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        7,
+        3,
+        3,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        70,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 315628,
+      "map": 10,
+      "bosses": [
+        346,
+        349,
+        351,
+        350,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        1,
+        5,
+        2,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        0,
+        10,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 315640,
+      "map": 10,
+      "bosses": [
+        20,
+        133,
+        132,
+        0,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        1,
+        3,
+        0,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 60003,
+      "map": 10,
+      "bosses": [
+        54,
+        98,
+        107,
+        0,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        1,
+        3,
+        0,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 60106,
+      "map": 10,
+      "bosses": [
+        109,
+        42,
+        37,
+        0,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        7,
+        12,
+        0,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        50,
+        40,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 60133,
+      "map": 10,
+      "bosses": [
+        59,
+        59,
+        23,
+        0,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        1,
+        13,
+        0,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        0,
+        50,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 365501,
+      "map": 10,
+      "bosses": [
+        23,
+        19,
+        20,
+        0,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        1,
+        3,
+        0,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": 365101,
+      "map": 10,
+      "bosses": [
+        98,
+        54,
+        59,
+        62,
+        0,
+        0,
+        0
+      ],
+      "conditions": [
+        1,
+        1,
+        3,
+        3,
+        0,
+        0,
+        0
+      ],
+      "params": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "arenaMonsterIds": [
+    1,
+    2,
+    3,
+    4,
+    7,
+    19,
+    20,
+    23,
+    32,
+    37,
+    42,
+    44,
+    54,
+    57,
+    59,
+    60,
+    61,
+    62,
+    71,
+    72,
+    81,
+    82,
+    89,
+    90,
+    92,
+    94,
+    97,
+    98,
+    100,
+    107,
+    109,
+    118,
+    132,
+    133,
+    134,
+    136,
+    346,
+    349,
+    350,
+    351,
+    392,
+    513,
+    594,
+    1303,
+    1366,
+    1369
+  ]
+}

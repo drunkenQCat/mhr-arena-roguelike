@@ -1,0 +1,110 @@
+{
+  "note": "Original experimental pools retained for research. Not loaded by the M2 arena build; native map-10 compatibility is not established for every entry.",
+  "Pools": [
+    {
+      "From": 1,
+      "To": 5,
+      "Tier": "low",
+      "Weak": [
+        "Great Izuchi",
+        "Pukei-Pukei",
+        "Kulu-Ya-Ku",
+        "Aknosom",
+        "Tetranadon",
+        "Arzuros"
+      ],
+      "Strong": null,
+      "Ultimate": null,
+      "Types": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "From": 6,
+      "To": 10,
+      "Tier": "mid",
+      "Weak": [
+        "Jyuratodus",
+        "Tobi-Kadachi",
+        "Somnacanth",
+        "Barroth"
+      ],
+      "Strong": [
+        "Rathalos",
+        "Zinogre",
+        "Nargacuga",
+        "Magnamalo",
+        "Tigrex"
+      ],
+      "Ultimate": null,
+      "Types": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    {
+      "From": 11,
+      "To": 15,
+      "Tier": "adv",
+      "Weak": [
+        "Jyuratodus",
+        "Tobi-Kadachi",
+        "Somnacanth",
+        "Barroth"
+      ],
+      "Strong": [
+        "Diablos",
+        "Barioth",
+        "Seregios",
+        "Tigrex",
+        "Magnamalo",
+        "Rajang"
+      ],
+      "Ultimate": null,
+      "Types": [
+        "A",
+        "C",
+        "D"
+      ]
+    },
+    {
+      "From": 16,
+      "To": 999,
+      "Tier": "ultimate",
+      "Weak": [
+        "Jyuratodus",
+        "Tobi-Kadachi",
+        "Somnacanth",
+        "Barroth"
+      ],
+      "Strong": [
+        "Diablos",
+        "Barioth",
+        "Seregios",
+        "Tigrex",
+        "Magnamalo",
+        "Rajang"
+      ],
+      "Ultimate": [
+        "Apex Zinogre",
+        "Apex Diablos",
+        "Apex Rathalos",
+        "Apex Mizutsune",
+        "Valstrax",
+        "Malzeno",
+        "Gaismagorm"
+      ],
+      "Types": [
+        "A"
+      ]
+    }
+  ],
+  "UnlockChain": [
+    {
+      "Monster": "Gaismagorm",
+      "RequiresKilling": "Malzeno"
+    }
+  ]
+}
