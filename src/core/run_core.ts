@@ -64,6 +64,11 @@ export class RunCore {
     return this.config.armorOptions;
   }
 
+  abortRun(reason: string): void {
+    this.state.phase = "GameOver";
+    this.log(reason);
+  }
+
   startRun(armor: string): Result {
     if (this.state.phase !== "Idle" && this.state.phase !== "GameOver") {
       return fail("Run already in progress");
@@ -71,6 +76,7 @@ export class RunCore {
     if (!this.config.armorOptions.includes(armor)) {
       return fail("Unknown armor option");
     }
+    this.reset();
     this.state.armor = armor;
     this.state.layer = 1;
     this.state.phase = "Prep";
@@ -217,15 +223,20 @@ export class RunCore {
   generateChoices(playerCount = 1): WaveOption[] {
     if (this.state.phase !== "Prep") return this.state.currentChoices;
     const tier = this.tierFor(this.state.layer);
-    const types = this.allowedTypes(tier).slice();
-    this.rng.shuffle(types);
-    const chosen = types.slice(0, this.config.choiceCount);
+    const types = this.allowedTypes(tier);
+    if (types.length === 0) throw new Error("No available wave types");
+    const chosen: string[] = [];
+    while (chosen.length < this.config.choiceCount) {
+      const shuffled = types.slice();
+      this.rng.shuffle(shuffled);
+      chosen.push(...shuffled.slice(0, this.config.choiceCount - chosen.length));
+    }
 
     const opts: WaveOption[] = [];
     for (const type of chosen) {
       const composed = this.compose(type, tier);
       const hp = this.hpMul(this.state.layer, type, playerCount);
-      const dmg = this.dmgMul(this.state.layer);
+      const dmg = this.dmgMul(this.state.layer, playerCount);
       // 双怪的血量折扣同步折扣基础分；任务倍率是"双怪烦"的唯一补偿（策划 V1.3 修订）
       const hpFactor = type === "B" || type === "C" || type === "D" ? this.config.scaling.dualCompensation : 1.0;
       let sum = 0;
@@ -253,7 +264,7 @@ export class RunCore {
   private compose(type: string, tier: PoolTier): Tier {
     const ult = tier.tier === "ultimate";
     const pick = (arr: string[]): string => arr[this.rng.int(arr.length)]!;
-    if (type === "A") {
+    if (type === "A" || type === "AU") {
       return ult
         ? { tag: "Ultimate single", monsters: [this.pickUltimate(tier)], tier: "ultimate" }
         : { tag: "Single", monsters: [pick(this.strongOrWeak(tier))], tier: this.tierOfSingle(tier) };
@@ -312,7 +323,7 @@ export class RunCore {
   }
 
   private allowedTypes(t: PoolTier): string[] {
-    return t.tier === "ultimate" ? ["A"] : t.types.slice();
+    return t.tier === "ultimate" ? ["AU"] : t.types.slice();
   }
 
   private tierOfMonster(m: string, t: PoolTier): string {

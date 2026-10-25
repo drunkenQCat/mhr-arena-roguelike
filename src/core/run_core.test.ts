@@ -53,6 +53,55 @@ function started(): RunCore {
   return c;
 }
 
+describe("review regressions", () => {
+  it("starts a clean run after game over, including carts, unlocks and limits", () => {
+    const c = started();
+    c.generateChoices();
+    c.pickChoice(0);
+    c.cart();
+    c.killWave();
+    c.returnToCamp();
+    c.state.wallet.pt = 1000;
+    expect(c.cartRestore().ok).toBe(true);
+    c.state.killedUltimates.push("previous run boss");
+    c.buy("secret");
+    c.generateChoices();
+    c.pickChoice(0);
+    c.cart(); c.cart(); c.cart();
+    expect(c.state.phase).toBe("GameOver");
+    const stateReference = c.state;
+    expect(c.startRun(c.config.armorOptions[0]!).ok).toBe(true);
+    expect(c.state).toBe(stateReference);
+    expect(c.state).toMatchObject({
+      phase: "Prep", layer: 1, cartsLeft: 3, activeWave: null,
+      currentChoices: [], killedUltimates: [], cartRestoreUsed: false,
+      wallet: { pt: 150, bag: [], purchaseLog: [] },
+    });
+    expect(c.state.log).toHaveLength(1);
+    c.generateChoices(); c.pickChoice(0);
+    c.cart(); c.killWave(); c.returnToCamp();
+    c.state.wallet.pt = 1000;
+    expect(c.cartRestore().ok).toBe(true);
+  });
+
+  it("uses AU multipliers in actual ultimate choices and pays the reward", () => {
+    const c = started();
+    c.state.layer = 16;
+    const choices = c.generateChoices();
+    expect(choices).toHaveLength(c.config.choiceCount);
+    expect(choices[0]).toMatchObject({ tier: "ultimate", hpMul: 1.65, rewardMul: 1.7, rewardPt: 374 });
+    c.pickChoice(0); c.killWave();
+    expect(c.state.wallet.pt).toBe(524);
+  });
+
+  it.each([1, 2, 3, 4])("applies damage scaling to generated %i-player options", (players) => {
+    const c = started();
+    const options = c.generateChoices(players);
+    expect(options.length).toBeGreaterThan(0);
+    for (const option of options) expect(option.dmgMul).toBe(players >= 3 ? 1.1 : 1);
+  });
+});
+
 describe("RunCore（C# MhwRogue.Tests 语义移植）", () => {
   it("开局：清物资、发 150PT、进入 Prep", () => {
     const c = started();

@@ -1,0 +1,44 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { makeQuestPlan, normalPatch } from "./quest_plan";
+import { validateConfig } from "./config";
+import { RunCore } from "./run_core";
+
+describe("BOSSRUSH native table plan", () => {
+  it("replaces targets/slots together and clears unused template monsters", () => {
+    const config = validateConfig(JSON.parse(readFileSync(new URL("../../data/rogue_config.json", import.meta.url), "utf8")));
+    const catalog = JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8"));
+    const core = new RunCore(config, 42);
+    core.startRun(config.armorOptions[0]!);
+    const wave = core.generateChoices().find((choice) => choice.monsters.length === 2)!;
+    const plan = makeQuestPlan(config, catalog, wave, 1, 1, true);
+    const patch = normalPatch(plan, 1, 7, 8, 5);
+    expect(patch._BossEmType).toEqual([...plan.monsterIds, 0, 0, 0, 0, 0]);
+    expect(patch._BossSetCondition).toEqual([1, 7, 0, 0, 0, 0, 0]);
+    expect(patch._BossSetParam).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    expect(patch._TgtNum).toEqual([2, 0]);
+    expect(patch._TargetType).toEqual([5, 0]);
+    expect(patch._QuestType).toBe(8);
+    expect(patch._TimeLimit).toBe(0);
+    expect(() => makeQuestPlan(config, {}, wave, 1, 2, true)).toThrow("Unknown monster");
+  });
+
+  it("records actual HP thresholds rather than treating BOSSRUSH as a sequential flag", () => {
+    const reference = JSON.parse(readFileSync(new URL("../../data/bossrush_reference.json", import.meta.url), "utf8"));
+    expect(reference.bossrushCount).toBe(14);
+    expect(reference.base.normal._BossSetCondition.slice(0, 3)).toEqual([1, 7, 12]);
+    expect(reference.base.normal._BossSetParam.slice(0, 3)).toEqual([0, 65, 50]);
+  });
+
+  it("resolves every default pool name to a monster with native map-10 evidence", () => {
+    const config = JSON.parse(readFileSync(new URL("../../data/rogue_config.json", import.meta.url), "utf8"));
+    const ids = JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8"));
+    const reference = JSON.parse(readFileSync(new URL("../../data/bossrush_reference.json", import.meta.url), "utf8"));
+    for (const pool of config.Pools) {
+      for (const name of [...pool.Weak, ...(pool.Strong ?? []), ...(pool.Ultimate ?? [])]) {
+        expect(ids[name], name).toBeDefined();
+        expect(reference.arenaMonsterIds, name).toContain(ids[name].id);
+      }
+    }
+  });
+});
