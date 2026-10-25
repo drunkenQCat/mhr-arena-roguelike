@@ -43,7 +43,7 @@ function main() {
   console.log(`DEPLOY ${src.length} bytes -> ${target}`);
 
   if (isGameRunning()) {
-    console.log("NOTE 游戏正在运行：REFramework 应已热重载 autorun；UI 未变化就重启游戏。");
+    console.log("NOTE Game is running. In REFramework > ScriptRunner click Reset scripts to reload; copying alone does not reload Lua.");
   }
 }
 
