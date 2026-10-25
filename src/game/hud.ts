@@ -1,53 +1,54 @@
-/**
- * HUD —— 对应 MHW 版 Ui/Hud.cs：常驻状态板 + 手动驱动状态机的开发按钮。
- * 画在 REFramework Script Generated UI 的树节点下（re.on_draw_ui）。
- *
- * 文本一律英文：REFramework v1.5.9 默认字体是 RobotoMedium（无 CJK 字形），
- * 中文在 imgui 里渲染为 '?'。数据层保留中文（sim/策划侧不受影响）；
- * 任务柜里的任务名走游戏引擎字体，不受此限制（见 quest_installer）。
- * M2 起商店/任务选择迁移到这里。
- */
-
-import type { RunCore } from "../core/run_core";
+import type { Result } from "../core/run_core";
+import type { RunSession } from "../core/run_session";
+import type { NativeRuntime } from "./native_runtime";
 import { imguiApi } from "./sdk";
 
-export function drawHud(core: RunCore): void {
-  const open = imguiApi.tree_node("MHW Rogue (MHRise port)");
-  if (!open) return;
-
-  const s = core.state;
-  imguiApi.text(`Phase: ${s.phase}   Layer: ${s.layer}`);
-  imguiApi.text(`PT: ${s.wallet.pt}   Carts: ${s.cartsLeft}/${core.config.maxCarts}`);
-  if (s.armor) imguiApi.text(`Armor: ${s.armor}`);
-  if (s.activeWave) imguiApi.text(`Wave: ${s.activeWave.label}`);
-  imguiApi.separator();
-
-  // ---- Dev buttons (M1 drives the state machine by hand; M2 wires game events) ----
-  if (s.phase === "Idle" || s.phase === "GameOver") {
-    for (const armor of core.armorOptions()) {
-      if (imguiApi.button(`Start run: ${armor}`)) {
-        const r = core.startRun(armor);
-        imguiApi.text_disabled(`${r.ok ? "OK" : "NG"} ${r.message ?? ""}`);
+/** Real event-driven M2 controls. No simulated clear / next-layer buttons. */
+export function drawHud(session: RunSession, runtime: NativeRuntime): void {
+  if (!imguiApi.tree_node("MHR Arena Roguelike - M2")) return;
+  const core = session.core;
+  const state = core.state;
+  const action = (result: Result): void => { if (!result.ok) session.message = result.message ?? "Action failed"; };
+  try {
+    imguiApi.text("TEST TOOLS (900101/900102, solo only)");
+    if (imguiApi.button(`Invincible: ${runtime.testTools.invincible ? "ON" : "OFF"}`)) runtime.testTools.toggleGod();
+    if (imguiApi.button("Kill all spawned bosses now")) runtime.testTools.requestKill();
+    imguiApi.text(runtime.testTools.message);
+    imguiApi.separator();
+    imguiApi.text(runtime.ready() ? "Native hooks ready (solo)" : "Waiting / not ready");
+    imguiApi.text(runtime.status());
+    imguiApi.text(`Session: ${session.stage} / Core: ${state.phase} / Layer: ${state.layer}`);
+    imguiApi.text(`PT: ${state.wallet.pt} / Carts: ${state.cartsLeft}/${core.config.maxCarts}`);
+    imguiApi.text(`Route: ${session.route} / Spawn: ${session.settings.spawnMode}`);
+    imguiApi.text(session.message);
+    if (state.activeWave) imguiApi.text(`Wave: ${state.activeWave.label}`);
+    imguiApi.separator();
+    if (["Idle", "Finished", "Fault"].includes(session.stage)) {
+      for (const armor of core.armorOptions()) {
+        if (imguiApi.button(`Start run: ${armor}`)) action(session.start(armor));
+      }
+      if (imguiApi.button("M2a: test 2 native sequential monsters (0 PT)")) {
+        const armor = core.armorOptions()[0];
+        if (armor) action(session.start(armor, true));
+      }
+      if (imguiApi.button(`Switch route (current ${session.settings.route})`)) {
+        session.settings.route = session.settings.route === "reentry" ? "inPlace" : "reentry";
+        session.route = session.settings.route;
       }
     }
-  } else if (s.phase === "Prep") {
-    if (imguiApi.button("Generate quest options (pick 1 of 3)")) {
-      for (const o of core.generateChoices()) {
-        imguiApi.text_disabled(`#${o.index} ${o.label}  HP x${o.hpMul}  +${o.rewardPt}PT`);
+    if (session.stage === "Selecting") {
+      for (const choice of state.currentChoices) {
+        imguiApi.text(`HP x${choice.hpMul} / ATK x${choice.dmgMul} / +${choice.rewardPt} PT`);
+        if (imguiApi.button(`Pick #${choice.index + 1}: ${choice.label}`)) action(session.choose(choice.index));
       }
     }
-  } else if (s.phase === "Choosing") {
-    for (const o of s.currentChoices) {
-      if (imguiApi.button(`Pick #${o.index}: ${o.label}`)) core.pickChoice(o.index);
+    if (session.stage === "Fault" || session.stage === "AwaitQuest") {
+      if (imguiApi.button("Retry native post (village, no accepted quest)")) action(session.retryPost());
     }
-  } else if (s.phase === "Combat") {
-    // M2 replaces this with kill detection; kept to hand-drive the loop for now
-    if (imguiApi.button("Simulate clear")) imguiApi.text_disabled(core.killWave().message ?? "");
-  } else if (s.phase === "Carve") {
-    if (imguiApi.button("Return to camp -> next layer")) {
-      imguiApi.text_disabled(core.returnToCamp().message ?? "");
+    if (!["Idle", "Finished"].includes(session.stage)) {
+      if (imguiApi.button("Stop run / release native return flow")) {
+        try { session.stop(); } catch (error) { session.message = String(error); }
+      }
     }
-  }
-
-  imguiApi.tree_pop();
+  } finally { imguiApi.tree_pop(); }
 }

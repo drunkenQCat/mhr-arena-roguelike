@@ -59,6 +59,9 @@ interface RefSdk {
   find_type_definition(name: string): RETypeDefinition | null;
   create_instance(typeName: string, simplify?: boolean): REManagedObject | null;
   create_managed_string(value: string): REManagedObject;
+  create_managed_array(typeName: string, length: number): REManagedArray;
+  to_float(value: unknown): number;
+  float_to_ptr(value: number): unknown;
   hook(
     method: REMethodDefinition,
     pre?: (this: void, args: Record<number, unknown>) => number | void,
@@ -83,12 +86,20 @@ export interface REManagedObject {
   set_field(name: string, value: unknown): void;
   call(name: string, ...args: unknown[]): unknown;
   add_ref(): void;
+  release(): void;
+  get_address(): unknown;
   get_type_definition(): RETypeDefinition;
+}
+
+export interface REManagedArray extends REManagedObject {
+  get_size(): number;
+  get_element(index: number): unknown;
 }
 
 export interface REField {
   get_name(): string;
   is_static(): boolean;
+  get_type(): RETypeDefinition;
 }
 
 export interface RETypeDefinition {
@@ -113,6 +124,11 @@ export function questManager(): REManagedObject | null {
   return sdk.get_managed_singleton("snow.QuestManager");
 }
 
+/** Explicit escape for verified native signatures missing from the RTTI dump. */
+export function unsafeGameObject(obj: REManagedObject): REManagedObject {
+  return obj;
+}
+
 /** 保留引用防 GC（free_arena.lua 的 retain 模式）。 */
 export function retain<T extends REManagedObject>(obj: T, pool: REManagedObject[]): T {
   if (!obj) throw new Error("retain: object is nil");
@@ -127,6 +143,9 @@ export const toPtr = sdk.to_ptr;
 export const toInt64 = sdk.to_int64;
 export const createManagedString = sdk.create_managed_string;
 export const createInstance = sdk.create_instance;
+export const createManagedArray = sdk.create_managed_array;
+export const toFloat = sdk.to_float;
+export const floatToPtr = sdk.float_to_ptr;
 export const findTypeDefinition = sdk.find_type_definition;
 
 export const reframework = {
@@ -139,3 +158,6 @@ export const reframework = {
 export const relog = log;
 export const rejson = json;
 export const imguiApi = imgui;
+
+/** Wall clock, rather than process CPU time, for spawn/post deadlines. */
+export function clockSeconds(): number { return os.time(); }
