@@ -24,12 +24,18 @@ reentry 的层间成本 = 原生结算演出（数秒）+ 任务加载（硬成�
 - 收益即使只有 3~5 秒/层，20 层也省 1~2 分钟，且实现风险低（纯时序，不碰数据）。
 - 可能与 T1 冲突（若演出期间就是快照窗口，压缩=抢改表时间），需一起测。
 
-### T3：连战任务（BOSSRUSH）的第二波数据块
-M2a 已证明引擎在战斗中会"刷出下一只怪"——那么第二只怪的**出怪指令**在战斗中是可读的。
-逆向：BOSSRUSH 刷第二只时读的是 RawNormal 还是独立的波次数据块（如 SpawnSet /
-EnemyLot / 内部队列）？若是后者且可写，则找到了"战斗中可读的正确入口"，inPlace 以
-新形态复活（改那个块而不是 RawNormal）。
-- 探测法：M2a 场景下，杀第一只前后对 900102 相关对象做字段快照 diff。
+### T3：连战任务（BOSSRUSH）的出怪队列 —— **入口已找到（2026-10-26）**
+只读探针（inplace_queue_probe.lua）在 M2a 场景捕获了完整证据
+（docs/evidence/2026-10-26-t3-queue/）：战斗中可读可写的出怪入口是
+`EnemyManager._EnemySetInfoList`（EnemySetInfo：EmSetId 可写、
+updateSetStatus/repop/setupEnemy 可调、生命周期
+InitWait(0)→Alive(2)→Dead(3)→End(4) 实测在案；createEnemyFromSetInfo
+即出怪调用点、repop 引擎全场未调用）。
+**附带机制修正**：双怪不是"死一只刷一只"——第二只在首只出场约 30 秒后
+自动入场（存活期重叠），EM1_HP 条件疑似未生效，BOSSRUSH 实为"依次自动
+入场"。死亡判定可升级用 bosses 快照的 dying 标志。
+下一实验：杀一只后改存活条目的 EmSetId + repop/updateSetStatus，
+验证（a）按新 ID 生成（b）进讨伐计数。
 
 ## 判定与退出
 
