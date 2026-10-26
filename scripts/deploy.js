@@ -45,8 +45,7 @@ function main() {
   // REFramework 字体开关：该文件存在 => 默认 imgui 字体切到内嵌百度字体（中文可渲染）。
   const mode = path.join(gameDir, "reframework_pictographic.mode");
   if (!fs.existsSync(mode)) {
-    fs.writeFileSync(mode, "Presence of this file makes REFramework load its embedded CJK font.
-");
+    fs.writeFileSync(mode, "Presence of this file makes REFramework load its embedded CJK font.\n");
     console.log(`DEPLOY ${mode} (CJK font switch)`);
   }
 
