@@ -25,7 +25,7 @@ export function drawHud(session: RunSession, runtime: NativeRuntime, shop: ShopW
     if (state.activeWave) imguiApi.text(`本层: ${state.activeWave.label}`);
     if (session.stage === "Selecting") {
       imguiApi.separator();
-      shop.draw();
+      if (imguiApi.button("打开独立商店窗口")) shop.open();
     }
     imguiApi.separator();
     if (["Idle", "Finished", "Fault"].includes(session.stage)) {

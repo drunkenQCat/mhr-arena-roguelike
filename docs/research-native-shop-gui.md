@@ -125,3 +125,14 @@ HUD 把 SessionStage 当作 Core Phase 判断，导致 Selecting 时商店不出
 
 新增交易/发货离线测试覆盖 void 无效果、成功读回、容量/在线/阶段拒绝、退款及限购恢复、
 不确定结果锁定。尚未完成本轮修复后的实机购买：Computer Use native pipe 不可用。
+
+## 2026-10-26 交易确认与独立浮窗
+
+玩家确认：指定 `tryAddGameItem(snow.data.ContentsIdSystem.ItemId, System.Int32)` 完整重载后，
+PT 购买成功，日志记录生命粉尘 1→2。先前裸方法名触发参数数量不匹配警告。
+
+商店改为 `on_frame` 中的独立 ImGui 窗口，进入 Selecting 自动显示；可拖动、缩放、右上角关闭。
+Generated UI 只保留“打开独立商店窗口”入口。离开 Selecting 自动隐藏，下次整备再自动显示。
+已移除宿主没有的 `text_disabled`，统一使用 `text`。窗口内容抛异常时仍配对 `end_window`。
+当前鼠标交互仍沿用 REFramework 菜单开启状态；可以收起主面板，仅操作浮窗。
+关闭主菜单后的独立光标/输入接管尚未实现；本次浮窗尚待玩家实机验证。

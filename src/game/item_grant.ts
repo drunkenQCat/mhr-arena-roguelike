@@ -10,6 +10,9 @@
 import { itemIds } from "./default_config";
 import { getSingleton, relog, type REManagedObject } from "./sdk";
 
+// Bare-name dispatch may select the other overload and reject two arguments without throwing.
+const ADD_ITEM = "tryAddGameItem(snow.data.ContentsIdSystem.ItemId, System.Int32)";
+
 /** 商店 id → 游戏道具数值（default_config 内嵌；data/item_ids.json 的生成源）。 */
 export function gameIdOf(shopItemId: string): number | null {
   return itemIds[shopItemId]?.id ?? null;
@@ -35,6 +38,8 @@ export interface GrantReport {
   before?: number;
   after?: number;
   uncertain?: boolean;
+  method?: string;
+  reason?: string;
 }
 
 /** Native add returns void: only a count delta proves delivery. */
@@ -61,7 +66,7 @@ export function canTradeInVillage(): boolean {
 export function grantItem(shopItemId: string, count: number): GrantReport {
   const gameId = gameIdOf(shopItemId);
   const gameName = gameNameOf(shopItemId) ?? shopItemId;
-  const base: GrantReport = { shopItemId, gameName, requested: count, granted: false };
+  const base: GrantReport = { shopItemId, gameName, requested: count, granted: false, method: ADD_ITEM };
   if (gameId === null) {
     relog.warn(`[MhwRogue] 无 ${shopItemId} 的游戏道具 ID 映射`);
     return base;
@@ -74,10 +79,13 @@ export function grantItem(shopItemId: string, count: number): GrantReport {
   }
   let before: number;
   try {
+    if (!pouch.get_type_definition().get_method(ADD_ITEM)) {
+      return { ...base, reason: "Required two-argument native overload is unavailable" };
+    }
     if (!canTradeInVillage() || pouch.call("canAddItem", gameId) !== true) return base;
     before = pouchCount(shopItemId);
   } catch { return base; }
-  try { pouch.call("tryAddGameItem", gameId, count); }
+  try { pouch.call(ADD_ITEM, gameId, count); }
   catch (error) { relog.error(`[MhwRogue] native grant threw; checking delivery: ${String(error)}`); }
   // Even a throwing call may have mutated the pouch. Never blindly retry.
   try {

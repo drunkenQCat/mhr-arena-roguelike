@@ -166,3 +166,42 @@ assert host.globals().callbacks.frame is not None
 host.globals().callbacks.ui()
 host.globals().callbacks.reset()
 print("PASS Lua 5.4: full autorun bootstrap and UI/reset callback signatures")
+
+# Reproduce REFramework's bare-name overload ambiguity against the emitted Lua.
+host.execute('''
+  item_count = 0; item_writes = 0
+  local signature = "tryAddGameItem(snow.data.ContentsIdSystem.ItemId, System.Int32)"
+  local pouch = {}
+  function pouch:get_type_definition()
+    return {get_method = function(_, name) if name == signature then return {} end end}
+  end
+  function pouch:call(name, id, count)
+    if name == "findInventoryData" then
+      if item_count == 0 then return nil end
+      return {call = function() return item_count end}
+    end
+    if name == "canAddItem" then return true end
+    if name == "tryAddGameItem" then return nil end -- wrong overload: warns, no exception
+    if name == signature then
+      assert(id == 68157449 and count == 1, "wrong item or quantity sent to native method")
+      item_count = item_count + count; item_writes = item_writes + 1
+      return nil -- real method returns void
+    end
+    error("Unexpected pouch method: " .. name)
+  end
+  sdk.get_managed_singleton = function(name)
+    if name == "snow.data.DataManager" then return {get_field = function() return pouch end} end
+    if name == "snow.QuestManager" or name == "snow.stage.StageManager" then
+      return {call = function() return false end}
+    end
+    if name == "snow.gui.GuiManager" then
+      return {call = function(_, method) return method == "IsCanInvokeQuestBoard" end}
+    end
+  end
+''')
+grant_module = host.execute(original_bundle.replace(entry, 'return require("src.game.item_grant")'))
+for expected in (1, 2):
+    report = grant_module.grantItem(None, "dust_life", 1)
+    assert report.granted and report.before == expected - 1 and report.after == expected
+assert host.globals().item_writes == 2
+print("PASS Lua 5.4: explicit native grant overload, first stack and stacking, void return readback")

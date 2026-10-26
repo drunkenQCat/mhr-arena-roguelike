@@ -3,12 +3,13 @@ import { RunCore } from "../core/run_core";
 import { validateConfig } from "../core/config";
 import { defaultConfig } from "./default_config";
 const mock = vi.hoisted(() => ({ click: false, selecting: true, village: true, count: 2,
-  grant: vi.fn(), dumps: vi.fn() }));
+  grant: vi.fn(), dumps: vi.fn(), begin: vi.fn(), end: vi.fn(), text: vi.fn() }));
 vi.mock("./item_grant", () => ({ canTradeInVillage: () => mock.village,
   pouchCount: () => mock.count, grantItem: mock.grant }));
 vi.mock("./sdk", () => ({ rejson: { dump_file: mock.dumps }, imguiApi: {
-  tree_node: () => true, tree_pop: () => {}, separator: () => {}, same_line: () => {},
-  text: () => {}, text_disabled: () => {},
+  begin_window: mock.begin, end_window: mock.end,
+  set_next_window_pos: () => {}, set_next_window_size: () => {},
+  separator: () => {}, same_line: () => {}, text: mock.text,
   button: (label: string) => { if (label.includes("PT") && mock.click) { mock.click = false; return true; } return false; },
 } }));
 import { ShopWindow } from "./shop_window";
@@ -24,8 +25,24 @@ function fixture() {
 beforeEach(() => {
   mock.click = false; mock.selecting = true; mock.village = true; mock.count = 2;
   mock.grant.mockReset(); mock.dumps.mockReset();
+  mock.begin.mockReset().mockReturnValue(true); mock.end.mockReset(); mock.text.mockReset();
 });
 describe("shop transaction", () => {
+  it("opens independently, stays closed after X, and can be reopened or auto-opened next prep", () => {
+    const { shop } = fixture();
+    mock.begin.mockReturnValueOnce(false); shop.draw();
+    expect(mock.end).toHaveBeenCalledTimes(1);
+    shop.draw(); expect(mock.begin).toHaveBeenCalledTimes(1);
+    shop.open(); shop.draw(); expect(mock.begin).toHaveBeenCalledTimes(2);
+    mock.selecting = false; shop.draw(); expect(mock.begin).toHaveBeenCalledTimes(2);
+    mock.selecting = true; shop.draw(); expect(mock.begin).toHaveBeenCalledTimes(3);
+    expect(mock.end).toHaveBeenCalledTimes(3);
+  });
+  it("balances the native window stack even if content rendering throws", () => {
+    const { shop } = fixture(); mock.text.mockImplementationOnce(() => { throw new Error("draw failed"); });
+    expect(() => shop.draw()).toThrow("draw failed");
+    expect(mock.end).toHaveBeenCalledTimes(1);
+  });
   it("queues on draw, reads actual pouch and commits PT/limit only for verified delivery", () => {
     const { core, shop, click } = fixture(); const initial = core.state.wallet.pt;
     mock.grant.mockReturnValue({ granted: true, before: 2, after: 3, gameName: "Potion" });

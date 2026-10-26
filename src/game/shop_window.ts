@@ -10,10 +10,14 @@ export class ShopWindow
   private notice: string | null = null;
   private pending: string | null = null;
   private unresolved = false;
+  private visible = false;
+  private wasSelecting = false;
 
   constructor(private readonly core: RunCore, private readonly selecting: () => boolean) {}
 
   get busy(): boolean { return this.pending !== null || this.unresolved; }
+
+  open(): void { if (this.selecting()) this.visible = true; }
 
   tick(): void {
     const id = this.pending;
@@ -48,19 +52,37 @@ export class ShopWindow
   }
 
   draw(): void {
-    if (!imguiApi.tree_node("Shop (M3 prototype)")) return;
+    // Called from on_frame: independent of Script Generated UI's expansion state.
+    if (!this.selecting()) {
+      this.visible = false;
+      this.wasSelecting = false;
+      return;
+    }
+    if (!this.wasSelecting) { this.visible = true; this.wasSelecting = true; }
+    if (!this.visible) return;
+    const FIRST_USE_EVER = 4;
+    imguiApi.set_next_window_pos([380, 160], FIRST_USE_EVER);
+    imguiApi.set_next_window_size([640, 480], FIRST_USE_EVER);
+    this.visible = imguiApi.begin_window("肉鸽商店###MhrRogueShop", true, 0);
+    try {
+    if (!this.visible) return;
+    imguiApi.text(`第 ${this.core.state.layer} 层整备 · 余额 ${this.core.state.wallet.pt} PT`);
+    imguiApi.text("拖动标题栏移动，拖动边缘缩放；右上角 × 关闭。");
+    imguiApi.text("鼠标操作请保持 REFramework 菜单开启，主面板可以收起。");
+    imguiApi.separator();
 
     const shop = this.core.getShop();
     const categories = Object.keys(shop);
     if (!this.category || !categories.includes(this.category)) this.category = categories[0] ?? "";
 
     // 分类页签
-    for (const c of categories) {
-      imguiApi.same_line();
+    for (let i = 0; i < categories.length; i++) {
+      const c = categories[i]!;
+      if (i > 0) imguiApi.same_line();
       if (imguiApi.button(c === this.category ? `[${c}]` : c)) this.category = c;
     }
     imguiApi.separator();
-    imguiApi.text("Single items only; fill/services pending integration. Village only.");
+    imguiApi.text("仅限村庄整备期购买单件；补满和服务暂未开放。");
 
     const list = shop[this.category] ?? [];
     for (const e of list) {
@@ -71,13 +93,13 @@ export class ShopWindow
       const label = `${e.name}  ${e.price}PT  (${owned ?? "?"}/${e.cap})`;
       if (imguiApi.button(enabled ? label : `${label} [unavailable]`) && enabled) this.pending = e.id;
       imguiApi.same_line();
-      imguiApi.text_disabled(e.desc ?? e.mode);
+      imguiApi.text(e.desc ?? e.mode);
     }
 
     if (this.notice) {
       imguiApi.separator();
-      imguiApi.text_disabled(this.notice);
+      imguiApi.text(this.notice);
     }
-    imguiApi.tree_pop();
+    } finally { imguiApi.end_window(); }
   }
 }

@@ -1,18 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const host = vi.hoisted(() => ({ count: 2, add: true, active: false, online: false, throwAfter: false,
-  readBroken: false, capacity: true, writes: 0 }));
+  readBroken: false, capacity: true, writes: 0, methodAvailable: true, args: [] as unknown[] }));
 vi.mock("./sdk", () => ({
   getSingleton: (name: string) => {
     if (name === "snow.QuestManager") return { call: () => host.active };
     if (name === "snow.stage.StageManager") return { call: () => host.online };
     if (name === "snow.gui.GuiManager") return { call: (m: string) => m === "IsCanInvokeQuestBoard" };
-    if (name === "snow.data.DataManager") return { get_field: () => ({ call: (m: string) => {
+    if (name === "snow.data.DataManager") return { get_field: () => ({
+      get_type_definition: () => ({ get_method: (name: string) =>
+        host.methodAvailable && name === "tryAddGameItem(snow.data.ContentsIdSystem.ItemId, System.Int32)" ? {} : null }),
+      call: (m: string, ...args: unknown[]) => {
       if (m === "canAddItem") return host.capacity;
       if (m === "findInventoryData") {
         if (host.readBroken) throw new Error("count unavailable");
-        return { call: () => host.count };
+        return host.count === 0 ? null : { call: () => host.count };
       }
-      if (m === "tryAddGameItem") {
+      // Bare-name lookup returns another overload and silently does nothing, as in the game log.
+      if (m === "tryAddGameItem(snow.data.ContentsIdSystem.ItemId, System.Int32)") {
+        host.args = args;
         host.writes++;
         if (host.add) host.count++;
         if (host.throwAfter) { host.readBroken = true; throw new Error("native failed after write"); }
@@ -25,7 +30,7 @@ vi.mock("./sdk", () => ({
 import { grantItem } from "./item_grant";
 
 beforeEach(() => Object.assign(host, { count: 2, add: true, active: false, online: false,
-  throwAfter: false, readBroken: false, capacity: true, writes: 0 }));
+  throwAfter: false, readBroken: false, capacity: true, writes: 0, methodAvailable: true, args: [] }));
 describe("native delivery confirmation", () => {
   it("does not mistake a void no-op for successful delivery", () => {
     host.add = false;
@@ -33,6 +38,18 @@ describe("native delivery confirmation", () => {
   });
   it("requires exactly one item to be observed in the pouch", () => {
     expect(grantItem("potion", 1)).toMatchObject({ granted: true, before: 2, after: 3 });
+    expect(host.args).toEqual([68157446, 1]);
+  });
+  it("uses the explicit overload for the first item in an empty stack", () => {
+    host.count = 0;
+    expect(grantItem("dust_life", 1)).toMatchObject({ granted: true, before: 0, after: 1 });
+    expect(host.args).toEqual([68157449, 1]);
+  });
+  it("does not fall back to ambiguous dispatch when the exact overload is missing", () => {
+    host.methodAvailable = false;
+    expect(grantItem("potion", 1)).toMatchObject({ granted: false,
+      reason: "Required two-argument native overload is unavailable" });
+    expect(host.writes).toBe(0);
   });
   it("rejects accepted quests, online play, full pouch and non-unit requests before mutation", () => {
     host.active = true; expect(grantItem("potion", 1).granted).toBe(false);

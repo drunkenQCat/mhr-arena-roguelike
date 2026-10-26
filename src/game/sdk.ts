@@ -37,8 +37,11 @@ interface RefRe {
 /** @noSelf */
 interface RefImgui {
   text(text: string): void;
-  text_disabled(text: string): void;
-  text_colored(r: number, g: number, b: number, a: number, text: string): void;
+  text_colored(text: string, color: number): void;
+  begin_window(name: string, open: boolean | null, flags?: number): boolean;
+  end_window(): void;
+  set_next_window_pos(position: number[], condition?: number, pivot?: number[]): void;
+  set_next_window_size(size: number[], condition?: number): void;
   button(label: string): boolean;
   separator(): void;
   spacing(): void;

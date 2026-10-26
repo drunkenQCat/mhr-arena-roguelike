@@ -30,6 +30,10 @@ try {
     }
   });
   reframework.onDrawUi(() => drawHud(session, runtime, shopWindow));
+  reframework.onFrame(() => {
+    try { shopWindow.draw(); }
+    catch (error) { relog.error(`[MhwRogue] shop window: ${String(error)}`); }
+  });
   reframework.onScriptReset(() => runtime.shutdown());
   rejson.dump_file("mhw_rogue_boot.json", { ok: true, version: 2,
     quest: config.quest, route: session.route, startedAt: clockSeconds(), runtimeVerified: false }, 2);
