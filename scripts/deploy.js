@@ -42,6 +42,14 @@ function main() {
   fs.writeFileSync(target, src);
   console.log(`DEPLOY ${src.length} bytes -> ${target}`);
 
+  // REFramework 字体开关：该文件存在 => 默认 imgui 字体切到内嵌百度字体（中文可渲染）。
+  const mode = path.join(gameDir, "reframework_pictographic.mode");
+  if (!fs.existsSync(mode)) {
+    fs.writeFileSync(mode, "Presence of this file makes REFramework load its embedded CJK font.
+");
+    console.log(`DEPLOY ${mode} (CJK font switch)`);
+  }
+
   if (isGameRunning()) {
     console.log("NOTE Game is running. In REFramework > ScriptRunner click Reset scripts to reload; copying alone does not reload Lua.");
   }
