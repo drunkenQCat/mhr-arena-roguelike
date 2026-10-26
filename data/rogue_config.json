@@ -1,5 +1,5 @@
 {
-  "//": "M2 arena-only default roster: every included monster ID appears in the captured native map-10 quest catalogue. The original unverified pools are retained in data/unverified_monster_pools.json. This is offline evidence, not a runtime spawn guarantee.",
+  "//": "MHRise 斗技场肉鸽数值配置 —— 唯一真源。怪物池为中文名（英文对照见 data/monster_ids.json）。构建期内嵌为默认；游戏目录 mhw_rogue_config.json 可覆盖。",
   "StartPt": 150,
   "MaxCarts": 3,
   "CartRestorePrice": 400,
@@ -37,13 +37,13 @@
     "AU": 1.7
   },
   "ArmorOptions": [
-    "Bone set (balanced)",
-    "Iron set (glass cannon)"
+    "骨套（均衡）",
+    "铁套（攻高防低）"
   ],
   "UnlockChain": [
     {
-      "Monster": "Gaismagorm",
-      "RequiresKilling": "Malzeno"
+      "Monster": "冥渊龙",
+      "RequiresKilling": "爵银龙"
     }
   ],
   "Pools": [
@@ -52,10 +52,10 @@
       "To": 5,
       "Tier": "low",
       "Weak": [
-        "Great Izuchi",
-        "Kulu-Ya-Ku",
-        "Tetranadon",
-        "Arzuros"
+        "镰鼬龙王",
+        "搔鸟",
+        "河童蛙",
+        "青熊兽"
       ],
       "Strong": null,
       "Ultimate": null,
@@ -69,15 +69,15 @@
       "To": 10,
       "Tier": "mid",
       "Weak": [
-        "Tobi-Kadachi",
-        "Barroth"
+        "飞雷龙",
+        "土砂龙"
       ],
       "Strong": [
-        "Rathalos",
-        "Zinogre",
-        "Nargacuga",
-        "Magnamalo",
-        "Tigrex"
+        "火龙",
+        "雷狼龙",
+        "迅龙",
+        "怨虎龙",
+        "轰龙"
       ],
       "Ultimate": null,
       "Types": [
@@ -91,15 +91,15 @@
       "To": 15,
       "Tier": "adv",
       "Weak": [
-        "Tobi-Kadachi",
-        "Barroth"
+        "飞雷龙",
+        "土砂龙"
       ],
       "Strong": [
-        "Diablos",
-        "Barioth",
-        "Tigrex",
-        "Magnamalo",
-        "Rajang"
+        "角龙",
+        "冰牙龙",
+        "轰龙",
+        "怨虎龙",
+        "金狮子"
       ],
       "Ultimate": null,
       "Types": [
@@ -113,19 +113,19 @@
       "To": 999,
       "Tier": "ultimate",
       "Weak": [
-        "Tobi-Kadachi",
-        "Barroth"
+        "飞雷龙",
+        "土砂龙"
       ],
       "Strong": [
-        "Diablos",
-        "Barioth",
-        "Tigrex",
-        "Magnamalo",
-        "Rajang"
+        "角龙",
+        "冰牙龙",
+        "轰龙",
+        "怨虎龙",
+        "金狮子"
       ],
       "Ultimate": [
-        "Crimson Glow Valstrax",
-        "Malzeno"
+        "天彗龙",
+        "爵银龙"
       ],
       "Types": [
         "A"

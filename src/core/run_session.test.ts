@@ -181,6 +181,28 @@ describe("real-event session", () => {
     expect(game.events.filter((e) => e.event === "wave-cleared")).toHaveLength(1);
   });
 
+  it("does not misreport a silent non-playing in-place attempt as settlement before its timeout", () => {
+    const { core, game, session, tick, start, enter, clear } = setup("inPlace");
+    start(); enter(); clear(); tick(2); tick();
+    const pt = core.state.wallet.pt;
+    session.choose(0);
+    game.reading.quest!.playing = false;
+    game.reading.quest!.status = "ready";
+    tick(); expect(session.stage).toBe("Combat");
+    tick(6); expect(session.stage).toBe("Returning");
+    expect(session.route).toBe("reentry");
+    expect(core.state.wallet.pt).toBe(pt);
+    expect(game.events.some((event) => event.event === "in-place-no-go")).toBe(true);
+  });
+
+  it("never treats explicit native success as an in-place spawn wait", () => {
+    const { game, session, tick, start, enter, clear } = setup("inPlace");
+    start(); enter(); clear(); tick(2); tick(); session.choose(0);
+    game.reading.quest!.playing = false; game.reading.quest!.status = "success";
+    tick(); expect(session.stage).toBe("Fault");
+    expect(game.finishes).toEqual([]);
+  });
+
   it("stops on all carts, before a false clear can award PT", () => {
     const { core, game, session, tick, start, enter } = setup();
     start(); enter(); game.reading.deaths = 3; tick();

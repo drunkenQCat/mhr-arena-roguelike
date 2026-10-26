@@ -35,8 +35,9 @@ export type MonsterCatalog = Record<string, { id: number; cn?: string }>;
 export function makeQuestPlan(config: RogueConfig, catalog: MonsterCatalog, wave: WaveOption,
   layer: number, token: number, sequential: boolean): QuestPlan {
   if (wave.monsters.length < 1 || wave.monsters.length > 2) throw new Error("M2 supports single/dual monster waves");
+  const byCn = new Map(Object.entries(catalog).map(([en, v]) => [v.cn ?? en, v]));
   const monsterIds = wave.monsters.map((name) => {
-    const id = catalog[name]?.id;
+    const id = (catalog[name] ?? byCn.get(name))?.id;
     if (id === undefined || !Number.isInteger(id) || id <= 0) throw new Error(`Unknown monster: ${name}`);
     return id;
   });

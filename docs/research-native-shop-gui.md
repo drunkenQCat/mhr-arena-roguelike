@@ -108,3 +108,20 @@ RSZ 中还找到了 `GuiItemShopBuyYNFsmAction`、`GuiItemShopBuyYNAgainFsmActio
 
 商品列表/购买操作 = ImGui 自绘（数据全控）；确认弹窗/三选一 = 原生 select window（观感原生）；
 原生商店 FSM 接管 = 后续可选实验，不阻塞主线。
+
+## 后续代码复核与修复（2026-10-25）
+
+`53757bb` 的商品列表、ID 映射和 ItemPouch 发货入口可复用，但不能视作已完成交易闭环：
+HUD 把 SessionStage 当作 Core Phase 判断，导致 Selecting 时商店不出现；发货失败不退款，
+且 `tryAddGameItem` 返回 void，未抛异常不能证实入袋。所谓自动补发并没有对应实现。
+数量也取自影子背包；service 商品未执行实际效果。
+
+本轮修复：Selecting 显示商店，购买请求排到 on_frame；限制空闲单人村庄；单件购买前读真实
+`findInventoryData(id).get_Count()`，检查游戏 `canAddItem`，发货后重新读取数量。
+确认增加一件才保留扣款；确认未增加时恢复 PT、限购和购买日志；结果无法读回时保留预留扣款、
+锁定商店和选波入口并记录 `mhw_rogue_shop_transaction.json`，禁止自动重试造成重复发货。
+补满和服务保留展示但暂不可购买。GUI 原生 select 仍是候选，本实现没有原生确认窗。
+当前物品 ID 的数值存在性也不证明每个策划商品映射的语义都正确，材料项仍需逐个核对。
+
+新增交易/发货离线测试覆盖 void 无效果、成功读回、容量/在线/阶段拒绝、退款及限购恢复、
+不确定结果锁定。尚未完成本轮修复后的实机购买：Computer Use native pipe 不可用。

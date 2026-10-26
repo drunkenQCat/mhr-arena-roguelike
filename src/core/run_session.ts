@@ -35,7 +35,7 @@ export type SessionStage = "Idle" | "Selecting" | "AwaitQuest" | "Combat" | "Car
 
 export class RunSession {
   stage: SessionStage = "Idle";
-  message = "Start in the village. M2 uses your existing equipment.";
+  message = "在村庄开始。M2 使用你当前的装备。";
   route: RuntimeSettings["route"];
   readonly settings: RuntimeSettings;
   plan: QuestPlan | null = null;
@@ -68,10 +68,10 @@ export class RunSession {
   start(armor: string, spike = false): Result {
     try {
       const reading = this.port.read();
-      if (!this.port.ready()) return fail("Quest installer is not ready");
+      if (!this.port.ready()) return fail("任务安装器尚未就绪");
       if (reading.online) return fail("M2 is solo-only; online quest data/state synchronization is not implemented");
-      if (reading.quest !== null || !reading.canPost) return fail("Start in the village with no quest accepted");
-      if (!["Idle", "Finished", "Fault"].includes(this.stage)) return fail("Session already running");
+      if (reading.quest !== null || !reading.canPost) return fail("请在村庄且未接任务的状态开始");
+      if (!["Idle", "Finished", "Fault"].includes(this.stage)) return fail("会话已在进行中");
       if (this.core.state.phase !== "Idle" && this.core.state.phase !== "GameOver") this.core.abortRun("Starting a new session");
       const result = this.core.startRun(armor);
       if (!result.ok) return result;
@@ -97,26 +97,26 @@ export class RunSession {
     const lastLayer = Math.max(...this.core.config.pools.map((pool) => pool.to));
     if (this.core.state.layer > lastLayer) {
       this.stage = "Finished";
-      this.message = "All configured layers completed";
+      this.message = "已完成全部配置层数";
       this.port.policy(null, false);
       return;
     }
     this.core.generateChoices(players);
     this.stage = "Selecting";
-    this.message = "Choose a wave; publishing never creates an enemy directly.";
+    this.message = "选择本层波次；怪物始终由引擎自行刷出。";
   }
 
   choose(index: number): Result {
     try {
-      if (this.stage !== "Selecting") return fail("Not selecting a wave");
+      if (this.stage !== "Selecting") return fail("当前不在选波次阶段");
       const reading = this.port.read();
-      if (reading.online) return fail("Online play is not supported by M2");
+      if (reading.online) return fail("M2 不支持联机");
       const inPlace = !!reading.quest?.playing;
       if (inPlace && (!this.plan || reading.quest!.id !== this.plan.questId || this.route !== "inPlace")) {
-        return fail("Return to the village before publishing this wave");
+        return fail("发布本波前请先回村");
       }
       const wave = this.core.state.currentChoices.find((choice) => choice.index === index);
-      if (!wave) return fail("Invalid option");
+      if (!wave) return fail("无效选项");
       // Resolve IDs before changing the core phase; unknown names leave choices retryable.
       const plan = makeQuestPlan(this.core.config, this.catalog, wave, this.core.state.layer,
         ++this.token, this.testOnly || this.settings.spawnMode === "sequential");
@@ -152,16 +152,16 @@ export class RunSession {
   private requestPost(reading: RuntimeReading): void {
     this.stage = "AwaitQuest";
     this.requestedAt = reading.time;
-    this.message = this.settings.autoPost ? "Posting the prepared quest" : "Accept quest 900102 from Village > Free Exploration";
+    this.message = this.settings.autoPost ? "正在自动接取已准备的任务" : "请手动接取 900102（村庄 > 探索任务）";
     if (this.settings.autoPost && reading.canPost) this.port.post(this.plan!.questId);
   }
 
   retryPost(): Result {
     try {
       const reading = this.port.read();
-      if (!this.plan || reading.quest !== null || !reading.canPost) return fail("Retry from the village with no accepted quest");
-      if (reading.online) return fail("Online play is not supported by M2");
-      if (this.core.state.phase !== "Combat") return fail("No prepared wave to retry");
+      if (!this.plan || reading.quest !== null || !reading.canPost) return fail("请回村且未接任务后重试");
+      if (reading.online) return fail("M2 不支持联机");
+      if (this.core.state.phase !== "Combat") return fail("没有可重试的已准备波次");
       this.port.cancelPost();
       this.port.publish(this.plan, false);
       this.port.policy(this.plan, true);
@@ -178,7 +178,7 @@ export class RunSession {
     this.core.abortRun("Run stopped");
     if (this.plan && reading.quest?.id === this.plan.questId && reading.quest.playing) this.port.finish(true);
     this.stage = "Finished";
-    this.message = "Run stopped; native return flow is enabled";
+    this.message = "已终止；原生返回流程已恢复";
   }
 
   tick(): void {
@@ -239,7 +239,13 @@ export class RunSession {
         this.stage = "Finished"; this.message = "Run over; native return flow is enabled";
         return;
       }
-      if (!reading.quest.playing) { this.fault("Native settlement began unexpectedly; no automatic next wave"); return; }
+      // A quiet engine after an experimental table replacement is not evidence of settlement.
+      // Let the bounded no-spawn fallback run; explicit success/return still releases ownership.
+      const waitingInPlace = this.route === "inPlace" && this.stage === "Combat" &&
+        this.seen.length === 0 && reading.quest.status === "ready";
+      if (!reading.quest.playing && !waitingInPlace) {
+        this.fault("Native quest is no longer playing; inspect its status before retrying"); return;
+      }
 
       if (this.stage === "Combat") {
         const unexpected = reading.enemies.find((enemy) => !enemy.dead && !enemy.captured &&

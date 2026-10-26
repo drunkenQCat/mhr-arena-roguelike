@@ -19,8 +19,9 @@ try {
   const installer = new QuestInstaller(config, initial);
   const runtime = new NativeRuntime(config, installer);
   const session = new RunSession(core, monsterCatalog, runtime);
+  const shopWindow = new ShopWindow(session.core, () => session.stage === "Selecting");
   reframework.onFrame(() => {
-    try { runtime.tick(); session.tick(); }
+    try { runtime.tick(); shopWindow.tick(); session.tick(); }
     catch (error) {
       runtime.shutdown();
       session.stage = "Fault";
@@ -28,8 +29,7 @@ try {
       runtime.report("frame-error", session.message);
     }
   });
-  const shopWindow = new ShopWindow(session.core);
-reframework.onDrawUi(() => drawHud(session, runtime, shopWindow));
+  reframework.onDrawUi(() => drawHud(session, runtime, shopWindow));
   reframework.onScriptReset(() => runtime.shutdown());
   rejson.dump_file("mhw_rogue_boot.json", { ok: true, version: 2,
     quest: config.quest, route: session.route, startedAt: clockSeconds(), runtimeVerified: false }, 2);

@@ -71,10 +71,10 @@ export class RunCore {
 
   startRun(armor: string): Result {
     if (this.state.phase !== "Idle" && this.state.phase !== "GameOver") {
-      return fail("Run already in progress");
+      return fail("本局已在进行中");
     }
     if (!this.config.armorOptions.includes(armor)) {
-      return fail("Unknown armor option");
+      return fail("未知初始装备");
     }
     this.reset();
     this.state.armor = armor;
@@ -88,16 +88,16 @@ export class RunCore {
   /** 猫车恢复：全局限购一次（V1.3 §3.6）。 */
   cartRestore(): Result {
     if (this.state.phase !== "Prep" && this.state.phase !== "Choosing") {
-      return fail("Purchases only allowed during Prep");
+      return fail("只有起始点整备期可以购买");
     }
     if (this.state.cartRestoreUsed) {
-      return fail("Cart restore is once per run, already used");
+      return fail("猫车恢复整局仅限1次，已使用");
     }
     if (this.state.cartsLeft >= this.config.maxCarts) {
-      return fail("Carts already full, nothing to restore");
+      return fail("当前猫车已满，无需恢复");
     }
     if (this.state.wallet.pt < this.config.cartRestorePrice) {
-      return fail(`Not enough PT (need ${this.config.cartRestorePrice})`);
+      return fail(`PT不足（需要 ${this.config.cartRestorePrice}）`);
     }
     this.state.wallet = {
       ...this.state.wallet,
@@ -151,7 +151,10 @@ export class RunCore {
     const owned = countOf(this.state.wallet, item.id);
     let canBuy = true;
     let reason: string | null = null;
-    if (item.mode !== "service" && owned >= item.cap) {
+    if (this.state.phase !== "Prep" && this.state.phase !== "Choosing") {
+      canBuy = false;
+      reason = "仅整备阶段可购买";
+    } else if (item.mode !== "service" && owned >= item.cap) {
       canBuy = false;
       reason = "已达持有上限";
     } else if (item.globalLimit !== undefined && this.purchaseCount(item.id) >= item.globalLimit) {
@@ -182,20 +185,20 @@ export class RunCore {
    */
   buy(itemId: string): Result {
     if (this.state.phase !== "Prep" && this.state.phase !== "Choosing") {
-      return fail("Purchases only allowed during Prep");
+      return fail("只有起始点整备期可以购买");
     }
     const item = this.config.shop.find((i) => i.id === itemId);
-    if (!item) return fail("No such item");
+    if (!item) return fail("无此商品");
 
     const owned = countOf(this.state.wallet, itemId);
     if (item.mode !== "service" && owned >= item.cap) {
-      return fail(`${item.name} at carry limit (${item.cap})`);
+      return fail(`${item.name} 已达持有上限（${item.cap}），不能再买`);
     }
     if (item.globalLimit !== undefined && this.purchaseCount(itemId) >= item.globalLimit) {
-      return fail(`${item.name} global purchase limit (${item.globalLimit}) reached`);
+      return fail(`${item.name} 全局限购 ${item.globalLimit} 次已用完`);
     }
     if (this.state.wallet.pt < item.price) {
-      return fail(`Not enough PT (need ${item.price}, have ${this.state.wallet.pt})`);
+      return fail(`PT不足（需要 ${item.price}，持有 ${this.state.wallet.pt}）`);
     }
 
     const bag: OwnedItem[] =
@@ -208,7 +211,7 @@ export class RunCore {
       purchaseLog: this.state.wallet.purchaseLog.concat([itemId]),
     };
     this.log(`购买 ${item.name}（-${item.price} PT）`);
-    if (item.mode === "service") return ok(`${item.name} activated`);
+    if (item.mode === "service") return ok(`${item.name} 已生效`);
     const n = countOf(this.state.wallet, itemId);
     return ok(`${item.name} → ${n}/${item.cap}`);
   }
@@ -247,7 +250,7 @@ export class RunCore {
       opts.push({
         index: opts.length,
         typeTag: composed.tag,
-        label: `${composed.tag}: ${composed.monsters.join(" + ")}`,
+        label: `${composed.tag}：${composed.monsters.join(" + ")}`,
         monsters: composed.monsters,
         tier: composed.tier,
         rewardMul: this.config.typeRewardMul[type as RewardType],
@@ -266,17 +269,17 @@ export class RunCore {
     const pick = (arr: string[]): string => arr[this.rng.int(arr.length)]!;
     if (type === "A" || type === "AU") {
       return ult
-        ? { tag: "Ultimate single", monsters: [this.pickUltimate(tier)], tier: "ultimate" }
-        : { tag: "Single", monsters: [pick(this.strongOrWeak(tier))], tier: this.tierOfSingle(tier) };
+        ? { tag: "极强怪单怪", monsters: [this.pickUltimate(tier)], tier: "ultimate" }
+        : { tag: "单怪", monsters: [pick(this.strongOrWeak(tier))], tier: this.tierOfSingle(tier) };
     }
     if (type === "B") {
-      return { tag: "Dual weak", monsters: [pick(tier.weak), pick(tier.weak)], tier: "weak" };
+      return { tag: "双弱", monsters: [pick(tier.weak), pick(tier.weak)], tier: "weak" };
     }
     if (type === "C") {
-      return { tag: "Weak+strong", monsters: [pick(tier.weak), pick(tier.strong!)], tier: "strong" };
+      return { tag: "强弱混搭", monsters: [pick(tier.weak), pick(tier.strong!)], tier: "strong" };
     }
     if (type === "D") {
-      return { tag: "Dual strong", monsters: [pick(tier.strong!), pick(tier.strong!)], tier: "strong" };
+      return { tag: "双强", monsters: [pick(tier.strong!), pick(tier.strong!)], tier: "strong" };
     }
     throw new Error(`未知任务类型 ${type}`);
   }
@@ -354,9 +357,9 @@ export class RunCore {
   // ---------- 战斗流程 ----------
 
   pickChoice(index: number): Result {
-    if (this.state.phase !== "Choosing") return fail("Not in the Choosing phase");
+    if (this.state.phase !== "Choosing") return fail("当前不在选任务阶段");
     const opt = this.state.currentChoices.find((o) => o.index === index);
-    if (!opt) return fail("Invalid option");
+    if (!opt) return fail("无效选项");
     this.state.activeWave = opt;
     this.state.phase = "Combat";
     this.log(`选择 ${opt.label}`);
@@ -365,7 +368,7 @@ export class RunCore {
 
   killWave(): Result {
     if (this.state.phase !== "Combat" || !this.state.activeWave) {
-      return fail("No wave in progress");
+      return fail("当前没有进行中的战斗");
     }
     const w = this.state.activeWave;
     this.state.wallet = { ...this.state.wallet, pt: this.state.wallet.pt + w.rewardPt };
@@ -381,19 +384,19 @@ export class RunCore {
 
   cart(): Result {
     if (this.state.phase !== "Combat" && this.state.phase !== "Carve") {
-      return fail("Not in combat");
+      return fail("不在战斗中");
     }
     this.state.cartsLeft--;
     this.log(`猫车！剩余 ${this.state.cartsLeft}`);
     if (this.state.cartsLeft <= 0) {
       this.state.phase = "GameOver";
-      return fail("Three carts - run over");
+      return fail("三次猫车，本局结束");
     }
     return ok(`剩余猫车 ${this.state.cartsLeft}`);
   }
 
   returnToCamp(): Result {
-    if (this.state.phase !== "Carve") return fail("Wave not cleared yet");
+    if (this.state.phase !== "Carve") return fail("尚未完成讨伐");
     this.state.layer++;
     this.state.phase = "Prep";
     this.state.activeWave = null;

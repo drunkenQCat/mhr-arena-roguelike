@@ -7,7 +7,9 @@ import { RunCore } from "./run_core";
 describe("BOSSRUSH native table plan", () => {
   it("replaces targets/slots together and clears unused template monsters", () => {
     const config = validateConfig(JSON.parse(readFileSync(new URL("../../data/rogue_config.json", import.meta.url), "utf8")));
-    const catalog = JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8"));
+    const rawCatalog = JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8"));
+    const catalog = { ...rawCatalog };
+    for (const [en, v] of Object.entries(rawCatalog)) if (v.cn) catalog[v.cn] = v;
     const core = new RunCore(config, 42);
     core.startRun(config.armorOptions[0]!);
     const wave = core.generateChoices().find((choice) => choice.monsters.length === 2)!;
@@ -36,8 +38,9 @@ describe("BOSSRUSH native table plan", () => {
     const reference = JSON.parse(readFileSync(new URL("../../data/bossrush_reference.json", import.meta.url), "utf8"));
     for (const pool of config.Pools) {
       for (const name of [...pool.Weak, ...(pool.Strong ?? []), ...(pool.Ultimate ?? [])]) {
-        expect(ids[name], name).toBeDefined();
-        expect(reference.arenaMonsterIds, name).toContain(ids[name].id);
+        const entry = ids[name] ?? Object.values(ids).find((v) => v.cn === name);
+        expect(entry, name).toBeDefined();
+        expect(reference.arenaMonsterIds, name).toContain(entry.id);
       }
     }
   });
