@@ -105,3 +105,23 @@ Lua 是真实状态和执行结果的权威；Node 负责通信、静态页面�
 4. 用当前漏刷第二只、HP 异常问题验收观测面板：同时显示计划倍率、原生倍率、最终 HP、登记 UID 和加载阶段。这是提高后续研究效率的实际用途。
 
 完成第 1 步之前，只能称方案有代码依据，不能宣称 Lua 与网页通信已在本机打通。HTML 属于外部浏览器界面，若以后要求直接嵌在游戏画面中，需额外的 WebView/渲染集成，不包含在本方案内。
+
+
+## Phase-1 实机验证结果（2026-10-27）— 已打通
+
+技术路线定案：**REFramework 原生插件（webconsole.dll，C++/cpp-httplib）承载 HTTP + 数据目录命令/状态文件槽**，
+Lua 控制层限频轮询执行。排除的路线：游戏 exe 不导出任何 lua_* 符号（422 导出全为 Wwise/NGX），
+LuaSocket 式 C 模块无法解析宿主 API；插件必须按安装版本（5bae4701，API 1.10.0）的 API.h 编译，
+master API.h（1.15.0）会被加载器以 minor version 拒绝。
+
+实测（curl 代位浏览器，全部真实游戏内执行）：
+
+1. 插件加载：PluginLoader "Loaded ...webconsole.dll"，初始化日志在案；启动 ~20 秒内 /api/health 200。
+2. 状态读取：/api/state 返回真实层数/PT/猫车（Lua 桥 ~2Hz 发布，counter 单调递增）。
+3. 命令链：POST setInvincible(true) → 桥执行 → results 记录 status=applied / invincible=true → 状态回读 True。
+4. id 去重：同 id 重发 value=false 未执行（invincible 保持 true）——防重放按设计工作。
+5. 未知命令：rejected "unknown cmd"。setInvincible(false) 关回验证。
+6. 插件不受 ScriptRunner Reset 影响（原生常驻）；Lua 桥经 on_script_reset 清理（实现于桥内）。
+
+未验证/后续：慢客户端与半包长测、多页面共享采样、Reset 后端口行为（插件常驻预期正常）、
+Vite+Vue 单 HTML 前端（第三阶段）、热调参生效点（第四阶段）。
