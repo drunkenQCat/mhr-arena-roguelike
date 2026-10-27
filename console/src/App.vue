@@ -2,12 +2,14 @@
 import { onMounted, ref } from "vue";
 
 interface ShopEntry { id: string; name: string; category: string; price: number; cap: number; owned: number; mode: string; desc: string | null; canBuy: boolean; reason: string | null; }
+interface ShopEntry { id: string; name: string; category: string; price: number; cap: number; owned: number; mode: string; desc: string | null; canBuy: boolean; reason: string | null; }
 interface WaveChoice { index: number; typeTag: string; label: string; monsters: string[]; rewardMul: number; hpMul: number; dmgMul: number; rewardPt: number; }
 interface State {
   ok: boolean; protocol: number; counter: number; bridgeId: string; configVersion: number;
   sessionStage: string; corePhase: string; questId: number; questUnique: number | null;
   layer: number; pt: number; cartsLeft: number; maxCarts: number; armor: string | null;
   invincible: boolean; activeWave: string | null; choices: WaveChoice[] | null;
+  shop: Record<string, ShopEntry[]> | null;
   shopNotice: string | null; shopBusy: boolean; message: string;
 }
 
@@ -78,6 +80,42 @@ function exportResults(): void {
   a.download = `webconsole-results-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/* ---------- 商店面板 ---------- */
+const shopCategory = ref("");
+const shopCategories = (): string[] => Object.keys(state.value?.shop ?? {});
+const shopList = (): ShopEntry[] => (state.value?.shop ?? {})[shopCategory.value] ?? [];
+function pickCategory(c: string): void { shopCategory.value = c; }
+
+async function buy(entry: ShopEntry): Promise<void> {
+  if (!entry.canBuy || state.value?.shopBusy) return;
+  await send("buy", { itemId: entry.id });
+}
+
+/* ---------- 配置预设导入导出 ---------- */
+function exportConfigPreset(): void {
+  const blob = new Blob([configDraft.value], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `rogue-preset-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importConfigPreset(): void {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json";
+  input.onchange = () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    file.text().then((text) => {
+      try { configDraft.value = JSON.stringify(JSON.parse(text), null, 2); configMessage.value = "预设已载入草稿（尚未提交）"; }
+      catch (e) { configMessage.value = `预设解析失败：${String(e)}`; }
+    });
+  };
+  input.click();
 }
 
 function visibleResults(): Array<Record<string, unknown>> {
@@ -154,7 +192,26 @@ onMounted(() => {
       <div class="card wide">
         <h2>商店（整备/选任务阶段可购）</h2>
         <p>{{ state.shopNotice ?? "—" }}</p>
-        <p class="dim">发货=写入道具袋并读回校验；失败自动恢复 PT 与限购记录。补满/服务类暂未开放。</p>
+        <div class="cats">
+          <button v-for="c in shopCategories()" :key="c" :class="[c === shopCategory ? 'on' : '']" @click="pickCategory(c)">{{ c }}</button>
+        </div>
+        <table>
+          <thead><tr><th>商品</th><th>价格</th><th>持有/上限</th><th>模式</th><th>说明</th><th></th></tr></thead>
+          <tbody>
+            <tr v-for="e in shopList()" :key="e.id">
+              <td>{{ e.name }}</td>
+              <td>{{ e.price }} PT</td>
+              <td>{{ e.mode === "service" ? "—" : e.owned + "/" + e.cap }}</td>
+              <td>{{ e.mode === "fill" ? "补满" : e.mode === "service" ? "服务" : "单件" }}</td>
+              <td class="dim">{{ e.desc ?? e.reason ?? "" }}</td>
+              <td>
+                <button v-if="e.canBuy" :disabled="state.shopBusy" @click="buy(e)">购买</button>
+                <span v-else class="no">{{ e.reason ?? "不可购" }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="dim">发货=写入道具袋并读回校验；失败自动恢复 PT 与限购记录。购买结果见 shopNotice 与命令结果。</p>
       </div>
 
       <div class="card wide">
@@ -164,6 +221,8 @@ onMounted(() => {
         <div class="row">
           <button @click="loadConfig">载入当前生效配置</button>
           <button @click="submitConfig">校验并提交</button>
+          <button @click="exportConfigPreset">导出预设</button>
+          <button @click="importConfigPreset">导入预设</button>
           <span>{{ configMessage }}</span>
         </div>
       </div>
@@ -205,4 +264,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 textarea { width: 100%; background: #100d09; color: #d8cdb4; border: 1px solid #4a3f2c; border-radius: 4px; font-family: Consolas, monospace; }
 input { background: #100d09; color: #e8dcc8; border: 1px solid #4a3f2c; border-radius: 4px; padding: 4px 8px; }
 .ev { font-family: Consolas, monospace; font-size: 12px; color: #9a8f78; padding: 2px 0; border-bottom: 1px dashed #2c2418; overflow-wrap: anywhere; }
+.cats { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.cats button.on { background: #6b5630; color: #f0c96a; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { border-bottom: 1px solid #3a3020; padding: 5px 6px; text-align: left; }
+th { color: #b8a67a; font-weight: normal; font-size: 11px; }
+.no { color: #e07a5f; font-size: 12px; }
 </style>

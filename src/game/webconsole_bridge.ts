@@ -213,6 +213,14 @@ export class WebConsoleBridge
         const s = this.session;
         const state = s.core.state;
         this.stateCounter++;
+        // 商店目录体积大（50 项×校验字段）：仅在 (配置版本, PT, 交易锁) 变化时重算，
+        // 其余轮次复用缓存——避免 2Hz 全量序列化（简报 §8）
+        const shopKey = `${this.configVersion}:${state.wallet.pt}:${this.shop.busy}`;
+        if (shopKey !== this.lastShopKey)
+        {
+            this.shopCache = s.core.getShop();
+            this.lastShopKey = shopKey;
+        }
         rejson.dump_file(STATE_FILE, {
             ok: true,
             protocol: 2,
@@ -231,9 +239,13 @@ export class WebConsoleBridge
             invincible: this.runtime.testTools.invincible,
             activeWave: state.activeWave?.label ?? null,
             choices: state.currentChoices,
+            shop: this.shopCache,
             shopNotice: this.shop.notice,
             shopBusy: this.shop.busy,
             message: s.message,
         }, 1);
     }
+
+    private lastShopKey = "";
+    private shopCache: Record<string, Array<{ id: string; name: string; category: string; price: number; cap: number; owned: number; mode: string; desc: string | null; canBuy: boolean; reason: string | null }>> = {};
 }
