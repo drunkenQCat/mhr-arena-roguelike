@@ -237,3 +237,11 @@ describe("real-event session", () => {
     expect(game.posts).toHaveLength(2);
   });
 });
+
+it("offers an arena shop identity only after clearing and gathering, never during combat", () => {
+ const { session, start, enter, clear, tick } = setup("inPlace");
+ start(); expect(session.shopQuest()).toBeUndefined(); enter(42);
+ expect(session.shopQuest()).toBeUndefined(); clear(); tick(2); tick();
+ expect(session.shopQuest()).toEqual({ questId: 900102, questUnique: 42 });
+ session.choose(0); expect(session.shopQuest()).toBeUndefined();
+});

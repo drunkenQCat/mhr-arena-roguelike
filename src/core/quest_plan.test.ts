@@ -45,3 +45,14 @@ describe("BOSSRUSH native table plan", () => {
     }
   });
 });
+
+it("the selected option's mode overrides the legacy global spawn setting", () => {
+ const config = validateConfig(JSON.parse(readFileSync(new URL("../../data/rogue_config.json", import.meta.url), "utf8")));
+ const catalog = JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8"));
+ const core = new RunCore(config, 42); core.startRun(config.armorOptions[0]!);
+ const choices = core.generateChoices();
+ const seq = makeQuestPlan(config, catalog, choices[1]!, 1, 1, false);
+ const sim = makeQuestPlan(config, catalog, choices[2]!, 1, 2, true);
+ expect(seq.sequential).toBe(true); expect(sim.sequential).toBe(false);
+ expect((normalPatch(sim, 1, 7, 8, 5)._BossSetCondition as number[]).slice(0, 2)).toEqual([1, 1]);
+});

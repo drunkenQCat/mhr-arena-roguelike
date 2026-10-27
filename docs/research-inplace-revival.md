@@ -24,18 +24,16 @@ reentry 的层间成本 = 原生结算演出（数秒）+ 任务加载（硬成�
 - 收益即使只有 3~5 秒/层，20 层也省 1~2 分钟，且实现风险低（纯时序，不碰数据）。
 - 可能与 T1 冲突（若演出期间就是快照窗口，压缩=抢改表时间），需一起测。
 
-### T3：连战任务（BOSSRUSH）的出怪队列 —— **入口已找到（2026-10-26）**
-只读探针（inplace_queue_probe.lua）在 M2a 场景捕获了完整证据
-（docs/evidence/2026-10-26-t3-queue/）：战斗中可读可写的出怪入口是
-`EnemyManager._EnemySetInfoList`（EnemySetInfo：EmSetId 可写、
-updateSetStatus/repop/setupEnemy 可调、生命周期
-InitWait(0)→Alive(2)→Dead(3)→End(4) 实测在案；createEnemyFromSetInfo
-即出怪调用点、repop 引擎全场未调用）。
-**附带机制修正**：双怪不是"死一只刷一只"——第二只在首只出场约 30 秒后
-自动入场（存活期重叠），EM1_HP 条件疑似未生效，BOSSRUSH 实为"依次自动
-入场"。死亡判定可升级用 bosses 快照的 dying 标志。
-下一实验：杀一只后改存活条目的 EmSetId + repop/updateSetStatus，
-验证（a）按新 ID 生成（b）进讨伐计数。
+### T3：连战任务的运行时队列 —— 已观测，复用尚未验证（2026-10-26 更正）
+只读探针捕获 `_EnemySetInfoList` 生命周期 InitWait→Alive→Dead→End，
+以及 QuestManager._BossSet 的激活/释放变化。详见 docs/evidence/2026-10-26-t3-queue/。
+玩家确认死一个才放下一个；16:27:11 第二只出现时，第一只原生讨伐计数已为 1，
+死亡 UID 列表已包含第一只。dying 晚约 9 秒才置位，不能当作死亡发生时间。
+撤回“30 秒自动入场、EM1_HP 疑似失效”以及“以 dying 替代 UID 判定”的结论。
+`EmSetId` 是出怪记录编号（0、1），怪物类型是 EmType（98、54）；不能将 54/44 写入 EmSetId 换怪。
+反射有 repop/updateSetStatus 等方法不代表已验证可用；只读探针未验证任何写入或复活。
+下一步补齐 BossSetParam 的父类字段，再在已清理条目上单独验证同怪种 repop；
+换怪、重设状态和目标计数分别研究，不与第一次复用试验同时修改。
 
 ## 判定与退出
 
@@ -81,3 +79,29 @@ JSON 序列化接口依据 [REFramework 官方文档](https://cursey.github.io/r
 代码同时修复了观测层的一个分支：仅凭 `isPlayQuest=false` 不再将未出怪的 inPlace 等待
 直接叫作“结算”；同一任务 ready 且尚未观察到新怪时允许走既有超时回退。
 显式 success/return 仍停止追踪。本轮只有离线状态机验证，原生回退能否完成仍待实机。
+
+## 2026-10-26 实机 repop 对照结果
+
+已重启游戏恢复面板，开启启动时显示菜单；不再依赖失效的 Insert，后续均由 agent 操作。
+
+- 已清理的首领槽直接 repop：原生空指针异常。异常指令与 OwnerEnemy 字段偏移匹配，尸体清理后 OwnerEnemy 已空。
+- Dead 且 OwnerEnemy 尚存时 repop：正常返回，但槽变为 End，未增加生成次数、未出现新 UID；不是可用的首领复活。
+- 已清理槽调用 updateSetStatus(InitWait)：正常返回，SetStatus=0；437 秒后仍无新出怪，DestroyStatus 仍为 2，生成调用次数不变。单改 SetStatus 不足以恢复槽。
+- 下一对照需区分 DestroyStatus 与已释放的 QuestManager._BossSet 门控；目前没有证明原地复活。
+
+原始数据、探针版本、SHA256 与机器码证据见 [repop 实机记录](evidence/2026-10-26-repop/README.md)。这些结果只否定相应调用形态，不能宣布整个 T3 不可行。
+
+
+## 2026-10-27：原生代码纠正研究方向
+
+已只读核对当前进程元数据、18 个原生函数和运行现场。updateEnemySetInfoQuestHost 遍历 _ZakoSetInfoList，不是首领列表；此前 enableRevival=true 不能推导首领可复活。首领由 QuestManager.updateBossEnemy → updateExtraEnemyCommon 调度，当前 _ExtraEmRno=End、_BossSetCount=2、后续顺序项=-1。第一只首领参数的 RepopMax 虚函数实际返回 0。详见[原生代码证据](evidence/2026-10-27-native-flow/README.md)。停止猜状态，先追踪正常首领加载/创建的完整调度链。
+
+
+## 2026-10-27：不同怪种与释放槽复用实测通过
+
+同一任务 unique 1994278460 中，使用独立 BossSetParam 注册青熊兽（type60），先在未用任务槽3生成 UID11700，随后在已释放任务槽2生成 UID11800。均经原生 RequestLoad 调度，无地图加载。青熊兽可被原生致死伤害讨伐、清理；非原目标怪未加入目标死亡 UID 列表，正式波次不能依赖该列表覆盖所有怪。仍保留原眠狗龙王，尚未验证全灭续波或无限循环。详见 [原始证据](evidence/2026-10-27-species/README.md)。
+
+
+## 2026-10-27：全灭后续波与游标回收通过
+
+拦截原生成功结算后，原目标全清、全部尸体清理，仍保持任务进行；用槽2和顺序索引2连续两轮生成青熊兽UID11900、12000。questEnemyDie对非原目标也触发，可作为通用死亡事件。EnemySetInfo仍追加、未回收，不宣称无限循环。见[证据](evidence/2026-10-27-cycle/README.md)。正式实验分支已接入InplaceWaves，默认reentry保持，等待实际状态机验收。

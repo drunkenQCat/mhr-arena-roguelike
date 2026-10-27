@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const host = vi.hoisted(() => ({ count: 2, add: true, active: false, online: false, throwAfter: false,
+const host = vi.hoisted(() => ({ count: 2, add: true, active: false, online: false, playing: true, questId: 900102, unique: 42, live: false, throwAfter: false,
   readBroken: false, capacity: true, writes: 0, methodAvailable: true, args: [] as unknown[] }));
 vi.mock("./sdk", () => ({
   getSingleton: (name: string) => {
-    if (name === "snow.QuestManager") return { call: () => host.active };
+    if (name === "snow.QuestManager") return { call: (m: string) => m === "isActiveQuest" ? host.active : m === "isPlayQuest" ? host.playing : m === "get_ActiveQuestNo" ? host.questId : m === "getActiveQuestUniqueNo" ? host.unique : null };
+    if (name === "snow.enemy.EnemyManager") return { call: (m: string) => m === "getBossEnemyCount" ? 1 : { call: (method: string) => method === "isDieBehaviorActive" && !host.live } };
     if (name === "snow.stage.StageManager") return { call: () => host.online };
     if (name === "snow.gui.GuiManager") return { call: (m: string) => m === "IsCanInvokeQuestBoard" };
     if (name === "snow.data.DataManager") return { get_field: () => ({
@@ -30,7 +31,7 @@ vi.mock("./sdk", () => ({
 import { grantItem } from "./item_grant";
 
 beforeEach(() => Object.assign(host, { count: 2, add: true, active: false, online: false,
-  throwAfter: false, readBroken: false, capacity: true, writes: 0, methodAvailable: true, args: [] }));
+  playing: true, questId: 900102, unique: 42, live: false, throwAfter: false, readBroken: false, capacity: true, writes: 0, methodAvailable: true, args: [] }));
 describe("native delivery confirmation", () => {
   it("does not mistake a void no-op for successful delivery", () => {
     host.add = false;
@@ -63,4 +64,14 @@ describe("native delivery confirmation", () => {
     expect(grantItem("potion", 1)).toMatchObject({ granted: false, uncertain: true, before: 2 });
     expect(host.writes).toBe(1);
   });
+});
+
+it("permits the owned solo arena between waves and rejects live actors or stale quest contexts", () => {
+  host.active = true;
+  const context = { questId: 900102, questUnique: 42 };
+  expect(grantItem("potion", 1, context).granted).toBe(true);
+  host.live = true; expect(grantItem("potion", 1, context).granted).toBe(false);
+  host.live = false; host.unique = 43; expect(grantItem("potion", 1, context).granted).toBe(false);
+  host.unique = 42; host.online = true; expect(grantItem("potion", 1, context).granted).toBe(false);
+  expect(host.writes).toBe(1);
 });

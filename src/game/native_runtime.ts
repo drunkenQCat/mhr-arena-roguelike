@@ -1,3 +1,4 @@
+import { InplaceWaves } from "./inplace_waves";
 import { TestTools } from "./test_tools";
 import type { RogueConfig } from "../core/config";
 import { DEFAULT_RUNTIME, type QuestPlan } from "../core/quest_plan";
@@ -25,6 +26,7 @@ interface Diagnostic { time: number; event: string; detail: unknown }
 export class NativeRuntime implements SessionPort {
   readonly transport: QuestTransport;
   readonly testTools = new TestTools((event, detail) => this.report(event, detail));
+  private readonly inplace = new InplaceWaves((event, detail) => this.report(event, detail));
   private activePlan: QuestPlan | null = null;
   private holdClear = false;
   private hooks = false;
@@ -46,17 +48,22 @@ export class NativeRuntime implements SessionPort {
       catch (error) { this.bootError = String(error); this.report("hook-install-error", this.bootError); }
     }
     this.transport.tick();
+    this.inplace.tick(clockSeconds());
     this.testTools.tick();
     const rates = this.rateEvidence;
     this.rateEvidence = [];
     for (const evidence of rates) this.report("rate-applied", evidence);
   }
   ready(): boolean { return this.installer.isInstalled() && this.hooks && this.bootError === null; }
-  status(): string { return this.bootError ?? `${this.installer.getStatus()} / counter: ${this.transport.getStatus()}`; }
-  publish(plan: QuestPlan, inPlace: boolean): void { this.installer.publish(plan, inPlace); }
+  status(): string { return this.bootError ?? `${this.installer.getStatus()} / counter: ${this.transport.getStatus()} / ${this.inplace.status}`; }
+  publish(plan: QuestPlan, inPlace: boolean): void {
+    if (inPlace) this.inplace.prepare(plan);
+    else { this.inplace.cancel(); this.installer.publish(plan, false); }
+  }
   policy(plan: QuestPlan | null, holdClear: boolean): void {
     if (this.activePlan?.token !== plan?.token) this.rateKeys = [];
     this.activePlan = plan; this.holdClear = holdClear;
+    if (!plan || !holdClear) this.inplace.cancel();
   }
   post(questId: number): void { this.transport.request(questId); }
   cancelPost(): void { this.transport.cancel(); }
@@ -111,8 +118,12 @@ export class NativeRuntime implements SessionPort {
         if (!Number.isFinite(uid) || !Number.isFinite(typeId)) throw new Error("Invalid native enemy identity");
         if (!Number.isFinite(hp) || !Number.isFinite(maxHp) || maxHp <= 0) continue;
         const nativeDead = qm.get_field("_QuestTargetEmDieUidList") as REManagedObject | null;
-        enemies.push({ uid, typeId, captured: !!callNative(enemy, "isCapture"),
-          dead: !!nativeDead?.call("Contains", uid) || (maxHp > 0 && hp <= 0 && !!callNative(enemy, "isDieBehaviorActive")) });
+        const captured = !!callNative(enemy, "isCapture");
+        const dead = !!nativeDead?.call("Contains", uid) || (maxHp > 0 && hp <= 0 && !!callNative(enemy, "isDieBehaviorActive"));
+        // Native death callbacks are not guaranteed on every dynamically registered actor.
+        // Feed the same conservative evidence used by RunSession into the sequential queue.
+        if (captured || dead) this.inplace.death(uid);
+        enemies.push({ uid, typeId, captured, dead });
       }
     }
     const gui = getSingleton("snow.gui.GuiManager");
@@ -204,6 +215,7 @@ export class NativeRuntime implements SessionPort {
       const enemy = this.matches(args[3]);
       const kind = toInt64(args[4]);
       if (enemy && (kind === snow_quest_EmEndType.Die || kind === snow_quest_EmEndType.Capture)) {
+        this.inplace.death(callNative(enemy, "get_UniqueId") as number);
         this.deaths.push({ uid: callNative(enemy, "get_UniqueId") as number,
           typeId: callNative(enemy, "get_EnemyType") as number,
           kind: kind === snow_quest_EmEndType.Die ? "kill" : "capture" });

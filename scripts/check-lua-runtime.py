@@ -87,6 +87,9 @@ print("PASS Lua 5.4: 600 RNG draws, AU/multiplayer/restart flow, invalid configs
 
 # Execute the emitted session state machine, not a Python/JS reimplementation.
 lua.eval('''function(modules, config)
+  assert(config.runtime.route == 'inPlace')
+  -- Exercise the explicit fallback route independently of the new default.
+  config.runtime.route = 'reentry'
   config.runtime.carveSeconds = 2
   config.runtime.campDwellSeconds = 1
   local core = setmetatable({}, modules.RunCore.prototype)
@@ -161,6 +164,7 @@ host.execute('''
 ''')
 host.execute(original_bundle)
 assert host.globals().reports["mhw_rogue_boot.json"].ok is True
+assert host.globals().reports["mhw_rogue_boot.json"].route == "inPlace"
 assert host.globals().reports["mhw_rogue_error.json"] is None
 assert host.globals().callbacks.frame is not None
 host.globals().callbacks.ui()

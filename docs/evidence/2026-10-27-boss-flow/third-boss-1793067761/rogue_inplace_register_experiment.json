@@ -1,0 +1,36 @@
+{
+  "events": [
+    {
+      "at": 1793067563,
+      "detail": {
+        "count": 116,
+        "orderIndex": 2,
+        "phase": 10,
+        "taskSlot": 2,
+        "type": 98,
+        "unique": 576249578
+      },
+      "event": "before"
+    },
+    {
+      "at": 1793067563,
+      "detail": {
+        "count": 117,
+        "id": 116,
+        "uid": 11600,
+        "unique": 576249578
+      },
+      "event": "registered"
+    },
+    {
+      "at": 1793067563,
+      "detail": {
+        "id": 116,
+        "phase": 5,
+        "uid": 11600,
+        "unique": 576249578
+      },
+      "event": "requested-native-load"
+    }
+  ]
+}

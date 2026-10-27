@@ -1,0 +1,4 @@
+slot0=2391f560240 param=2391f5601e0 vtable=23925abadd0
+virtual slot 40 target=7ff7bee94ac0
+7ff7bee94ac0 xor eax, eax
+7ff7bee94ac2 ret 

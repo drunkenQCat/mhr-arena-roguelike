@@ -1,0 +1,346 @@
+{
+  "events": [
+    {
+      "detail": {
+        "online": "disabled",
+        "scope": 900102
+      },
+      "event": "runtime-hooks-installed",
+      "time": 1793077625
+    },
+    {
+      "detail": {
+        "enabled": true
+      },
+      "event": "test-invincible",
+      "time": 1793077662
+    },
+    {
+      "detail": {
+        "experimentalInPlace": false,
+        "plan": {
+          "baseId": 603,
+          "layer": 1,
+          "mapNo": 10,
+          "monsterIds": [
+            92
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 1,
+          "wave": {
+            "dmgMul": 1.0,
+            "hpMul": 0.75,
+            "index": 1,
+            "label": "单怪：河童蛙",
+            "monsters": [
+              "河童蛙"
+            ],
+            "rewardMul": 1,
+            "rewardPt": 80,
+            "tier": "weak",
+            "typeTag": "单怪"
+          }
+        },
+        "route": "inPlace"
+      },
+      "event": "wave-published",
+      "time": 1793077749
+    },
+    {
+      "detail": {
+        "kind": "hp",
+        "multiplier": 0.75,
+        "original": 2.140000104904175,
+        "result": 1.605000078678131,
+        "token": 1
+      },
+      "event": "rate-applied",
+      "time": 1793077751
+    },
+    {
+      "detail": {
+        "camp": {
+          "x": -3.205841991871239e-08,
+          "y": 50.29914474487305,
+          "z": 46.91426086425781
+        },
+        "roster": [
+          0
+        ],
+        "unique": -15494639
+      },
+      "event": "quest-entered",
+      "time": 1793077752
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 1,
+        "typeId": 92,
+        "uid": 0
+      },
+      "event": "monster-observed",
+      "time": 1793077752
+    },
+    {
+      "detail": {
+        "hpBefore": 7223.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1793077838
+    },
+    {
+      "detail": {
+        "resolved": [
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 92,
+            "uid": 0
+          }
+        ],
+        "reward": 80,
+        "token": 1
+      },
+      "event": "wave-cleared",
+      "time": 1793077839
+    },
+    {
+      "detail": {
+        "token": 1
+      },
+      "event": "camp-gathered",
+      "time": 1793077861
+    },
+    {
+      "detail": {
+        "experimentalInPlace": true,
+        "plan": {
+          "baseId": 603,
+          "layer": 2,
+          "mapNo": 10,
+          "monsterIds": [
+            60
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 2,
+          "wave": {
+            "dmgMul": 1.03,
+            "hpMul": 0.8,
+            "index": 0,
+            "label": "单怪：青熊兽",
+            "monsters": [
+              "青熊兽"
+            ],
+            "rewardMul": 1,
+            "rewardPt": 80,
+            "tier": "weak",
+            "typeTag": "单怪"
+          }
+        },
+        "route": "inPlace"
+      },
+      "event": "wave-published",
+      "time": 1793077987
+    },
+    {
+      "detail": {
+        "fresh": [
+          {
+            "id": 7,
+            "type": 60,
+            "uid": 700
+          }
+        ],
+        "remaining": 0,
+        "token": 2,
+        "unique": -15494639
+      },
+      "event": "in-place-native-load",
+      "time": 1793078029
+    },
+    {
+      "detail": {
+        "kind": "hp",
+        "multiplier": 0.8,
+        "original": 0.10000000149011612,
+        "result": 0.0800000011920929,
+        "token": 2
+      },
+      "event": "rate-applied",
+      "time": 1793078029
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 2,
+        "typeId": 60,
+        "uid": 700
+      },
+      "event": "monster-observed",
+      "time": 1793078030
+    },
+    {
+      "detail": {
+        "hpBefore": 264.0,
+        "nativeDeathsOnly": true,
+        "uid": 700
+      },
+      "event": "test-kill",
+      "time": 1793078292
+    },
+    {
+      "detail": {
+        "resolved": [
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 60,
+            "uid": 700
+          }
+        ],
+        "reward": 80,
+        "token": 2
+      },
+      "event": "wave-cleared",
+      "time": 1793078293
+    },
+    {
+      "detail": {
+        "token": 2
+      },
+      "event": "camp-gathered",
+      "time": 1793078315
+    },
+    {
+      "detail": {
+        "experimentalInPlace": true,
+        "plan": {
+          "baseId": 603,
+          "layer": 3,
+          "mapNo": 10,
+          "monsterIds": [
+            98,
+            98
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 3,
+          "wave": {
+            "dmgMul": 1.06,
+            "hpMul": 0.595,
+            "index": 1,
+            "label": "双弱：镰鼬龙王 + 镰鼬龙王",
+            "monsters": [
+              "镰鼬龙王",
+              "镰鼬龙王"
+            ],
+            "rewardMul": 1.1,
+            "rewardPt": 123,
+            "tier": "weak",
+            "typeTag": "双弱"
+          }
+        },
+        "route": "inPlace"
+      },
+      "event": "wave-published",
+      "time": 1793078421
+    },
+    {
+      "detail": {
+        "fresh": [
+          {
+            "id": 8,
+            "type": 98,
+            "uid": 800
+          }
+        ],
+        "remaining": 1,
+        "token": 3,
+        "unique": -15494639
+      },
+      "event": "in-place-native-load",
+      "time": 1793078480
+    },
+    {
+      "detail": {
+        "kind": "hp",
+        "multiplier": 0.595,
+        "original": 1.0,
+        "result": 0.595,
+        "token": 3
+      },
+      "event": "rate-applied",
+      "time": 1793078480
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 3,
+        "typeId": 98,
+        "uid": 800
+      },
+      "event": "monster-observed",
+      "time": 1793078481
+    },
+    {
+      "detail": {
+        "hpBefore": 1785.0,
+        "nativeDeathsOnly": true,
+        "uid": 800
+      },
+      "event": "test-kill",
+      "time": 1793078565
+    },
+    {
+      "detail": {
+        "token": 3
+      },
+      "event": "in-place-no-go",
+      "time": 1793078657
+    }
+  ],
+  "last": {
+    "detail": {
+      "token": 3
+    },
+    "event": "in-place-no-go",
+    "time": 1793078657
+  },
+  "plan": {
+    "baseId": 603,
+    "layer": 3,
+    "mapNo": 10,
+    "monsterIds": [
+      98,
+      98
+    ],
+    "questId": 900102,
+    "sequential": true,
+    "token": 3,
+    "wave": {
+      "dmgMul": 1.06,
+      "hpMul": 0.595,
+      "index": 1,
+      "label": "双弱：镰鼬龙王 + 镰鼬龙王",
+      "monsters": [
+        "镰鼬龙王",
+        "镰鼬龙王"
+      ],
+      "rewardMul": 1.1,
+      "rewardPt": 123,
+      "tier": "weak",
+      "typeTag": "双弱"
+    }
+  },
+  "ready": true,
+  "status": "Quest 900102: layer 1, monsters 92 / counter: Idle",
+  "version": 2
+}

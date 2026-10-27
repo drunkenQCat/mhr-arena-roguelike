@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "quest": {
+    "baseId": 603,
+    "id": 900102,
+    "mapNo": 10
+  },
+  "route": "reentry",
+  "runtimeVerified": false,
+  "startedAt": 1793092292,
+  "version": 2
+}

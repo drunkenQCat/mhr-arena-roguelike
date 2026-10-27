@@ -63,6 +63,13 @@ export class RunSession {
     this.route = this.settings.route;
   }
 
+  shopQuest(): { questId: number; questUnique: number } | undefined {
+    if (this.stage === "Selecting" && this.route === "inPlace" && this.plan && this.questUnique !== null) {
+      return { questId: this.plan.questId, questUnique: this.questUnique };
+    }
+    return undefined;
+  }
+
   private announce(event: string, detail: unknown): void { this.port.report(event, detail); }
 
   start(armor: string, spike = false): Result {

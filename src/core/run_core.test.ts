@@ -98,7 +98,7 @@ describe("review regressions", () => {
     const c = started();
     const options = c.generateChoices(players);
     expect(options.length).toBeGreaterThan(0);
-    for (const option of options) expect(option.dmgMul).toBe(players >= 3 ? 1.1 : 1);
+    for (const option of options) expect(option.dmgMul).toBeCloseTo((players >= 3 ? 1.1 : 1) * (option.mode === "simultaneous" ? 0.95 : 1));
   });
 });
 
@@ -149,7 +149,7 @@ describe("RunCore（C# MhwRogue.Tests 语义移植）", () => {
       const c = new RunCore(cfg(), seed);
       c.startRun("骨套（均衡）");
       for (const o of c.generateChoices()) {
-        if (o.monsters.length === 2) expect(o.rewardPt).toBe(123);
+        if (o.monsters.length === 2) expect(o.rewardPt).toBe(o.mode === "simultaneous" ? 141 : 123);
         else expect(o.rewardPt).toBe(80);
       }
     }
@@ -239,4 +239,25 @@ describe("Rise 新增语义", () => {
     expect(c.state.cartsLeft).toBe(3);
     expect(c.cartRestore().ok).toBe(false); // 整局一次已用
   });
+});
+
+it("offers Single, Sequential and Simultaneous as distinct normal-tier choices", () => {
+ const c = started(); const choices = c.generateChoices();
+ expect(choices.map((o) => o.mode)).toEqual(["single", "sequential", "simultaneous"]);
+ expect(choices.map((o) => o.monsters.length)).toEqual([1, 2, 2]);
+ c.state.layer = 16; c.state.phase = "Prep";
+ expect(c.generateChoices().every((o) => o.mode === "single" && o.monsters.length === 1)).toBe(true);
+});
+
+it.each([1, 2, 3, 4])("offers more PT and slightly easier stats for the same simultaneous pair (%i players)", (players) => {
+ const c = started(); const [, seq, sim] = c.generateChoices(players);
+ expect(seq!.mode).toBe("sequential"); expect(sim!.mode).toBe("simultaneous");
+ expect(sim!.monsters).toEqual(seq!.monsters);
+ expect(sim!.monsters).not.toBe(seq!.monsters);
+ expect(sim!.rewardMul).toBeCloseTo(seq!.rewardMul * 1.15);
+ expect(sim!.rewardPt).toBeGreaterThan(seq!.rewardPt);
+ expect(sim!.hpMul).toBeCloseTo(seq!.hpMul * 0.9, 4);
+ expect(sim!.dmgMul).toBeCloseTo(seq!.dmgMul * 0.95, 4);
+ c.pickChoice(sim!.index); c.killWave();
+ expect(c.state.wallet.pt).toBe(150 + sim!.rewardPt);
 });

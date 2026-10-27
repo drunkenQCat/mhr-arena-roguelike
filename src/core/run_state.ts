@@ -10,7 +10,10 @@ export interface OwnedItem {
   count: number;
 }
 
+export type WaveMode = "single" | "sequential" | "simultaneous";
+
 export interface WaveOption {
+  mode?: WaveMode;
   index: number;
   typeTag: string;
   label: string;

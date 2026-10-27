@@ -14,7 +14,7 @@ export interface RuntimeSettings {
 }
 
 export const DEFAULT_RUNTIME: RuntimeSettings = {
-  route: "reentry", spawnMode: "sequential", autoPost: true,
+  route: "inPlace", spawnMode: "sequential", autoPost: true,
   pollSeconds: 1, spawnTimeoutSeconds: 90, carveSeconds: 20,
   campRadius: 15, campDwellSeconds: 2, postTimeoutSeconds: 45,
 };
@@ -42,7 +42,7 @@ export function makeQuestPlan(config: RogueConfig, catalog: MonsterCatalog, wave
     return id;
   });
   return { questId: config.quest.id, baseId: config.quest.baseId, mapNo: config.quest.mapNo,
-    layer, token, monsterIds, wave, sequential };
+    layer, token, monsterIds, wave, sequential: wave.mode ? wave.mode === "sequential" : sequential };
 }
 
 /** Native table patch, not a generator. Condition values are supplied from RTTI enums. */

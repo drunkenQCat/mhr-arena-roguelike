@@ -1,0 +1,6 @@
+{
+  "probeSha256": "3fc8c7c4fcc65888bacd0d3289d7c2a643026d62f7e7e88a767bcdd1b93aba7d",
+  "questUnique": 714039215,
+  "context": "re.on_frame",
+  "onlyMutation": "EnemySetInfo.updateSetStatus(InitWait)"
+}

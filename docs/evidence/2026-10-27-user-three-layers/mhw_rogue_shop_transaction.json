@@ -1,0 +1,16 @@
+{
+  "id": "flash",
+  "message": "已购买 Flash Bomb ×1（0 → 1）",
+  "pt": 100,
+  "report": {
+    "after": 1,
+    "before": 0,
+    "gameName": "Flash Bomb",
+    "granted": true,
+    "method": "tryAddGameItem(snow.data.ContentsIdSystem.ItemId, System.Int32)",
+    "requested": 1,
+    "shopItemId": "flash",
+    "uncertain": false
+  },
+  "unresolved": false
+}

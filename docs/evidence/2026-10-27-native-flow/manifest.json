@@ -1,0 +1,115 @@
+{
+  "pid": 48204,
+  "metadataAt": 1793033121,
+  "readOnly": true,
+  "functions": [
+    {
+      "name": "snow.QuestManager.updateBossEnemy",
+      "address": "0x7ff7c19b3840",
+      "captureBytes": 8192,
+      "sha256": "c81bac56bc968981faf1745a4eacb4e4b3c8d808ea8e0159f24df91d500d42cb"
+    },
+    {
+      "name": "snow.QuestManager.clearBossSetAll",
+      "address": "0x7ff7c186f4a0",
+      "captureBytes": 8192,
+      "sha256": "367441c56265934e72568cb8353f4e15dacb92a5ab0c1a650f5714a7c115ba68"
+    },
+    {
+      "name": "snow.QuestManager.getBossSetInfo",
+      "address": "0x7ff7bf5d2690",
+      "captureBytes": 8192,
+      "sha256": "a623449b0e2dc825e963d6458a0a7138e5ffec251265cc50652ee9d10b7a261c"
+    },
+    {
+      "name": "snow.QuestManager.setBossLoadStartOk",
+      "address": "0x7ff7bf5d5600",
+      "captureBytes": 8192,
+      "sha256": "075c96ef404686d9044a2c2e63f8b0025f8b65802be0356ec53969a2c6e4c6c2"
+    },
+    {
+      "name": "snow.QuestManager.getNextEnemyAppearSpace",
+      "address": "0x7ff7c18edac0",
+      "captureBytes": 8192,
+      "sha256": "9baafeca357e176ebe71ad4af01f5d0539215cc65be968bcee29e08ed1746126"
+    },
+    {
+      "name": "snow.QuestManager.checkNextEnemyAppearCondition",
+      "address": "0x7ff7c186b960",
+      "captureBytes": 8192,
+      "sha256": "ec9e95f4e0329569c2b990224ba24a950f8a51df8b1f27d3aa2ab1a87e6d7578"
+    },
+    {
+      "name": "snow.QuestManager.checkBossLoadDone",
+      "address": "0x7ff7bf5db370",
+      "captureBytes": 8192,
+      "sha256": "d746bf1bc4ca9ca288468a556d0d1b8d5be60e35afdd9087f61f38a2c1a240f3"
+    },
+    {
+      "name": "snow.QuestManager.updateExtraEnemyCommon",
+      "address": "0x7ff7c19bec40",
+      "captureBytes": 8192,
+      "sha256": "bd25258c33d923c777c786bcaa3e417e140aeeba201591c94409e4c0c35cd2d9"
+    },
+    {
+      "name": "snow.QuestManager.setupQuest_CreateEnemy",
+      "address": "0x7ff7c198a280",
+      "captureBytes": 8192,
+      "sha256": "60c71880a20d2a2af70e532952dcc1c2789dd31588b34ffbe550d849c48d13ad"
+    },
+    {
+      "name": "snow.enemy.EnemyManager.createEnemySetInfo",
+      "address": "0x7ff7bf5072e0",
+      "captureBytes": 8192,
+      "sha256": "7e98f47a1cd0c152225e5913198882651dd323d2cc0122011059cd137fbd8f7a"
+    },
+    {
+      "name": "snow.enemy.EnemyManager.getEnemySetInfo",
+      "address": "0x7ff7c1b0d200",
+      "captureBytes": 8192,
+      "sha256": "d80a71bca79f65028ce07fa3e6a98f3d07ddf592e341b743d91794b4f1b2084f"
+    },
+    {
+      "name": "snow.enemy.EnemyManager.createEnemyFromSetInfo",
+      "address": "0x7ff7c1ade020",
+      "captureBytes": 8192,
+      "sha256": "314e3350861bef7d52199140ee98b00a579b30ce854d083229104f3c8d162e98"
+    },
+    {
+      "name": "snow.enemy.EnemyManager.updateEnemySetInfoQuestHost",
+      "address": "0x7ff7c1bc32c0",
+      "captureBytes": 8192,
+      "sha256": "cbf0b7f146258d632518f83fca732d602e1f1badb223c2ea9248bc6f44eaecdf"
+    },
+    {
+      "name": "snow.enemy.EnemySetInfo.get_RepopMax",
+      "address": "0x7ff7bf598d00",
+      "captureBytes": 8192,
+      "sha256": "c3095604326a850048b77c572524743ad239c0803206378ce25296589e86fa5b"
+    },
+    {
+      "name": "snow.enemy.EnemySetInfo.updateSetStatus",
+      "address": "0x7ff7bee9e570",
+      "captureBytes": 8192,
+      "sha256": "badd87201b8d220fce96c65b72813eb787d99cbdfcd3263a77364bff99d4e32f"
+    },
+    {
+      "name": "snow.enemy.EnemySetInfo.updateDestroyStatus",
+      "address": "0x7ff7beebd090",
+      "captureBytes": 8192,
+      "sha256": "5051ea1496ba7dc202061cfc0bf9ed94b5468bac276eaaf3a92842a254537f0d"
+    },
+    {
+      "name": "snow.enemy.EnemySetInfo.repop",
+      "address": "0x7ff7c1335fa0",
+      "captureBytes": 8192,
+      "sha256": "408b0bcb2651e2c82a48b5356d17f00bdf8e66ac54a18a1d9c512768769fe229"
+    },
+    {
+      "name": "snow.enemy.EnemySetInfo.resetEnemy",
+      "address": "0x7ff7c1338b90",
+      "captureBytes": 8192,
+      "sha256": "2e2990643a3ee32fd8b4859f54305ff27a4872b665864f847f941dbd938375a3"
+    }
+  ]
+}

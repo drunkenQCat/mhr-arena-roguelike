@@ -4,7 +4,7 @@ import { validateConfig } from "../core/config";
 import { defaultConfig } from "./default_config";
 const mock = vi.hoisted(() => ({ click: false, selecting: true, village: true, count: 2,
   grant: vi.fn(), dumps: vi.fn(), begin: vi.fn(), end: vi.fn(), text: vi.fn() }));
-vi.mock("./item_grant", () => ({ canTradeInVillage: () => mock.village,
+vi.mock("./item_grant", () => ({ canTrade: () => mock.village,
   pouchCount: () => mock.count, grantItem: mock.grant }));
 vi.mock("./sdk", () => ({ rejson: { dump_file: mock.dumps }, imguiApi: {
   begin_window: mock.begin, end_window: mock.end,
@@ -74,4 +74,19 @@ describe("shop transaction", () => {
     click(); shop.tick(); click(); shop.tick();
     expect(shop.busy).toBe(true); expect(mock.grant).toHaveBeenCalledTimes(1);
   });
+});
+
+it("passes the between-wave quest identity to delivery and logs blocked queued purchases", () => {
+  const { core } = fixture();
+  const context = { questId: 900102, questUnique: 42 };
+  const shop = new ShopWindow(core, () => mock.selecting, () => context);
+  mock.grant.mockReturnValue({ granted: true, before: 2, after: 3 });
+  mock.click = true; shop.draw(); shop.tick();
+  expect(mock.grant).toHaveBeenCalledWith("potion", 1, context);
+  mock.selecting = false;
+  // A queued request must be revalidated even when the game state changes before tick.
+  mock.selecting = true; core.state.wallet.purchaseLog = [];
+  mock.click = true; shop.draw(); mock.village = false; shop.tick();
+  expect(mock.dumps).toHaveBeenLastCalledWith("mhw_rogue_shop_transaction.json", expect.objectContaining({ blocked: true }), 2);
+  expect(mock.grant).toHaveBeenCalledTimes(1);
 });

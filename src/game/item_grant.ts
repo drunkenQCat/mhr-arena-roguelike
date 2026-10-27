@@ -4,7 +4,7 @@
  *   snow.data.DataManager._ItemPouch (snow.data.ItemPouch)
  *     .tryAddGameItem(itemId: snow.data.ContentsIdSystem.ItemId, addNum: int)
  *   ItemId 是 UInt32 枚举，data/item_ids.json 的整数值可直接传（Potion=0x04100006 已验证）。
- * 仅空闲单人村庄发放单件；调用返回 void，必须读回数量验证。
+ * 村庄整备或已清波的单人自定义斗技场发放单件；调用返回 void，必须读回数量验证。
  */
 
 import { itemIds } from "./default_config";
@@ -53,17 +53,32 @@ export function pouchCount(shopItemId: string): number {
   return count;
 }
 
-export function canTradeInVillage(): boolean {
-  const qm = getSingleton("snow.QuestManager");
-  const stage = getSingleton("snow.stage.StageManager");
-  const gui = getSingleton("snow.gui.GuiManager");
-  return !!qm && !!stage && !!gui && !qm.call("isActiveQuest") &&
-    !stage.call("get_IsQuestOnline") && !!gui.call("IsCanInvokeQuestBoard") &&
-    !gui.call("isOpenYNInfo") && !gui.call("isOpenSelectInfo");
+export interface TradeQuest { questId: number; questUnique: number }
+
+/** An arena context is supplied only by the session's between-wave Selecting stage. */
+export function canTrade(context?: TradeQuest): boolean {
+  try {
+    const qm = getSingleton("snow.QuestManager");
+    const stage = getSingleton("snow.stage.StageManager");
+    const gui = getSingleton("snow.gui.GuiManager");
+    if (!qm || !stage || !gui || stage.call("get_IsQuestOnline") || gui.call("isOpenYNInfo") || gui.call("isOpenSelectInfo")) return false;
+    if (!qm.call("isActiveQuest")) return !!gui.call("IsCanInvokeQuestBoard");
+    if (!context || context.questId !== 900102 || qm.call("get_ActiveQuestNo") !== context.questId ||
+        qm.call("getActiveQuestUniqueNo") !== context.questUnique || qm.call("isPlayQuest") !== true) return false;
+    const em = getSingleton("snow.enemy.EnemyManager");
+    if (!em) return false;
+    const count = em.call("getBossEnemyCount") as number;
+    if (!Number.isInteger(count) || count < 0 || count > 64) return false;
+    for (let i = 0; i < count; i++) {
+      const e = em.call("getBossEnemy", i) as REManagedObject | null;
+      if (!e || (!e.call("isDieBehaviorActive") && !e.call("isCapture"))) return false;
+    }
+    return true;
+  } catch { return false; }
 }
 
 /** 单件发货。调用前检查游戏容量；granted 表示数量确实增加了一件。 */
-export function grantItem(shopItemId: string, count: number): GrantReport {
+export function grantItem(shopItemId: string, count: number, context?: TradeQuest): GrantReport {
   const gameId = gameIdOf(shopItemId);
   const gameName = gameNameOf(shopItemId) ?? shopItemId;
   const base: GrantReport = { shopItemId, gameName, requested: count, granted: false, method: ADD_ITEM };
@@ -82,7 +97,7 @@ export function grantItem(shopItemId: string, count: number): GrantReport {
     if (!pouch.get_type_definition().get_method(ADD_ITEM)) {
       return { ...base, reason: "Required two-argument native overload is unavailable" };
     }
-    if (!canTradeInVillage() || pouch.call("canAddItem", gameId) !== true) return base;
+    if (!canTrade(context) || pouch.call("canAddItem", gameId) !== true) return base;
     before = pouchCount(shopItemId);
   } catch { return base; }
   try { pouch.call(ADD_ITEM, gameId, count); }

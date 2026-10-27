@@ -1,0 +1,896 @@
+{
+  "events": [
+    {
+      "at": 1793076814,
+      "detail": {
+        "bosses": [
+          {
+            "dying": false,
+            "type": 54,
+            "uid": 100
+          }
+        ],
+        "cursor": 5,
+        "hold": false,
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "state"
+    },
+    {
+      "at": 1793076846,
+      "detail": {
+        "bosses": [
+          {
+            "dying": false,
+            "type": 54,
+            "uid": 100
+          }
+        ],
+        "cursor": 5,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "hold-enabled"
+    },
+    {
+      "at": 1793076847,
+      "detail": {
+        "bosses": [
+          {
+            "dying": false,
+            "type": 54,
+            "uid": 100
+          }
+        ],
+        "cursor": 5,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "state"
+    },
+    {
+      "at": 1793076857,
+      "detail": {
+        "bosses": [
+          {
+            "dying": false,
+            "type": 54,
+            "uid": 100
+          }
+        ],
+        "cursor": 5,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "kill-armed"
+    },
+    {
+      "at": 1793076857,
+      "detail": {
+        "uid": 100
+      },
+      "event": "kill-request"
+    },
+    {
+      "at": 1793076857,
+      "detail": {
+        "kind": 0,
+        "type": 54,
+        "uid": 100
+      },
+      "event": "native-death"
+    },
+    {
+      "at": 1793076867,
+      "detail": {
+        "bosses": [
+          {
+            "dying": true,
+            "type": 54,
+            "uid": 100
+          }
+        ],
+        "cursor": 5,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "state"
+    },
+    {
+      "at": 1793076929,
+      "detail": {
+        "bosses": null,
+        "cursor": 5,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "state"
+    },
+    {
+      "at": 1793076984,
+      "detail": {
+        "countBefore": 119,
+        "cursor": 2,
+        "record": 119,
+        "slot": 2,
+        "type": 60,
+        "uid": 11900
+      },
+      "event": "rewind-load"
+    },
+    {
+      "at": 1793076985,
+      "detail": {
+        "bosses": [
+          {
+            "dying": false,
+            "type": 60,
+            "uid": 11900
+          }
+        ],
+        "cursor": 3,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 119,
+            "state": 1,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "state"
+    },
+    {
+      "at": 1793077043,
+      "detail": {
+        "bosses": [
+          {
+            "dying": false,
+            "type": 60,
+            "uid": 11900
+          }
+        ],
+        "cursor": 3,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 119,
+            "state": 1,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "kill-armed"
+    },
+    {
+      "at": 1793077043,
+      "detail": {
+        "uid": 11900
+      },
+      "event": "kill-request"
+    },
+    {
+      "at": 1793077043,
+      "detail": {
+        "kind": 0,
+        "type": 60,
+        "uid": 11900
+      },
+      "event": "native-death"
+    },
+    {
+      "at": 1793077048,
+      "detail": {
+        "bosses": [
+          {
+            "dying": true,
+            "type": 60,
+            "uid": 11900
+          }
+        ],
+        "cursor": 3,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 119,
+            "state": 1,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "state"
+    },
+    {
+      "at": 1793077110,
+      "detail": {
+        "bosses": null,
+        "cursor": 3,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "state"
+    },
+    {
+      "at": 1793077150,
+      "detail": {
+        "countBefore": 120,
+        "cursor": 2,
+        "record": 120,
+        "slot": 2,
+        "type": 60,
+        "uid": 12000
+      },
+      "event": "rewind-load"
+    },
+    {
+      "at": 1793077151,
+      "detail": {
+        "bosses": [
+          {
+            "dying": false,
+            "type": 60,
+            "uid": 12000
+          }
+        ],
+        "cursor": 3,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 120,
+            "state": 1,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "state"
+    },
+    {
+      "at": 1793077417,
+      "detail": {
+        "bosses": [
+          {
+            "dying": false,
+            "type": 60,
+            "uid": 12000
+          }
+        ],
+        "cursor": 3,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 120,
+            "state": 1,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "kill-armed"
+    },
+    {
+      "at": 1793077417,
+      "detail": {
+        "uid": 12000
+      },
+      "event": "kill-request"
+    },
+    {
+      "at": 1793077417,
+      "detail": {
+        "kind": 0,
+        "type": 60,
+        "uid": 12000
+      },
+      "event": "native-death"
+    },
+    {
+      "at": 1793077422,
+      "detail": {
+        "bosses": [
+          {
+            "dying": true,
+            "type": 60,
+            "uid": 12000
+          }
+        ],
+        "cursor": 3,
+        "hold": true,
+        "order": [
+          0,
+          1,
+          2,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 120,
+            "state": 1,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "status": 2,
+        "unique": 1994278460
+      },
+      "event": "state"
+    }
+  ]
+}

@@ -19,7 +19,7 @@ try {
   const installer = new QuestInstaller(config, initial);
   const runtime = new NativeRuntime(config, installer);
   const session = new RunSession(core, monsterCatalog, runtime);
-  const shopWindow = new ShopWindow(session.core, () => session.stage === "Selecting");
+  const shopWindow = new ShopWindow(session.core, () => session.stage === "Selecting", () => session.shopQuest());
   reframework.onFrame(() => {
     try { runtime.tick(); shopWindow.tick(); session.tick(); }
     catch (error) {

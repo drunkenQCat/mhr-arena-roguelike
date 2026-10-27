@@ -1,0 +1,38 @@
+{
+  "questManager": "0x239244562f0",
+  "enemyManager": "0x239243f7830",
+  "note": "Sequential read-only memory sample, not an atomic snapshot",
+  "quest": {
+    "_ExtraEmRno": 10,
+    "_BossSetCount": 2,
+    "_ExtraSetCount": 1,
+    "_BossSetNoTbl": [
+      0,
+      1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1
+    ],
+    "_BossSetCond": [
+      1,
+      7,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "lists": {
+    "_EnemySetInfoList": {
+      "address": "0x239243fa2d0",
+      "count": 116
+    },
+    "_ZakoSetInfoList": {
+      "address": "0x239243fa330",
+      "count": 0
+    }
+  }
+}

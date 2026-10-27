@@ -1,0 +1,1592 @@
+{
+  "at": 1793074519,
+  "events": [
+    {
+      "at": 1793074066,
+      "clock": 6897.893,
+      "detail": {
+        "count": 3,
+        "extra": 2,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "frame",
+      "frame": 1
+    },
+    {
+      "at": 1793074345,
+      "clock": 7176.525,
+      "detail": {
+        "count": 3,
+        "extra": 2,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 5,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 117,
+            "state": 0,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "pre:updateBossEnemy",
+      "frame": 14932
+    },
+    {
+      "at": 1793074345,
+      "clock": 7176.525,
+      "detail": {
+        "arg1": 60,
+        "scheduler": {
+          "count": 3,
+          "extra": 2,
+          "loadDone": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "loadOk": [
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "order": [
+            0,
+            1,
+            2,
+            3,
+            -1,
+            -1,
+            -1
+          ],
+          "phase": 5,
+          "slots": [
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": 1,
+              "state": 1,
+              "type": 54
+            },
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": 117,
+              "state": 0,
+              "type": 60
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            }
+          ],
+          "unique": 1994278460
+        }
+      },
+      "event": "call:requestLoadEnemy",
+      "frame": 14932
+    },
+    {
+      "at": 1793074345,
+      "clock": 7176.525,
+      "detail": {
+        "count": 3,
+        "extra": 2,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 6,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 117,
+            "state": 0,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "post:updateExtraEnemyCommon",
+      "frame": 14932
+    },
+    {
+      "at": 1793074345,
+      "clock": 7176.592,
+      "detail": {
+        "arg1": 1,
+        "scheduler": {
+          "count": 3,
+          "extra": 2,
+          "loadDone": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "loadOk": [
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "order": [
+            0,
+            1,
+            2,
+            3,
+            -1,
+            -1,
+            -1
+          ],
+          "phase": 7,
+          "slots": [
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": 1,
+              "state": 1,
+              "type": 54
+            },
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": 117,
+              "state": 0,
+              "type": 60
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            }
+          ],
+          "unique": 1994278460
+        }
+      },
+      "event": "call:netSendBossLoad",
+      "frame": 14936
+    },
+    {
+      "at": 1793074345,
+      "clock": 7176.592,
+      "detail": {
+        "count": 3,
+        "extra": 2,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 7,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 117,
+            "state": 0,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "post:netSendBossLoad",
+      "frame": 14936
+    },
+    {
+      "at": 1793074345,
+      "clock": 7176.609,
+      "detail": {
+        "count": 3,
+        "extra": 2,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 8,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 117,
+            "state": 0,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "post:updateExtraEnemyCommon",
+      "frame": 14937
+    },
+    {
+      "at": 1793074345,
+      "clock": 7176.625,
+      "detail": {
+        "info": {
+          "destroy": 0,
+          "gen": 0,
+          "id": 117,
+          "owner": false,
+          "status": 0,
+          "type": 60,
+          "uid": 11700
+        },
+        "scheduler": {
+          "count": 3,
+          "extra": 2,
+          "loadDone": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "loadOk": [
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "order": [
+            0,
+            1,
+            2,
+            3,
+            -1,
+            -1,
+            -1
+          ],
+          "phase": 8,
+          "slots": [
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": 1,
+              "state": 1,
+              "type": 54
+            },
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": 117,
+              "state": 0,
+              "type": 60
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            }
+          ],
+          "unique": 1994278460
+        },
+        "setType": 1
+      },
+      "event": "create:request",
+      "frame": 14938
+    },
+    {
+      "at": 1793074345,
+      "clock": 7176.629,
+      "detail": {
+        "present": true,
+        "type": 60,
+        "uid": 11700
+      },
+      "event": "create:return",
+      "frame": 14938
+    },
+    {
+      "at": 1793074345,
+      "clock": 7176.63,
+      "detail": {
+        "count": 4,
+        "extra": 3,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 9,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 117,
+            "state": 1,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "post:updateExtraEnemyCommon",
+      "frame": 14938
+    },
+    {
+      "at": 1793074345,
+      "clock": 7176.641,
+      "detail": {
+        "count": 4,
+        "extra": 3,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 117,
+            "state": 1,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "post:updateBossEnemy",
+      "frame": 14939
+    },
+    {
+      "at": 1793074472,
+      "clock": 7303.569,
+      "detail": {
+        "count": 4,
+        "extra": 3,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          -1,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "pre:updateBossEnemy",
+      "frame": 21386
+    },
+    {
+      "at": 1793074518,
+      "clock": 7349.822,
+      "detail": {
+        "count": 4,
+        "extra": 3,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 5,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": 118,
+            "state": 0,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "pre:updateBossEnemy",
+      "frame": 23750
+    },
+    {
+      "at": 1793074518,
+      "clock": 7349.823,
+      "detail": {
+        "arg1": 60,
+        "scheduler": {
+          "count": 4,
+          "extra": 3,
+          "loadDone": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "loadOk": [
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "order": [
+            0,
+            1,
+            2,
+            3,
+            2,
+            -1,
+            -1
+          ],
+          "phase": 5,
+          "slots": [
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": 1,
+              "state": 1,
+              "type": 54
+            },
+            {
+              "id": 118,
+              "state": 0,
+              "type": 60
+            },
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            }
+          ],
+          "unique": 1994278460
+        }
+      },
+      "event": "call:requestLoadEnemy",
+      "frame": 23750
+    },
+    {
+      "at": 1793074518,
+      "clock": 7349.823,
+      "detail": {
+        "count": 4,
+        "extra": 3,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 6,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": 118,
+            "state": 0,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "post:updateExtraEnemyCommon",
+      "frame": 23750
+    },
+    {
+      "at": 1793074518,
+      "clock": 7349.889,
+      "detail": {
+        "arg1": 1,
+        "scheduler": {
+          "count": 4,
+          "extra": 3,
+          "loadDone": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "loadOk": [
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "order": [
+            0,
+            1,
+            2,
+            3,
+            2,
+            -1,
+            -1
+          ],
+          "phase": 7,
+          "slots": [
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": 1,
+              "state": 1,
+              "type": 54
+            },
+            {
+              "id": 118,
+              "state": 0,
+              "type": 60
+            },
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            }
+          ],
+          "unique": 1994278460
+        }
+      },
+      "event": "call:netSendBossLoad",
+      "frame": 23754
+    },
+    {
+      "at": 1793074518,
+      "clock": 7349.889,
+      "detail": {
+        "count": 4,
+        "extra": 3,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 7,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": 118,
+            "state": 0,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "post:netSendBossLoad",
+      "frame": 23754
+    },
+    {
+      "at": 1793074518,
+      "clock": 7349.905,
+      "detail": {
+        "count": 4,
+        "extra": 3,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 8,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": 118,
+            "state": 0,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "post:updateExtraEnemyCommon",
+      "frame": 23755
+    },
+    {
+      "at": 1793074518,
+      "clock": 7349.922,
+      "detail": {
+        "info": {
+          "destroy": 0,
+          "gen": 0,
+          "id": 118,
+          "owner": false,
+          "status": 0,
+          "type": 60,
+          "uid": 11800
+        },
+        "scheduler": {
+          "count": 4,
+          "extra": 3,
+          "loadDone": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "loadOk": [
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "order": [
+            0,
+            1,
+            2,
+            3,
+            2,
+            -1,
+            -1
+          ],
+          "phase": 8,
+          "slots": [
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": 1,
+              "state": 1,
+              "type": 54
+            },
+            {
+              "id": 118,
+              "state": 0,
+              "type": 60
+            },
+            {
+              "id": -1,
+              "state": 2,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            },
+            {
+              "id": -1,
+              "state": 0,
+              "type": 0
+            }
+          ],
+          "unique": 1994278460
+        },
+        "setType": 1
+      },
+      "event": "create:request",
+      "frame": 23756
+    },
+    {
+      "at": 1793074518,
+      "clock": 7349.925,
+      "detail": {
+        "present": true,
+        "type": 60,
+        "uid": 11800
+      },
+      "event": "create:return",
+      "frame": 23756
+    },
+    {
+      "at": 1793074518,
+      "clock": 7349.925,
+      "detail": {
+        "count": 5,
+        "extra": 4,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 9,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": 118,
+            "state": 1,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "post:updateExtraEnemyCommon",
+      "frame": 23756
+    },
+    {
+      "at": 1793074518,
+      "clock": 7349.938,
+      "detail": {
+        "count": 5,
+        "extra": 4,
+        "loadDone": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "loadOk": [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          -1,
+          -1
+        ],
+        "phase": 10,
+        "slots": [
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": 1,
+            "state": 1,
+            "type": 54
+          },
+          {
+            "id": 118,
+            "state": 1,
+            "type": 60
+          },
+          {
+            "id": -1,
+            "state": 2,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          },
+          {
+            "id": -1,
+            "state": 0,
+            "type": 0
+          }
+        ],
+        "unique": 1994278460
+      },
+      "event": "post:updateBossEnemy",
+      "frame": 23757
+    }
+  ],
+  "hooks": {
+    "snow.QuestManager.netSendBossLoad": "installed",
+    "snow.QuestManager.setBossLoadStartOk": "installed",
+    "snow.QuestManager.updateBossEnemy": "installed",
+    "snow.QuestManager.updateExtraEnemyCommon": "installed",
+    "snow.enemy.EnemyManager.createEnemyFromSetInfo": "installed",
+    "snow.enemy.EnemyManager.requestLoadEnemy": "installed"
+  },
+  "readOnly": true
+}

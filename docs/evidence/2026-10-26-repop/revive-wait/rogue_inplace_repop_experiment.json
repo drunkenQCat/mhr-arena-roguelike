@@ -1,0 +1,790 @@
+{
+  "events": [
+    {
+      "at": 1793025281,
+      "detail": {
+        "method": "repop()",
+        "quest": {
+          "items": [
+            {
+              "fields": {
+                "EmSetId": 0,
+                "EmType": 98,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 1
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": 1,
+                "EmType": 54,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 1
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            }
+          ],
+          "total": 7,
+          "type": "snow.QuestManager.QuestEmSetParam[]"
+        },
+        "slot": {
+          "fields": {
+            "<ArrangementActionType>k__BackingField": 0,
+            "<DestroyStatus>k__BackingField": 0,
+            "<EmGenId>k__BackingField": 0,
+            "<EmSetId>k__BackingField": 0,
+            "<EnemySetParam>k__BackingField": {
+              "fields": {
+                "HideGroup": false,
+                "_BlockNo": 11,
+                "_IndividualType": 0,
+                "_RouteNo": 10,
+                "_SetPos": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023A2172EE18"
+                },
+                "_SetRot": {
+                  "nativeValue": "sol.glm::qua<float,0>: 0000023A2172F7D8"
+                },
+                "_SubType": 0,
+                "_TypeValue": 98
+              },
+              "type": "snow.quest.BossSetParam"
+            },
+            "<HyakuryuType>k__BackingField": 0,
+            "<HyakuryuWaveNo>k__BackingField": -1,
+            "<OwnerEnemy>k__BackingField": true,
+            "<SetStatus>k__BackingField": 3,
+            "<SetupParam>k__BackingField": {
+              "fields": {
+                "<IsSetup>k__BackingField": true,
+                "<SetAttackDifficultyWave>k__BackingField": 0,
+                "<SetPos>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023A2172F0B8"
+                },
+                "<SetRandomScale>k__BackingField": 1.059999942779541,
+                "<SetVitalDifficultyWave>k__BackingField": 0,
+                "<SetZakoIndividualDifferenceBodyColor>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<2,float,0>: 0000023B30994778"
+                }
+              },
+              "type": "snow.enemy.EnemyManager.EnemySetupParam"
+            },
+            "<SummonOwnerId>k__BackingField": -1,
+            "<UniqueId>k__BackingField": 0,
+            "<WaitSecond>k__BackingField": 0.0,
+            "_HyakutyuAttr": 0,
+            "_RepopNum": 0
+          },
+          "type": "snow.enemy.EnemySetInfo"
+        },
+        "type": 98,
+        "uid": 0,
+        "unique": -1177157663
+      },
+      "event": "before-repop"
+    },
+    {
+      "at": 1793025281,
+      "detail": {
+        "ok": true,
+        "slot": {
+          "fields": {
+            "<ArrangementActionType>k__BackingField": 0,
+            "<DestroyStatus>k__BackingField": 0,
+            "<EmGenId>k__BackingField": 0,
+            "<EmSetId>k__BackingField": 0,
+            "<EnemySetParam>k__BackingField": {
+              "fields": {
+                "HideGroup": false,
+                "_BlockNo": 11,
+                "_IndividualType": 0,
+                "_RouteNo": 10,
+                "_SetPos": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023A21733318"
+                },
+                "_SetRot": {
+                  "nativeValue": "sol.glm::qua<float,0>: 0000023A217331F8"
+                },
+                "_SubType": 0,
+                "_TypeValue": 98
+              },
+              "type": "snow.quest.BossSetParam"
+            },
+            "<HyakuryuType>k__BackingField": 0,
+            "<HyakuryuWaveNo>k__BackingField": -1,
+            "<OwnerEnemy>k__BackingField": true,
+            "<SetStatus>k__BackingField": 4,
+            "<SetupParam>k__BackingField": {
+              "fields": {
+                "<IsSetup>k__BackingField": true,
+                "<SetAttackDifficultyWave>k__BackingField": 0,
+                "<SetPos>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023A21733C78"
+                },
+                "<SetRandomScale>k__BackingField": 1.059999942779541,
+                "<SetVitalDifficultyWave>k__BackingField": 0,
+                "<SetZakoIndividualDifferenceBodyColor>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<2,float,0>: 0000023B3099FDA8"
+                }
+              },
+              "type": "snow.enemy.EnemyManager.EnemySetupParam"
+            },
+            "<SummonOwnerId>k__BackingField": -1,
+            "<UniqueId>k__BackingField": 0,
+            "<WaitSecond>k__BackingField": 0.0,
+            "_HyakutyuAttr": 0,
+            "_RepopNum": 0
+          },
+          "type": "snow.enemy.EnemySetInfo"
+        },
+        "unique": -1177157663
+      },
+      "event": "after-repop"
+    },
+    {
+      "at": 1793025288,
+      "detail": "...erHunterRise\\reframework\\autorun\\inplace_queue_probe.lua:109: Already attempted repop once in this quest",
+      "event": "repop-error"
+    },
+    {
+      "at": 1793025293,
+      "detail": "...erHunterRise\\reframework\\autorun\\inplace_queue_probe.lua:108: Destroy reset requires this quest's completed InitWait experiment",
+      "event": "repop-error"
+    },
+    {
+      "at": 1793027391,
+      "detail": {
+        "method": "updateSetStatus(snow.enemy.EnemyManager.EnemySetStatus)",
+        "quest": {
+          "items": [
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 2
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": 1,
+                "EmType": 54,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 1
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            }
+          ],
+          "total": 7,
+          "type": "snow.QuestManager.QuestEmSetParam[]"
+        },
+        "slot": {
+          "fields": {
+            "<ArrangementActionType>k__BackingField": 0,
+            "<DestroyStatus>k__BackingField": 2,
+            "<EmGenId>k__BackingField": 0,
+            "<EmSetId>k__BackingField": 0,
+            "<EnemySetParam>k__BackingField": {
+              "fields": {
+                "HideGroup": false,
+                "_BlockNo": 11,
+                "_IndividualType": 0,
+                "_RouteNo": 10,
+                "_SetPos": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023B3FAE0AD8"
+                },
+                "_SetRot": {
+                  "nativeValue": "sol.glm::qua<float,0>: 0000023B3FAE0A18"
+                },
+                "_SubType": 0,
+                "_TypeValue": 98
+              },
+              "type": "snow.quest.BossSetParam"
+            },
+            "<HyakuryuType>k__BackingField": 0,
+            "<HyakuryuWaveNo>k__BackingField": -1,
+            "<OwnerEnemy>k__BackingField": false,
+            "<SetStatus>k__BackingField": 4,
+            "<SetupParam>k__BackingField": {
+              "fields": {
+                "<IsSetup>k__BackingField": false,
+                "<SetAttackDifficultyWave>k__BackingField": 0,
+                "<SetPos>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023B3FAE2FF8"
+                },
+                "<SetRandomScale>k__BackingField": 1.1200000047683716,
+                "<SetVitalDifficultyWave>k__BackingField": 0,
+                "<SetZakoIndividualDifferenceBodyColor>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<2,float,0>: 0000023B3ECE9318"
+                }
+              },
+              "type": "snow.enemy.EnemyManager.EnemySetupParam"
+            },
+            "<SummonOwnerId>k__BackingField": -1,
+            "<UniqueId>k__BackingField": 0,
+            "<WaitSecond>k__BackingField": 0.0,
+            "_HyakutyuAttr": 0,
+            "_RepopNum": 0
+          },
+          "type": "snow.enemy.EnemySetInfo"
+        },
+        "type": 98,
+        "uid": 0,
+        "unique": 692178887
+      },
+      "event": "before-init"
+    },
+    {
+      "at": 1793027391,
+      "detail": {
+        "ok": true,
+        "slot": {
+          "fields": {
+            "<ArrangementActionType>k__BackingField": 0,
+            "<DestroyStatus>k__BackingField": 2,
+            "<EmGenId>k__BackingField": 0,
+            "<EmSetId>k__BackingField": 0,
+            "<EnemySetParam>k__BackingField": {
+              "fields": {
+                "HideGroup": false,
+                "_BlockNo": 11,
+                "_IndividualType": 0,
+                "_RouteNo": 10,
+                "_SetPos": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023A8863EBC8"
+                },
+                "_SetRot": {
+                  "nativeValue": "sol.glm::qua<float,0>: 0000023A8863F228"
+                },
+                "_SubType": 0,
+                "_TypeValue": 98
+              },
+              "type": "snow.quest.BossSetParam"
+            },
+            "<HyakuryuType>k__BackingField": 0,
+            "<HyakuryuWaveNo>k__BackingField": -1,
+            "<OwnerEnemy>k__BackingField": false,
+            "<SetStatus>k__BackingField": 0,
+            "<SetupParam>k__BackingField": {
+              "fields": {
+                "<IsSetup>k__BackingField": false,
+                "<SetAttackDifficultyWave>k__BackingField": 0,
+                "<SetPos>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023A88642BE8"
+                },
+                "<SetRandomScale>k__BackingField": 1.1200000047683716,
+                "<SetVitalDifficultyWave>k__BackingField": 0,
+                "<SetZakoIndividualDifferenceBodyColor>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<2,float,0>: 0000023B3B3CDCE8"
+                }
+              },
+              "type": "snow.enemy.EnemyManager.EnemySetupParam"
+            },
+            "<SummonOwnerId>k__BackingField": -1,
+            "<UniqueId>k__BackingField": 0,
+            "<WaitSecond>k__BackingField": 0.0,
+            "_HyakutyuAttr": 0,
+            "_RepopNum": 0
+          },
+          "type": "snow.enemy.EnemySetInfo"
+        },
+        "unique": 692178887
+      },
+      "event": "after-init"
+    },
+    {
+      "at": 1793027625,
+      "detail": {
+        "method": "updateDestroyStatus(snow.enemy.EnemyManager.DestroyStatus)",
+        "quest": {
+          "items": [
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 2
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": 1,
+                "EmType": 54,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 1
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            }
+          ],
+          "total": 7,
+          "type": "snow.QuestManager.QuestEmSetParam[]"
+        },
+        "slot": {
+          "fields": {
+            "<ArrangementActionType>k__BackingField": 0,
+            "<DestroyStatus>k__BackingField": 2,
+            "<EmGenId>k__BackingField": 0,
+            "<EmSetId>k__BackingField": 0,
+            "<EnemySetParam>k__BackingField": {
+              "fields": {
+                "HideGroup": false,
+                "_BlockNo": 11,
+                "_IndividualType": 0,
+                "_RouteNo": 10,
+                "_SetPos": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023B3DC66C98"
+                },
+                "_SetRot": {
+                  "nativeValue": "sol.glm::qua<float,0>: 0000023B3DC66818"
+                },
+                "_SubType": 0,
+                "_TypeValue": 98
+              },
+              "type": "snow.quest.BossSetParam"
+            },
+            "<HyakuryuType>k__BackingField": 0,
+            "<HyakuryuWaveNo>k__BackingField": -1,
+            "<OwnerEnemy>k__BackingField": false,
+            "<SetStatus>k__BackingField": 0,
+            "<SetupParam>k__BackingField": {
+              "fields": {
+                "<IsSetup>k__BackingField": false,
+                "<SetAttackDifficultyWave>k__BackingField": 0,
+                "<SetPos>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023B3DC66E18"
+                },
+                "<SetRandomScale>k__BackingField": 1.1200000047683716,
+                "<SetVitalDifficultyWave>k__BackingField": 0,
+                "<SetZakoIndividualDifferenceBodyColor>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<2,float,0>: 0000023B3E077A18"
+                }
+              },
+              "type": "snow.enemy.EnemyManager.EnemySetupParam"
+            },
+            "<SummonOwnerId>k__BackingField": -1,
+            "<UniqueId>k__BackingField": 0,
+            "<WaitSecond>k__BackingField": 0.0,
+            "_HyakutyuAttr": 0,
+            "_RepopNum": 0
+          },
+          "type": "snow.enemy.EnemySetInfo"
+        },
+        "type": 98,
+        "uid": 0,
+        "unique": 692178887
+      },
+      "event": "before-destroy"
+    },
+    {
+      "at": 1793027625,
+      "detail": {
+        "ok": true,
+        "slot": {
+          "fields": {
+            "<ArrangementActionType>k__BackingField": 0,
+            "<DestroyStatus>k__BackingField": 0,
+            "<EmGenId>k__BackingField": 0,
+            "<EmSetId>k__BackingField": 0,
+            "<EnemySetParam>k__BackingField": {
+              "fields": {
+                "HideGroup": false,
+                "_BlockNo": 11,
+                "_IndividualType": 0,
+                "_RouteNo": 10,
+                "_SetPos": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023B3DC55298"
+                },
+                "_SetRot": {
+                  "nativeValue": "sol.glm::qua<float,0>: 0000023B3DC54698"
+                },
+                "_SubType": 0,
+                "_TypeValue": 98
+              },
+              "type": "snow.quest.BossSetParam"
+            },
+            "<HyakuryuType>k__BackingField": 0,
+            "<HyakuryuWaveNo>k__BackingField": -1,
+            "<OwnerEnemy>k__BackingField": false,
+            "<SetStatus>k__BackingField": 0,
+            "<SetupParam>k__BackingField": {
+              "fields": {
+                "<IsSetup>k__BackingField": false,
+                "<SetAttackDifficultyWave>k__BackingField": 0,
+                "<SetPos>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023B3DC555F8"
+                },
+                "<SetRandomScale>k__BackingField": 1.1200000047683716,
+                "<SetVitalDifficultyWave>k__BackingField": 0,
+                "<SetZakoIndividualDifferenceBodyColor>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<2,float,0>: 0000023B3E07D0F8"
+                }
+              },
+              "type": "snow.enemy.EnemyManager.EnemySetupParam"
+            },
+            "<SummonOwnerId>k__BackingField": -1,
+            "<UniqueId>k__BackingField": 0,
+            "<WaitSecond>k__BackingField": 0.0,
+            "_HyakutyuAttr": 0,
+            "_RepopNum": 0
+          },
+          "type": "snow.enemy.EnemySetInfo"
+        },
+        "unique": 692178887
+      },
+      "event": "after-destroy"
+    },
+    {
+      "at": 1793029040,
+      "detail": {
+        "method": "updateSetStatus(snow.enemy.EnemyManager.EnemySetStatus)",
+        "quest": {
+          "items": [
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 2
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": 1,
+                "EmType": 54,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 1
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            },
+            {
+              "fields": {
+                "EmSetId": -1,
+                "EmType": 0,
+                "Param0": 0,
+                "Param1": 0,
+                "State": 0
+              },
+              "type": "snow.QuestManager.QuestEmSetParam"
+            }
+          ],
+          "total": 7,
+          "type": "snow.QuestManager.QuestEmSetParam[]"
+        },
+        "slot": {
+          "fields": {
+            "<ArrangementActionType>k__BackingField": 0,
+            "<DestroyStatus>k__BackingField": 0,
+            "<EmGenId>k__BackingField": 0,
+            "<EmSetId>k__BackingField": 0,
+            "<EnemySetParam>k__BackingField": {
+              "fields": {
+                "HideGroup": false,
+                "_BlockNo": 11,
+                "_IndividualType": 0,
+                "_RouteNo": 10,
+                "_SetPos": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023B36F0FB48"
+                },
+                "_SetRot": {
+                  "nativeValue": "sol.glm::qua<float,0>: 0000023B36F0FD88"
+                },
+                "_SubType": 0,
+                "_TypeValue": 98
+              },
+              "type": "snow.quest.BossSetParam"
+            },
+            "<HyakuryuType>k__BackingField": 0,
+            "<HyakuryuWaveNo>k__BackingField": -1,
+            "<OwnerEnemy>k__BackingField": false,
+            "<SetStatus>k__BackingField": 0,
+            "<SetupParam>k__BackingField": {
+              "fields": {
+                "<IsSetup>k__BackingField": false,
+                "<SetAttackDifficultyWave>k__BackingField": 0,
+                "<SetPos>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023B36F0FE48"
+                },
+                "<SetRandomScale>k__BackingField": 1.1200000047683716,
+                "<SetVitalDifficultyWave>k__BackingField": 0,
+                "<SetZakoIndividualDifferenceBodyColor>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<2,float,0>: 0000023B3F276418"
+                }
+              },
+              "type": "snow.enemy.EnemyManager.EnemySetupParam"
+            },
+            "<SummonOwnerId>k__BackingField": -1,
+            "<UniqueId>k__BackingField": 0,
+            "<WaitSecond>k__BackingField": 0.0,
+            "_HyakutyuAttr": 0,
+            "_RepopNum": 0
+          },
+          "type": "snow.enemy.EnemySetInfo"
+        },
+        "type": 98,
+        "uid": 0,
+        "unique": 692178887
+      },
+      "event": "before-revive"
+    },
+    {
+      "at": 1793029040,
+      "detail": {
+        "ok": true,
+        "slot": {
+          "fields": {
+            "<ArrangementActionType>k__BackingField": 0,
+            "<DestroyStatus>k__BackingField": 0,
+            "<EmGenId>k__BackingField": 0,
+            "<EmSetId>k__BackingField": 0,
+            "<EnemySetParam>k__BackingField": {
+              "fields": {
+                "HideGroup": false,
+                "_BlockNo": 11,
+                "_IndividualType": 0,
+                "_RouteNo": 10,
+                "_SetPos": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023B3AC52088"
+                },
+                "_SetRot": {
+                  "nativeValue": "sol.glm::qua<float,0>: 0000023B3AC51BA8"
+                },
+                "_SubType": 0,
+                "_TypeValue": 98
+              },
+              "type": "snow.quest.BossSetParam"
+            },
+            "<HyakuryuType>k__BackingField": 0,
+            "<HyakuryuWaveNo>k__BackingField": -1,
+            "<OwnerEnemy>k__BackingField": false,
+            "<SetStatus>k__BackingField": 1,
+            "<SetupParam>k__BackingField": {
+              "fields": {
+                "<IsSetup>k__BackingField": false,
+                "<SetAttackDifficultyWave>k__BackingField": 0,
+                "<SetPos>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<3,float,0>: 0000023B3AC513C8"
+                },
+                "<SetRandomScale>k__BackingField": 1.1200000047683716,
+                "<SetVitalDifficultyWave>k__BackingField": 0,
+                "<SetZakoIndividualDifferenceBodyColor>k__BackingField": {
+                  "nativeValue": "sol.glm::vec<2,float,0>: 0000023B3F27F3D8"
+                }
+              },
+              "type": "snow.enemy.EnemyManager.EnemySetupParam"
+            },
+            "<SummonOwnerId>k__BackingField": -1,
+            "<UniqueId>k__BackingField": 0,
+            "<WaitSecond>k__BackingField": 0.0,
+            "_HyakutyuAttr": 0,
+            "_RepopNum": 0
+          },
+          "type": "snow.enemy.EnemySetInfo"
+        },
+        "unique": 692178887
+      },
+      "event": "after-revive"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "probeSha256": "a6fbacec26db77fe40bb6ec3da4259a0f1b73f11a8b358517da4791b625a1c01",
+  "questUnique": 928028325,
+  "context": "re.on_frame",
+  "onlyMutation": "EnemySetInfo.repop()"
+}

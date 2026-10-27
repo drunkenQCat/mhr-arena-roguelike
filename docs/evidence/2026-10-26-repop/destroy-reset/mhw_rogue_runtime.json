@@ -1,0 +1,263 @@
+{
+  "events": [
+    {
+      "detail": {
+        "online": "disabled",
+        "scope": 900102
+      },
+      "event": "runtime-hooks-installed",
+      "time": 1793025146
+    },
+    {
+      "detail": {
+        "experimentalInPlace": false,
+        "plan": {
+          "baseId": 603,
+          "layer": 1,
+          "mapNo": 10,
+          "monsterIds": [
+            98,
+            54
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 1,
+          "wave": {
+            "dmgMul": 1,
+            "hpMul": 1,
+            "index": 0,
+            "label": "M2a: Great Izuchi -> Great Baggi",
+            "monsters": [
+              "Great Izuchi",
+              "Great Baggi"
+            ],
+            "rewardMul": 0,
+            "rewardPt": 0,
+            "tier": "weak",
+            "typeTag": "M2a sequential spike"
+          }
+        },
+        "route": "reentry"
+      },
+      "event": "wave-published",
+      "time": 1793025224
+    },
+    {
+      "detail": {
+        "camp": {
+          "x": -3.205841991871239e-08,
+          "y": 50.29914474487305,
+          "z": 46.91426086425781
+        },
+        "roster": [
+          0
+        ],
+        "unique": -1177157663
+      },
+      "event": "quest-entered",
+      "time": 1793025228
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 1,
+        "typeId": 98,
+        "uid": 0
+      },
+      "event": "monster-observed",
+      "time": 1793025228
+    },
+    {
+      "detail": {
+        "hpBefore": 6420.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1793025255
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 1,
+        "typeId": 54,
+        "uid": 100
+      },
+      "event": "monster-observed",
+      "time": 1793025256
+    },
+    {
+      "detail": {
+        "seconds": 0,
+        "withinTenSeconds": true
+      },
+      "event": "sequential-spawn",
+      "time": 1793025256
+    },
+    {
+      "detail": {
+        "hpBefore": 6420.0,
+        "nativeDeathsOnly": true,
+        "uid": 100
+      },
+      "event": "test-kill",
+      "time": 1793025268
+    },
+    {
+      "detail": {
+        "resolved": [
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 98,
+            "uid": 0
+          },
+          {
+            "captured": false,
+            "dead": true,
+            "typeId": 54,
+            "uid": 100
+          }
+        ],
+        "reward": 0,
+        "token": 1
+      },
+      "event": "wave-cleared",
+      "time": 1793025269
+    },
+    {
+      "detail": {
+        "token": 1
+      },
+      "event": "camp-gathered",
+      "time": 1793025354
+    },
+    {
+      "detail": {
+        "experimentalInPlace": false,
+        "plan": {
+          "baseId": 603,
+          "layer": 1,
+          "mapNo": 10,
+          "monsterIds": [
+            98,
+            54
+          ],
+          "questId": 900102,
+          "sequential": true,
+          "token": 2,
+          "wave": {
+            "dmgMul": 1,
+            "hpMul": 1,
+            "index": 0,
+            "label": "M2a: Great Izuchi -> Great Baggi",
+            "monsters": [
+              "Great Izuchi",
+              "Great Baggi"
+            ],
+            "rewardMul": 0,
+            "rewardPt": 0,
+            "tier": "weak",
+            "typeTag": "M2a sequential spike"
+          }
+        },
+        "route": "reentry"
+      },
+      "event": "wave-published",
+      "time": 1793026726
+    },
+    {
+      "detail": {
+        "camp": {
+          "x": -3.205841991871239e-08,
+          "y": 50.29914474487305,
+          "z": 46.91426086425781
+        },
+        "roster": [
+          0
+        ],
+        "unique": 692178887
+      },
+      "event": "quest-entered",
+      "time": 1793026729
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 2,
+        "typeId": 98,
+        "uid": 0
+      },
+      "event": "monster-observed",
+      "time": 1793026729
+    },
+    {
+      "detail": {
+        "hpBefore": 6420.0,
+        "nativeDeathsOnly": true,
+        "uid": 0
+      },
+      "event": "test-kill",
+      "time": 1793026892
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "token": 2,
+        "typeId": 54,
+        "uid": 100
+      },
+      "event": "monster-observed",
+      "time": 1793026893
+    },
+    {
+      "detail": {
+        "seconds": 0,
+        "withinTenSeconds": true
+      },
+      "event": "sequential-spawn",
+      "time": 1793026893
+    }
+  ],
+  "last": {
+    "detail": {
+      "seconds": 0,
+      "withinTenSeconds": true
+    },
+    "event": "sequential-spawn",
+    "time": 1793026893
+  },
+  "plan": {
+    "baseId": 603,
+    "layer": 1,
+    "mapNo": 10,
+    "monsterIds": [
+      98,
+      54
+    ],
+    "questId": 900102,
+    "sequential": true,
+    "token": 2,
+    "wave": {
+      "dmgMul": 1,
+      "hpMul": 1,
+      "index": 0,
+      "label": "M2a: Great Izuchi -> Great Baggi",
+      "monsters": [
+        "Great Izuchi",
+        "Great Baggi"
+      ],
+      "rewardMul": 0,
+      "rewardPt": 0,
+      "tier": "weak",
+      "typeTag": "M2a sequential spike"
+    }
+  },
+  "ready": true,
+  "status": "Quest 900102: layer 1, monsters 98 / 54 / counter: Idle",
+  "version": 2
+}

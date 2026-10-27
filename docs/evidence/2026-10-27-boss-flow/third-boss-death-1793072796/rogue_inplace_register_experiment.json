@@ -1,0 +1,73 @@
+{
+  "events": [
+    {
+      "at": 1793067563,
+      "detail": {
+        "count": 116,
+        "orderIndex": 2,
+        "phase": 10,
+        "taskSlot": 2,
+        "type": 98,
+        "unique": 576249578
+      },
+      "event": "before"
+    },
+    {
+      "at": 1793067563,
+      "detail": {
+        "count": 117,
+        "id": 116,
+        "uid": 11600,
+        "unique": 576249578
+      },
+      "event": "registered"
+    },
+    {
+      "at": 1793067563,
+      "detail": {
+        "id": 116,
+        "phase": 5,
+        "uid": 11600,
+        "unique": 576249578
+      },
+      "event": "requested-native-load"
+    },
+    {
+      "at": 1793072585,
+      "detail": "...unterRise\\reframework\\autorun\\inplace_register_probe.lua:26: First corpse must be fully cleared",
+      "event": "error"
+    },
+    {
+      "at": 1793072654,
+      "detail": {
+        "count": 116,
+        "orderIndex": 2,
+        "phase": 10,
+        "taskSlot": 2,
+        "type": 98,
+        "unique": 1994278460
+      },
+      "event": "before"
+    },
+    {
+      "at": 1793072654,
+      "detail": {
+        "count": 117,
+        "id": 116,
+        "uid": 11600,
+        "unique": 1994278460
+      },
+      "event": "registered"
+    },
+    {
+      "at": 1793072654,
+      "detail": {
+        "id": 116,
+        "phase": 5,
+        "uid": 11600,
+        "unique": 1994278460
+      },
+      "event": "requested-native-load"
+    }
+  ]
+}

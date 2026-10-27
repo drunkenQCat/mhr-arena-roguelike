@@ -614,7 +614,7 @@
     }
   ],
   "Runtime": {
-    "Route": "reentry",
+    "Route": "inPlace",
     "SpawnMode": "sequential",
     "AutoPost": true,
     "PollSeconds": 1,

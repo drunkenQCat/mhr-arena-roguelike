@@ -1,7 +1,7 @@
 /** M3 prototype: single-item purchases, native readback, frame-queued mutations. */
 import type { RunCore } from "../core/run_core";
 import { replaceOrAdd } from "../core/run_state";
-import { canTradeInVillage, grantItem, pouchCount } from "./item_grant";
+import { canTrade, grantItem, pouchCount, type TradeQuest } from "./item_grant";
 import { imguiApi, rejson } from "./sdk";
 
 export class ShopWindow
@@ -13,7 +13,8 @@ export class ShopWindow
   private visible = false;
   private wasSelecting = false;
 
-  constructor(private readonly core: RunCore, private readonly selecting: () => boolean) {}
+  constructor(private readonly core: RunCore, private readonly selecting: () => boolean,
+    private readonly questContext: () => TradeQuest | undefined = () => undefined) {}
 
   get busy(): boolean { return this.pending !== null || this.unresolved; }
 
@@ -24,7 +25,8 @@ export class ShopWindow
     this.pending = null;
     if (!id || this.unresolved) return;
     try {
-      if (!this.selecting() || !canTradeInVillage()) throw new Error("Shop requires idle solo village before wave selection");
+      const context = this.questContext();
+      if (!this.selecting() || !canTrade(context)) throw new Error("Shop requires solo preparation or cleared arena between waves");
       const item = this.core.config.shop.find((entry) => entry.id === id);
       if (!item || item.mode !== "perUnit") throw new Error("Fill/services are awaiting game integration");
       const owned = pouchCount(id);
@@ -35,7 +37,7 @@ export class ShopWindow
       const result = this.core.buy(id);
       if (!result.ok) { this.notice = result.message; return; }
       let report;
-      try { report = grantItem(id, 1); }
+      try { report = grantItem(id, 1, context); }
       catch { report = { granted: false, uncertain: true, gameName: id }; }
       if (report.granted) this.notice = `已购买 ${report.gameName} ×1（${report.before} → ${report.after}）`;
       else if (report.uncertain) {
@@ -48,7 +50,11 @@ export class ShopWindow
       }
       rejson.dump_file("mhw_rogue_shop_transaction.json", { id, report, pt: this.core.state.wallet.pt,
         unresolved: this.unresolved, message: this.notice }, 2);
-    } catch (error) { this.notice = String(error); }
+    } catch (error) {
+      this.notice = String(error);
+      rejson.dump_file("mhw_rogue_shop_transaction.json", { id, blocked: true,
+        message: this.notice, pt: this.core.state.wallet.pt }, 2);
+    }
   }
 
   draw(): void {
@@ -82,7 +88,7 @@ export class ShopWindow
       if (imguiApi.button(c === this.category ? `[${c}]` : c)) this.category = c;
     }
     imguiApi.separator();
-    imguiApi.text("仅限村庄整备期购买单件；补满和服务暂未开放。");
+    imguiApi.text("村庄整备或单人斗技场波次间可购买单件；补满和服务暂未开放。");
 
     const list = shop[this.category] ?? [];
     for (const e of list) {

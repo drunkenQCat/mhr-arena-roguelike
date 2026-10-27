@@ -1,0 +1,87 @@
+{
+  "events": [
+    {
+      "at": 1793074345,
+      "detail": {
+        "count": 117,
+        "orderIndex": 3,
+        "reused": false,
+        "sourceType": 98,
+        "taskSlot": 3,
+        "type": 60,
+        "unique": 1994278460
+      },
+      "event": "before"
+    },
+    {
+      "at": 1793074345,
+      "detail": {
+        "id": 117,
+        "orderIndex": 3,
+        "taskSlot": 3,
+        "type": 60,
+        "uid": 11700,
+        "unique": 1994278460
+      },
+      "event": "registered"
+    },
+    {
+      "at": 1793074345,
+      "detail": {
+        "orderIndex": 3,
+        "phase": 5,
+        "taskSlot": 3,
+        "type": 60,
+        "uid": 11700,
+        "unique": 1994278460
+      },
+      "event": "requested-native-load"
+    },
+    {
+      "at": 1793074405,
+      "detail": {
+        "type": 60,
+        "uid": 11700,
+        "unique": 1994278460
+      },
+      "event": "targeted-kill-request"
+    },
+    {
+      "at": 1793074518,
+      "detail": {
+        "count": 118,
+        "orderIndex": 4,
+        "reused": true,
+        "sourceType": 98,
+        "taskSlot": 2,
+        "type": 60,
+        "unique": 1994278460
+      },
+      "event": "before"
+    },
+    {
+      "at": 1793074518,
+      "detail": {
+        "id": 118,
+        "orderIndex": 4,
+        "taskSlot": 2,
+        "type": 60,
+        "uid": 11800,
+        "unique": 1994278460
+      },
+      "event": "registered"
+    },
+    {
+      "at": 1793074518,
+      "detail": {
+        "orderIndex": 4,
+        "phase": 5,
+        "taskSlot": 2,
+        "type": 60,
+        "uid": 11800,
+        "unique": 1994278460
+      },
+      "event": "requested-native-load"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+[2026-10-26 18:50:30.816] [REFramework] [info] VMContext: Caught exception code c0000005
+[2026-10-26 18:50:30.816] [REFramework] [info] VMContext: Attempting to handle access violation. Attempting to dump callstack...
+[2026-10-26 18:50:30.816] [REFramework] [error] RIP: 7ff7c1336006
+[2026-10-26 18:50:30.816] [REFramework] [error] RSP: 62b7ffe7c0
+[2026-10-26 18:50:30.816] [REFramework] [error] RCX: 2550c673a40
+[2026-10-26 18:50:30.816] [REFramework] [error] RDX: 2556bcfc580
+[2026-10-26 18:50:30.816] [REFramework] [error] R8: 255013badd0
+[2026-10-26 18:50:30.816] [REFramework] [error] R9: 1
+[2026-10-26 18:50:30.816] [REFramework] [error] R10: 2569b51f560
+[2026-10-26 18:50:30.816] [REFramework] [error] R11: 0
+[2026-10-26 18:50:30.816] [REFramework] [error] R12: 0
+[2026-10-26 18:50:30.816] [REFramework] [error] R13: 7ff7bf76a2c0
+[2026-10-26 18:50:30.816] [REFramework] [error] R14: 7ff7ca155b20
+[2026-10-26 18:50:30.816] [REFramework] [error] R15: 2556bcfc500
+[2026-10-26 18:50:30.816] [REFramework] [error] RAX: 0
+[2026-10-26 18:50:30.816] [REFramework] [error] RBX: 2569b51f560
+[2026-10-26 18:50:30.816] [REFramework] [error] RBP: 2550c673a40
+[2026-10-26 18:50:30.816] [REFramework] [error] RSI: 62b7ffea00
+[2026-10-26 18:50:30.816] [REFramework] [error] RDI: 2556bcfc5e0
+[2026-10-26 18:50:30.816] [REFramework] [error] EFLAGS: 10246
+[2026-10-26 18:50:30.816] [REFramework] [error] CS: 33
+[2026-10-26 18:50:30.816] [REFramework] [error] DS: 2b
+[2026-10-26 18:50:30.816] [REFramework] [error] ES: 2b
+[2026-10-26 18:50:30.816] [REFramework] [error] FS: 53
+[2026-10-26 18:50:30.816] [REFramework] [error] GS: 2b
+[2026-10-26 18:50:30.816] [REFramework] [error] SS: 2b
+[2026-10-26 18:50:30.818] [REFramework] [error] Call stack:
+[2026-10-26 18:50:30.828] [REFramework] [error] 
+ igWindowRectRelToAbs
+  c:\program files (x86)\steam\steamapps\common\monsterhunterrise\_storage_\dinput8.dll + 0x465076
+
+ igWindowRectRelToAbs
+  c:\program files (x86)\steam\steamapps\common\monsterhunterrise\_storage_\dinput8.dll + 0x449218
+
+ igWindowRectRelToAbs
+  c:\program files (x86)\steam\steamapps\common\monsterhunterrise\_storage_\dinput8.dll + 0x595c85
+
+ igWindowRectRelToAbs
+  c:\program files (x86)\steam\steamapps\common\monsterhunterrise\_storage_\dinput8.dll + 0x599158
+
+ igWindowRectRelToAbs
+  c:\program files (x86)\steam\steamapps\common\monsterhunterrise\_storage_\dinput8.dll + 0x598db1
+
+ igWindowRectRelToAbs
+  c:\program files (x86)\steam\steamapps\common\monsterhunterrise\_storage_\dinput8.dll + 0x599abc
+
+ igWindowRectRelToAbs
+  c:\program files (x86)\steam\steamapps\common\monsterhunterrise\_storage_\dinput8.dll + 0x599b21
+
+ igWindowRectRelToAbs
+  c:\program files (x86)\steam\steamapps\common\monsterhunterrise\_storage_\dinput8.dll + 0x596899
+
+ _chkstk
+  C:\Windows\SYSTEM32\ntdll.dll + 0xa5e9f
+
+ RtlFindCharInUnicodeString
+  C:\Windows\SYSTEM32\ntdll.dll + 0x1e8c6
+
+ KiUserExceptionDispatcher
+  C:\Windows\SYSTEM32\ntdll.dll + 0xa4e9e
+
+ AK::SoundEngine::StopProfilerCapture
+  C:\Program Files (x86)\Steam\steamapps\common\MonsterHunterRise\MonsterHunterRise.exe + 0x24f6006
+
+ Unknown symbol
+  0x2569caa0a0f
+
+
+[2026-10-26 18:51:16.225] [REFramework] [info] [MhwRogue] test-kill
+[2026-10-26 18:51:17.173] [REFramework] [info] [MhwRogue] wave-cleared
+[2026-10-26 18:51:39.172] [REFramework] [info] [MhwRogue] camp-gathered

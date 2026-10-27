@@ -15,6 +15,8 @@ import {
   type WaveOption,
 } from "./run_state";
 
+const SIMULTANEOUS_BALANCE = { reward: 1.15, hp: 0.9, damage: 0.95 } as const;
+
 export interface Result {
   ok: boolean;
   message: string | null;
@@ -228,16 +230,19 @@ export class RunCore {
     const tier = this.tierFor(this.state.layer);
     const types = this.allowedTypes(tier);
     if (types.length === 0) throw new Error("No available wave types");
-    const chosen: string[] = [];
-    while (chosen.length < this.config.choiceCount) {
-      const shuffled = types.slice();
-      this.rng.shuffle(shuffled);
-      chosen.push(...shuffled.slice(0, this.config.choiceCount - chosen.length));
-    }
-
+    const dualTypes = types.filter((type) => type === "B" || type === "C" || type === "D");
+    const singleType = types.find((type) => type === "A" || type === "AU");
     const opts: WaveOption[] = [];
-    for (const type of chosen) {
-      const composed = this.compose(type, tier);
+    let previousDual: { type: string; composed: Tier } | null = null;
+    for (let i = 0; i < this.config.choiceCount; i++) {
+      // Ultimate-only pools retain their single-monster restriction.
+      const requestedMode = dualTypes.length === 0 ? "single"
+        : i % 3 === 0 ? "single" : i % 3 === 1 ? "sequential" : "simultaneous";
+      const shared: { type: string; composed: Tier } | null = requestedMode === "simultaneous" ? previousDual : null;
+      const type: string = shared ? shared.type : requestedMode === "single" ? (singleType ?? types[0]!)
+        : dualTypes[this.rng.int(dualTypes.length)]!;
+      const composed: Tier = shared ? { ...shared.composed, monsters: [...shared.composed.monsters] } : this.compose(type, tier);
+      previousDual = requestedMode === "sequential" ? { type, composed } : null;
       const hp = this.hpMul(this.state.layer, type, playerCount);
       const dmg = this.dmgMul(this.state.layer, playerCount);
       // 双怪的血量折扣同步折扣基础分；任务倍率是"双怪烦"的唯一补偿（策划 V1.3 修订）
@@ -246,16 +251,21 @@ export class RunCore {
       for (const m of composed.monsters) {
         sum += baseReward(this.config.reward, this.tierOfMonster(m, tier)) * hpFactor;
       }
-      const pt = sum * this.config.typeRewardMul[type as RewardType];
+      const baseRewardMul = this.config.typeRewardMul[type as RewardType];
+      const mode = composed.monsters.length === 1 ? "single" : requestedMode === "single" ? "sequential" : requestedMode;
+      const rewardMul = baseRewardMul * (mode === "simultaneous" ? SIMULTANEOUS_BALANCE.reward : 1);
+      const pt = sum * rewardMul;
+      const modeLabel = mode === "single" ? "Single" : mode === "sequential" ? "Sequential" : "Simultaneous";
       opts.push({
+        mode,
         index: opts.length,
         typeTag: composed.tag,
-        label: `${composed.tag}：${composed.monsters.join(" + ")}`,
+        label: `${modeLabel} · ${composed.tag}：${composed.monsters.join(" + ")}`,
         monsters: composed.monsters,
         tier: composed.tier,
-        rewardMul: this.config.typeRewardMul[type as RewardType],
-        hpMul: hp,
-        dmgMul: dmg,
+        rewardMul,
+        hpMul: mode === "simultaneous" ? Math.round(hp * SIMULTANEOUS_BALANCE.hp * 10000) / 10000 : hp,
+        dmgMul: mode === "simultaneous" ? Math.round(dmg * SIMULTANEOUS_BALANCE.damage * 10000) / 10000 : dmg,
         rewardPt: Math.trunc(pt),
       });
     }

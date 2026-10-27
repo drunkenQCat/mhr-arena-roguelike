@@ -1,0 +1,16 @@
+{
+  "id": "seed_any",
+  "message": "已购买 Might Seed ×1（1 → 2）",
+  "pt": 191,
+  "report": {
+    "after": 2,
+    "before": 1,
+    "gameName": "Might Seed",
+    "granted": true,
+    "method": "tryAddGameItem(snow.data.ContentsIdSystem.ItemId, System.Int32)",
+    "requested": 1,
+    "shopItemId": "seed_any",
+    "uncertain": false
+  },
+  "unresolved": false
+}

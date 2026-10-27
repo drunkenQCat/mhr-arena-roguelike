@@ -114,3 +114,19 @@ describe("native runtime hook scope", () => {
     expect(mock.hook).not.toHaveBeenCalled();
   });
 });
+
+
+it("feeds polled death evidence into the inPlace queue even without a questEnemyDie callback", () => {
+  const { runtime, plan, qm } = fixture();
+  runtime.policy(plan, true);
+  qm.call.mockImplementation((name: string) => name === "isActiveQuest" || name === "isPlayQuest" ? true : name === "get_ActiveQuestNo" ? plan.questId : null);
+  Object.assign(qm, { get_field: () => null });
+  const enemy = { call: (name: string) => name === "get_UniqueId" ? 700 : name === "get_EnemyType" ? plan.monsterIds[0] : name === "isDieBehaviorActive" };
+  const manager = { call: (name: string) => name === "getBossEnemyCount" ? 1 : enemy };
+  mock.singleton.mockImplementation((name: string) => name === "snow.enemy.EnemyManager" ? manager : name === "snow.stage.StageManager" ? { call: () => false } : null);
+  vi.spyOn(runtime.testTools, "getHealth").mockReturnValue({ hp: 0, maxHp: 100 });
+  const backend = (runtime as unknown as { inplace: { death(uid: number): void } }).inplace;
+  const death = vi.spyOn(backend, "death");
+  expect(runtime.read().enemies[0]?.dead).toBe(true);
+  expect(death).toHaveBeenCalledWith(700);
+});
