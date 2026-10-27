@@ -8,6 +8,7 @@ import { loadConfig } from "./load_config";
 import { NativeRuntime } from "./native_runtime";
 import { QuestInstaller } from "./quest_installer";
 import { ShopWindow } from "./shop_window";
+import { WebConsoleBridge } from "./webconsole_bridge";
 import { clockSeconds, reframework, rejson, relog } from "./sdk";
 
 try {
@@ -20,6 +21,7 @@ try {
   const runtime = new NativeRuntime(config, installer);
   const session = new RunSession(core, monsterCatalog, runtime);
   const shopWindow = new ShopWindow(session.core, () => session.stage === "Selecting", () => session.shopQuest());
+const webConsole = new WebConsoleBridge(session, runtime, shopWindow);
   reframework.onFrame(() => {
     try { runtime.tick(); shopWindow.tick(); session.tick(); }
     catch (error) {
@@ -30,6 +32,7 @@ try {
     }
   });
   reframework.onDrawUi(() => drawHud(session, runtime, shopWindow));
+reframework.onFrame(() => webConsole.tick());
   reframework.onFrame(() => {
     try { shopWindow.draw(); }
     catch (error) { relog.error(`[MhwRogue] shop window: ${String(error)}`); }

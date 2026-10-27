@@ -7,7 +7,9 @@ import { imguiApi, rejson } from "./sdk";
 export class ShopWindow
 {
   private category = "";
-  private notice: string | null = null;
+  private _notice: string | null = null;
+  get notice(): string | null { return this._notice; }
+  private set notice(v: string | null) { this._notice = v; }
   private pending: string | null = null;
   private unresolved = false;
   private visible = false;
@@ -17,6 +19,19 @@ export class ShopWindow
     private readonly questContext: () => TradeQuest | undefined = () => undefined) {}
 
   get busy(): boolean { return this.pending !== null || this.unresolved; }
+
+  /** 网页/脚本购买入口：走与点击相同的 pending→tick 执行路径与全部校验。 */
+  requestPurchase(id: string): { ok: boolean; message: string }
+  {
+    if (this.busy) return { ok: false, message: "商店交易进行中" };
+    const item = this.core.config.shop.find((entry) => entry.id === id);
+    if (!item) return { ok: false, message: "无此商品" };
+    if (item.mode !== "perUnit") return { ok: false, message: "补满与服务类暂未开放购买" };
+    const pt = this.core.state.wallet.pt;
+    if (pt < item.price) return { ok: false, message: `PT不足（需要 ${item.price}，持有 ${pt}）` };
+    this.pending = id;
+    return { ok: true, message: "queued" };
+  }
 
   open(): void { if (this.selecting()) this.visible = true; }
 

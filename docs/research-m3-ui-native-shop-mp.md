@@ -1,5 +1,7 @@
 # M3/M4 调研：UI 花哨化、原生商店深层、灰名商品、多人可用性（2026-10-27）
 
+后续交叉核对见 [策划能力与 Rise 原生接口总表](research-design-native-capabilities.md)：补充 REFramework 源码机制、资源／装备备份、难度参数链、支付对象和原生同步入口，并区分本页的可行性判断与已实测结论。
+
 ## ① ImGui 花哨化：上限比现状高一个档次（143 个绑定全部可用）
 
 对照 REFramework v1.5.9 `src/mods/bindings/ImGui.cpp` 的完整绑定面：

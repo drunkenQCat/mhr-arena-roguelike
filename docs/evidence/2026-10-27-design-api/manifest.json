@@ -1,0 +1,35 @@
+{
+  "scope": "offline extraction; no new runtime verification",
+  "inputs": [
+    {
+      "label": "sdk-subset",
+      "source": "C:\\TechProjects\\About_MyRepos\\About_Games\\mhr-roguelike-research\\sdk-dump\\sdk_types.json",
+      "sha256": "8bda14abf2c664ec14239813f93e1bb5997ff0bba24557e5f6721ed3eb0c59c1",
+      "selectedTypes": 16
+    },
+    {
+      "label": "native-flow",
+      "source": "C:\\TechProjects\\About_MyRepos\\About_Games\\mhr-roguelike-research\\docs\\evidence\\2026-10-27-native-flow\\metadata.json",
+      "sha256": "975ba89dc2fb9768856f310749daabd9bd3bb94dab09684a02e0d800ed905fb6",
+      "selectedTypes": 5
+    },
+    {
+      "label": "native-equipment",
+      "source": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\MonsterHunterRise\\reframework\\data\\rogue_inplace_native_metadata.json",
+      "sha256": "95c115ff703bd61c168084210fe2af2a04474fa6f7c467dc543d41a000a3f02f",
+      "selectedTypes": 9
+    },
+    {
+      "label": "native-gui",
+      "source": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\MonsterHunterRise\\reframework\\data\\rogue_native_gui_metadata.json",
+      "sha256": "2a5b429fb84d912e69beddf8400299b08463660a225a4e230eae64a0383bfa17",
+      "selectedTypes": 17
+    },
+    {
+      "label": "rsz",
+      "source": "C:\\TechProjects\\About_MyRepos\\About_Games\\mhr-roguelike-research\\.local\\save-editor\\assets\\mhrise\\rszmhrise.json",
+      "sha256": "679f296bb4997e49407f625d5e76afac02b315d3996bbd23f3a397f9c522e7a9",
+      "selectedTypes": 14
+    }
+  ]
+}

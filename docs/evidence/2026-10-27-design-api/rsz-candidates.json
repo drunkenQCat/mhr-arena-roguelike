@@ -1,0 +1,1267 @@
+{
+  "caution": "Serialization schema only; NOT a complete TDB or live memory layout. No field offsets.",
+  "types": {
+    "snow.data.PlItemPouchMySetData": {
+      "crc": "937967f9",
+      "fields": [
+        {
+          "align": 4,
+          "array": false,
+          "name": "_Name",
+          "native": false,
+          "original_type": "System.String",
+          "size": 4,
+          "type": "String"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_NormalCountList",
+          "native": false,
+          "original_type": "snow.data.ItemCount[]",
+          "size": 4,
+          "type": "Object"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_BulletBottleCountList",
+          "native": false,
+          "original_type": "snow.data.ItemCount[]",
+          "size": 4,
+          "type": "Object"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "STRUCT__PaletteSetIndex__HasValue",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "STRUCT__PaletteSetIndex__Value",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        }
+      ],
+      "name": "snow.data.PlItemPouchMySetData"
+    },
+    "snow.quest.BossSetParam": {
+      "crc": "f1bdedce",
+      "fields": [
+        {
+          "align": 16,
+          "array": false,
+          "name": "_SetPos",
+          "native": false,
+          "original_type": "via.vec3",
+          "size": 16,
+          "type": "Vec3"
+        },
+        {
+          "align": 16,
+          "array": false,
+          "name": "_SetRot",
+          "native": false,
+          "original_type": "via.Quaternion",
+          "size": 16,
+          "type": "Quaternion"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_TypeValue",
+          "native": false,
+          "original_type": "snow.enemy.EnemyDef.EmTypes",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_SubType",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_BlockNo",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_IndividualType",
+          "native": false,
+          "original_type": "snow.enemy.EnemyDef.EnemyIndividualType",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_RouteNo",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        }
+      ],
+      "name": "snow.quest.BossSetParam"
+    },
+    "snow.quest.NormalQuestDataForEnemy.Param": {
+      "crc": "46ffe13a",
+      "fields": [
+        {
+          "align": 4,
+          "array": false,
+          "name": "_QuestNo",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_EmsSetNo",
+          "native": false,
+          "original_type": "snow.quest.EmsSetNo",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_ZakoVital",
+          "native": false,
+          "original_type": "System.Byte",
+          "size": 1,
+          "type": "U8"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_ZakoAttack",
+          "native": false,
+          "original_type": "System.Byte",
+          "size": 1,
+          "type": "U8"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_ZakoParts",
+          "native": false,
+          "original_type": "System.Byte",
+          "size": 1,
+          "type": "U8"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_ZakoOther",
+          "native": false,
+          "original_type": "System.Byte",
+          "size": 1,
+          "type": "U8"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_ZakoMulti",
+          "native": false,
+          "original_type": "System.Byte",
+          "size": 1,
+          "type": "U8"
+        },
+        {
+          "align": 1,
+          "array": true,
+          "name": "_RouteNo",
+          "native": false,
+          "original_type": "System.Byte[]",
+          "size": 1,
+          "type": "U8"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_InitSetName",
+          "native": false,
+          "original_type": "System.String[]",
+          "size": 4,
+          "type": "String"
+        },
+        {
+          "align": 1,
+          "array": true,
+          "name": "_SubType",
+          "native": false,
+          "original_type": "System.Byte[]",
+          "size": 1,
+          "type": "U8"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_IndividualType",
+          "native": false,
+          "original_type": "snow.enemy.EnemyDef.EnemyIndividualType[]",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 2,
+          "array": true,
+          "name": "_VitalTbl",
+          "native": false,
+          "original_type": "System.UInt16[]",
+          "size": 2,
+          "type": "U16"
+        },
+        {
+          "align": 2,
+          "array": true,
+          "name": "_AttackTbl",
+          "native": false,
+          "original_type": "System.UInt16[]",
+          "size": 2,
+          "type": "U16"
+        },
+        {
+          "align": 2,
+          "array": true,
+          "name": "_PartsTbl",
+          "native": false,
+          "original_type": "System.UInt16[]",
+          "size": 2,
+          "type": "U16"
+        },
+        {
+          "align": 2,
+          "array": true,
+          "name": "_OtherTbl",
+          "native": false,
+          "original_type": "System.UInt16[]",
+          "size": 2,
+          "type": "U16"
+        },
+        {
+          "align": 1,
+          "array": true,
+          "name": "_StaminaTbl",
+          "native": false,
+          "original_type": "System.Byte[]",
+          "size": 1,
+          "type": "U8"
+        },
+        {
+          "align": 1,
+          "array": true,
+          "name": "_Scale",
+          "native": false,
+          "original_type": "System.Byte[]",
+          "size": 1,
+          "type": "U8"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_ScaleTbl",
+          "native": false,
+          "original_type": "snow.enemy.EnemyDef.BossScaleTblType[]",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_Difficulty",
+          "native": false,
+          "original_type": "snow.enemy.EnemyDef.NandoYuragi[]",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 1,
+          "array": true,
+          "name": "_BossMulti",
+          "native": false,
+          "original_type": "System.Byte[]",
+          "size": 1,
+          "type": "U8"
+        }
+      ],
+      "name": "snow.quest.NormalQuestDataForEnemy.Param"
+    },
+    "snow.quest.EnemySetParam": {
+      "crc": "db872703",
+      "fields": [
+        {
+          "align": 16,
+          "array": false,
+          "name": "_SetPos",
+          "native": false,
+          "original_type": "via.vec3",
+          "size": 16,
+          "type": "Vec3"
+        },
+        {
+          "align": 16,
+          "array": false,
+          "name": "_SetRot",
+          "native": false,
+          "original_type": "via.Quaternion",
+          "size": 16,
+          "type": "Quaternion"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_TypeValue",
+          "native": false,
+          "original_type": "snow.enemy.EnemyDef.EmTypes",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_SubType",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_BlockNo",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_IndividualType",
+          "native": false,
+          "original_type": "snow.enemy.EnemyDef.EnemyIndividualType",
+          "size": 4,
+          "type": "S32"
+        }
+      ],
+      "name": "snow.quest.EnemySetParam"
+    },
+    "snow.enemy.EnemyManager.EnemySetupParam": {
+      "crc": "b3f3ed23",
+      "fields": [],
+      "name": "snow.enemy.EnemyManager.EnemySetupParam"
+    },
+    "snow.QuestManager.NotifyQuestBossLoad": {
+      "crc": "c222949f",
+      "fields": [
+        {
+          "align": 4,
+          "array": false,
+          "name": "_Type",
+          "native": false,
+          "original_type": "snow.QuestManager.LoadPacketCmdType",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_BossSetNo",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_ExtraSetCount",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        }
+      ],
+      "name": "snow.QuestManager.NotifyQuestBossLoad"
+    },
+    "snow.equip.PlEquipMySetData.BackupData": {
+      "crc": "2192d3cc",
+      "fields": [
+        {
+          "align": 4,
+          "array": false,
+          "name": "IdVal",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "InsectIdVal",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "InsectInventoryIndex",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "BowgunCustomizeType",
+          "native": false,
+          "original_type": "snow.data.BowgunCustomize.BowgunCustomizeTypes",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "HyakuryuColorData",
+          "native": false,
+          "original_type": "snow.data.SymbolColorData",
+          "size": 4,
+          "type": "Object"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "DecoIdList",
+          "native": false,
+          "original_type": "snow.equip.DecorationsId[]",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "HyakuryuDecoId",
+          "native": false,
+          "original_type": "snow.equip.DecorationsId",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "SymbolColorSet",
+          "native": false,
+          "original_type": "snow.data.SymbolColorSet",
+          "size": 4,
+          "type": "Object"
+        }
+      ],
+      "name": "snow.equip.PlEquipMySetData.BackupData"
+    },
+    "snow.data.ItemShopDisplayUserData.Param": {
+      "crc": "6eacee0e",
+      "fields": [
+        {
+          "align": 4,
+          "array": false,
+          "name": "_Id",
+          "native": false,
+          "original_type": "snow.data.ContentsIdSystem.ItemId",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_SortId",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_VillageProgress",
+          "native": false,
+          "original_type": "snow.progress.VillageProgress",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_HallProgress",
+          "native": false,
+          "original_type": "snow.progress.HallProgress",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_MRProgress",
+          "native": false,
+          "original_type": "snow.progress.MasterRankProgress",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_IsUnlockAfterAlchemy",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_IsBargainObject",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_FlagIndex",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        }
+      ],
+      "name": "snow.data.ItemShopDisplayUserData.Param"
+    },
+    "snow.QuestManager.SyncNormalsQuest": {
+      "crc": "f0b83ffe",
+      "fields": [
+        {
+          "align": 1,
+          "array": false,
+          "name": "_IsFromHostPacket",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_IsQuestHostChange",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_DeathNum",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_QuestTimerSec",
+          "native": false,
+          "original_type": "System.Single",
+          "size": 4,
+          "type": "F32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_QuestElapsedSec",
+          "native": false,
+          "original_type": "System.Single",
+          "size": 4,
+          "type": "F32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "STRUCT__StageTime__Hour",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "STRUCT__StageTime__Minute",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "STRUCT__StageTime__Seconds",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_QuestTargetData",
+          "native": false,
+          "original_type": "snow.quest.QuestTargetData[]",
+          "size": 4,
+          "type": "Object"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_SupplyItemNum",
+          "native": false,
+          "original_type": "System.UInt32[]",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_QuestPhase",
+          "native": false,
+          "original_type": "snow.quest.QuestPhase",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_FlagCatSkillInsurance",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_TotalJoinNum",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_demoFlow",
+          "native": false,
+          "original_type": "snow.QuestManager.QuestInterruptEventDemoFlow",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_TgtPopFlag",
+          "native": false,
+          "original_type": "System.UInt32[]",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_TourSetChangeReady",
+          "native": false,
+          "original_type": "System.UInt32[]",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_TourBossLoadFlag",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_TourBossExtraSetCount",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_NewQuestHostIndex",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_TourSetChangeTimerSec",
+          "native": false,
+          "original_type": "System.Single",
+          "size": 4,
+          "type": "F32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_TourSetTermCnt",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_TourZakoType",
+          "native": false,
+          "original_type": "snow.quest.TourZakoType",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_TourZakoState",
+          "native": false,
+          "original_type": "snow.quest.TourZakoState",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_TourPopType",
+          "native": false,
+          "original_type": "snow.quest.TourPopType",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_QuestTargetEmDieUidList",
+          "native": false,
+          "original_type": "System.Int32[]",
+          "size": 4,
+          "type": "S32"
+        }
+      ],
+      "name": "snow.QuestManager.SyncNormalsQuest"
+    },
+    "snow.equip.PlEquipMySetData": {
+      "crc": "5de2e340",
+      "fields": [
+        {
+          "align": 4,
+          "array": true,
+          "name": "_InventoryIndexList",
+          "native": false,
+          "original_type": "System.Int32[]",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_IsUsing",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_Name",
+          "native": false,
+          "original_type": "System.String",
+          "size": 4,
+          "type": "String"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_BackupDataList",
+          "native": false,
+          "original_type": "snow.equip.PlEquipMySetData.BackupData[]",
+          "size": 4,
+          "type": "Object"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_ActionIdList",
+          "native": false,
+          "original_type": "snow.data.DataDef.PlWeaponActionId[]",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_ActionIdListMR_Red",
+          "native": false,
+          "original_type": "snow.data.DataDef.PlWeaponActionId[]",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_ActionIdListMR_Blue",
+          "native": false,
+          "original_type": "snow.data.DataDef.PlWeaponActionId[]",
+          "size": 4,
+          "type": "S32"
+        }
+      ],
+      "name": "snow.equip.PlEquipMySetData"
+    },
+    "snow.quest.QuestEnemyNando": {
+      "crc": "5b974682",
+      "fields": [
+        {
+          "align": 4,
+          "array": false,
+          "name": "Vital",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "Attack",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "NandoWave",
+          "native": false,
+          "original_type": "snow.enemy.EnemyDef.NandoYuragi",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "Scale",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "ScaleWave",
+          "native": false,
+          "original_type": "snow.enemy.EnemyDef.BossScaleTblType",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "Stamina",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "Parts",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "Other",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "MultiRate",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        }
+      ],
+      "name": "snow.quest.QuestEnemyNando"
+    },
+    "snow.QuestManager.SyncDiscoverNextBoss": {
+      "crc": "1fabcc79",
+      "fields": [
+        {
+          "align": 4,
+          "array": false,
+          "name": "_ExtraSetCount",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_DiscoverNextEmSetSlot",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_DiscoverNextEmSetId",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 2,
+          "array": false,
+          "name": "_EmGenId",
+          "native": false,
+          "original_type": "System.UInt16",
+          "size": 2,
+          "type": "U16"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_TourBossLoadQuestHost",
+          "native": false,
+          "original_type": "System.Int32",
+          "size": 4,
+          "type": "S32"
+        }
+      ],
+      "name": "snow.QuestManager.SyncDiscoverNextBoss"
+    },
+    "snow.data.ItemUserData.Param": {
+      "crc": "4a0d92b0",
+      "fields": [
+        {
+          "align": 4,
+          "array": false,
+          "name": "_Id",
+          "native": false,
+          "original_type": "snow.data.ContentsIdSystem.ItemId",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_CariableFilter",
+          "native": false,
+          "original_type": "snow.data.GameItemEnum.CarriableFilter",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_Type",
+          "native": false,
+          "original_type": "snow.data.DataDef.ItemTypes",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_Rare",
+          "native": false,
+          "original_type": "snow.data.DataDef.RareTypes",
+          "size": 1,
+          "type": "U8"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_PlMaxCount",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_OtMaxCount",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_SortId",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_Supply",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_CanPutInOtDogPouch",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_ShowItemWindow",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_ShowActionWindow",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_Infinite",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_Default",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_IconCanEat",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_IconItemRank",
+          "native": false,
+          "original_type": "snow.data.GameItemEnum.IconRank",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 1,
+          "array": false,
+          "name": "_EffectRare",
+          "native": false,
+          "original_type": "System.Boolean",
+          "size": 1,
+          "type": "Bool"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_IconChara",
+          "native": false,
+          "original_type": "snow.gui.SnowGuiCommonUtility.Icon.ItemIconPatternNo",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_IconColor",
+          "native": false,
+          "original_type": "snow.gui.SnowGuiCommonUtility.Icon.ItemIconColor",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_SeType",
+          "native": false,
+          "original_type": "snow.data.GameItemEnum.SeType",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_SellPrice",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_BuyPrice",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_ItemActionType",
+          "native": false,
+          "original_type": "snow.data.GameItemEnum.ItemActionType",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_RankType",
+          "native": false,
+          "original_type": "snow.data.DataDef.RankTypes",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_ItemGroup",
+          "native": false,
+          "original_type": "snow.data.NormalItemData.ItemGroupTypes",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_CategoryWorth",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        },
+        {
+          "align": 4,
+          "array": true,
+          "name": "_MaterialCategory",
+          "native": false,
+          "original_type": "snow.data.NormalItemData.MaterialCategory[]",
+          "size": 4,
+          "type": "S32"
+        },
+        {
+          "align": 4,
+          "array": false,
+          "name": "_EvalutionValue",
+          "native": false,
+          "original_type": "System.UInt32",
+          "size": 4,
+          "type": "U32"
+        }
+      ],
+      "name": "snow.data.ItemUserData.Param"
+    },
+    "snow.enemy.EnemyBossRandomScaleData": {
+      "crc": "c45db706",
+      "fields": [
+        {
+          "align": 4,
+          "array": true,
+          "name": "_RandomScaleTableDataList",
+          "native": false,
+          "original_type": "snow.enemy.EnemyBossRandomScaleData.RandomScaleTableData[]",
+          "size": 4,
+          "type": "Object"
+        }
+      ],
+      "name": "snow.enemy.EnemyBossRandomScaleData"
+    }
+  }
+}
