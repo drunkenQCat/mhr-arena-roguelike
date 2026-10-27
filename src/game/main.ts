@@ -37,7 +37,10 @@ reframework.onFrame(() => webConsole.tick());
     try { shopWindow.draw(); }
     catch (error) { relog.error(`[MhwRogue] shop window: ${String(error)}`); }
   });
-  reframework.onScriptReset(() => runtime.shutdown());
+  reframework.onScriptReset(() => {
+    runtime.shutdown();
+    webConsole.newScriptSession(); // Reset 后新桥会话：旧页面命令按 bridgeId 拒绝
+  });
   rejson.dump_file("mhw_rogue_boot.json", { ok: true, version: 2,
     quest: config.quest, route: session.route, startedAt: clockSeconds(), runtimeVerified: false }, 2);
   relog.info(`[MhwRogue] loaded M2. quest=${config.quest.id} template=${config.quest.baseId} route=${session.route}`);

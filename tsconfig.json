@@ -24,6 +24,8 @@
   ],
   "exclude": [
     "node_modules",
+    "console",
+    "native",
     "src/**/*.test.ts"
   ],
   "tstl": {

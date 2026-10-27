@@ -1,18 +1,23 @@
 /**
- * Web 控制台桥（Phase-1 phase B）—— Lua 侧命令执行与状态发布。
+ * Web 控制台桥（Phase-2）—— Lua 侧命令执行与状态发布。
  *
- * 通信模型（webconsole.dll 原生插件已承载 HTTP）：
+ * 通信模型（webconsole.dll 原生插件承载 HTTP，Phase-1 已实机验证）：
  *   浏览器 → POST /api/command → 插件原子写 webconsole_cmd.json（单命令槽）
  *   本桥：on_frame 限频轮询命令槽 → 执行（与 ImGui 共用 session/runtime/shop）→
  *         结果写 webconsole_results.json → 清空命令槽
  *   状态：限频写 webconsole_state.json（浏览器 GET /api/state 由插件线程读取返回）
  *
- * 协议：命令 { id, cmd, ... }，显式设置（setInvincible: true）避免重试副作用。
- * 结果：{ id, status: "applied"|"rejected"|"queued", message }。
- * buy 为 queued（购买经 ShopWindow.tick 异步执行，最终结果在 state.notice/交易日志）。
- * 安全：单槽天然串行；id 去重（重复 id 直接回最近结果不重复执行）；命令槽只由本桥清空。
+ * 会话安全：bridgeId 在构造与脚本重置（Reset scripts）时重新生成；命令必须携带
+ * 当前 bridgeId，旧页面/旧命令按过期拒绝。buy 走 ShopWindow 公共请求入口（与 ImGui
+ * 同一条 pending→tick 路径：真实发货、背包读回、失败恢复 PT），结果为 queued，
+ * 最终结果见 state.shopNotice 与交易日志。
+ *
+ * 配置热调（Phase-4 最小集）：submitConfig 校验后立即替换 RunCore 配置并落盘
+ * mhw_rogue_config.json（持久覆盖，重启亦生效）；生效点遵循简报 §7：
+ * 商店价格/怪池/倍率即时影响下一次取值；开局 PT 等在下一局生效。
  */
 
+import { validateConfig, type RogueConfig } from "../core/config";
 import type { RunSession } from "../core/run_session";
 import type { NativeRuntime } from "./native_runtime";
 import type { ShopWindow } from "./shop_window";
@@ -21,21 +26,31 @@ import { rejson } from "./sdk";
 interface Command
 {
     id?: string;
+    bridgeId?: string;
     cmd?: string;
     armor?: string;
     index?: number;
     value?: boolean;
     itemId?: string;
     route?: string;
+    config?: unknown;
 }
 
 const CMD_FILE = "webconsole_cmd.json";
 const RESULT_FILE = "webconsole_results.json";
 const STATE_FILE = "webconsole_state.json";
-const RESULT_HISTORY_MAX = 20;
+const CONFIG_OVERRIDE_FILE = "mhw_rogue_config.json";
+const RESULT_HISTORY_MAX = 50;
+
+function randomId(): string
+{
+    return Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, "0");
+}
 
 export class WebConsoleBridge
 {
+    readonly bridgeId = randomId();
+    configVersion = 0;
     private lastExecutedId: string | null = null;
     private lastOutcome: Record<string, unknown> = { status: "applied", message: "none" };
     private frameCounter = 0;
@@ -46,6 +61,16 @@ export class WebConsoleBridge
         private readonly runtime: NativeRuntime,
         private readonly shop: ShopWindow)
     {
+    }
+
+    private publishStateRef: (() => void) | null = null;
+
+    /** Reset scripts / 新装配时轮换会话：旧页面命令全部过期。 */
+    newScriptSession(): void
+    {
+        this.lastExecutedId = null;
+        this.results = [];
+        rejson.dump_file(RESULT_FILE, { bridgeId: this.bridgeId, rotated: true }, 1);
     }
 
     tick(): void
@@ -70,6 +95,13 @@ export class WebConsoleBridge
                 // 槽未被清空（结果写失败等）：重发最近结果并清槽，绝不重复执行
                 this.writeResults(id);
                 rejson.dump_file(CMD_FILE, {}, 1);
+                return;
+            }
+            if (cmd.bridgeId !== undefined && cmd.bridgeId !== this.bridgeId)
+            {
+                const outcome = { status: "rejected", message: "stale bridgeId" };
+                this.results.push({ id, ...outcome });
+                this.writeResults(id);
                 return;
             }
             this.lastExecutedId = id;
@@ -118,7 +150,6 @@ export class WebConsoleBridge
             {
                 if (!cmd.itemId) return { status: "rejected", message: "itemId required" };
                 const r = this.shop.requestPurchase(cmd.itemId);
-                // 购买异步执行（ShopWindow.tick），最终结果见 state.notice 与交易日志
                 return { status: r.ok ? "queued" : "rejected", message: r.message };
             }
             case "retryPost":
@@ -139,6 +170,27 @@ export class WebConsoleBridge
                 session.route = cmd.route;
                 return { status: "applied", message: cmd.route };
             }
+            case "submitConfig":
+            {
+                try
+                {
+                    const cfg = validateConfig(cmd.config);
+                    session.core.replaceConfig(cfg);
+                    this.configVersion++;
+                    // 持久覆盖：重启/Reset 后仍生效（loadConfig 优先读此文件）
+                    rejson.dump_file(CONFIG_OVERRIDE_FILE, cmd.config, 2);
+                    return { status: "applied", configVersion: this.configVersion };
+                }
+                catch (e)
+                {
+                    return { status: "rejected", message: String(e) };
+                }
+            }
+            case "getConfig":
+            {
+                // 结果文件带回完整配置（页面也可读 /api/config）
+                return { status: "applied", config: session.core.config };
+            }
             default:
                 return { status: "rejected", message: `unknown cmd ${cmd.cmd ?? "(none)"}` };
         }
@@ -147,7 +199,13 @@ export class WebConsoleBridge
     private writeResults(id: string): void
     {
         rejson.dump_file(RESULT_FILE,
-            { lastId: id, last: this.lastOutcome, history: this.results }, 2);
+            {
+                lastId: id,
+                last: this.lastOutcome,
+                bridgeId: this.bridgeId,
+                configVersion: this.configVersion,
+                history: this.results,
+            }, 2);
     }
 
     private publishState(): void
@@ -157,10 +215,14 @@ export class WebConsoleBridge
         this.stateCounter++;
         rejson.dump_file(STATE_FILE, {
             ok: true,
-            protocol: 1,
+            protocol: 2,
             counter: this.stateCounter,
+            bridgeId: this.bridgeId,
+            configVersion: this.configVersion,
             sessionStage: s.stage,
             corePhase: state.phase,
+            questId: s.core.config.quest.id,
+            questUnique: s.questUniqueSnapshot,
             layer: state.layer,
             pt: state.wallet.pt,
             cartsLeft: state.cartsLeft,

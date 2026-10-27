@@ -46,12 +46,16 @@ export interface ShopEntry {
 type Tier = { tag: string; monsters: string[]; tier: string };
 
 export class RunCore {
-  readonly config: RogueConfig;
+  private _config: RogueConfig;
+
+  /** 当前生效配置（replaceConfig 可热替换：商店/池/倍率在下次取值生效） */
+  get config(): RogueConfig { return this._config; }
+
   readonly state: RunState;
   private rng: Rng;
 
   constructor(config: RogueConfig, seed?: number) {
-    this.config = config;
+    this._config = config;
     this.rng = new Rng(seed);
     this.state = createState(config.startPt, config.maxCarts);
   }
@@ -61,6 +65,12 @@ export class RunCore {
   }
 
   // ---------- 开局 / 结束 ----------
+
+  /** 热替换配置（简报 §7 生效点：取值类即时、局规则下局生效）。 */
+  replaceConfig(config: RogueConfig): void
+  {
+    this._config = config;
+  }
 
   armorOptions(): string[] {
     return this.config.armorOptions;

@@ -48,6 +48,10 @@ export class RunSession {
   private camp: Position | null = null;
   private roster: number[] = [];
   private questUnique: number | null = null;
+
+  /** 当前任务实例号快照（状态发布用；null=未在任务中）。 */
+  get questUniqueSnapshot(): number | null { return this.questUnique; }
+
   private lastDeaths = 0;
   private seen: EnemyReading[] = [];
   private resolved: EnemyReading[] = [];
