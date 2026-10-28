@@ -1,0 +1,54 @@
+{
+  "ok": true,
+  "baseUrl": "http://127.0.0.1:11777",
+  "layers": {
+    "http": {
+      "state": "up",
+      "status": 200
+    },
+    "dll": {
+      "state": "up",
+      "plugin": "webconsole",
+      "version": "0.3.4",
+      "pid": 5072,
+      "session": "5072-9487061392",
+      "uptimeMs": 70370,
+      "transport": "memory",
+      "luaSessions": 1,
+      "pings": 2,
+      "commands": 0,
+      "queuedCommands": 0
+    },
+    "lua": {
+      "state": "pass",
+      "moduleVersion": "0.3.4",
+      "session": "5072-9487061392:lua-1",
+      "at": "2026-10-28T14:49:52Z",
+      "errors": []
+    },
+    "business": {
+      "state": "live",
+      "protocol": 4,
+      "sessionStage": "Idle",
+      "corePhase": "Idle",
+      "layer": 0,
+      "questUnique": null,
+      "sampledAt": 1793199055
+    }
+  },
+  "protocol": {
+    "expected": 4,
+    "actual": 4,
+    "compatible": true
+  },
+  "liveness": {
+    "state": "live",
+    "bridgeId": "1-1793198992-f5fd3c51",
+    "counter": {
+      "from": 63,
+      "to": 64
+    },
+    "sampleWindowMs": 1603
+  },
+  "blockers": []
+}

@@ -1,0 +1,30 @@
+{
+  "allowedActions": null,
+  "busy": false,
+  "canPost": false,
+  "dialogs": null,
+  "dialogsKnown": false,
+  "evidence": [
+    {
+      "source": "snow.QuestManager.isActiveQuest",
+      "value": false
+    },
+    {
+      "source": "snow.stage.StageManager",
+      "value": "no verified map accessor in the installed SDK"
+    },
+    {
+      "source": "snow.gui.GuiManager.IsCanInvokeQuestBoard",
+      "value": false
+    },
+    {
+      "source": "snow.player.PlayerManager.PlayerList",
+      "value": 0
+    }
+  ],
+  "loading": true,
+  "note": "Viewpoint sensor only: title, save select and dialogs are not observed.",
+  "online": false,
+  "scene": "unknown",
+  "sceneToken": "bridge:1-1793198992-f5fd3c51:?"
+}

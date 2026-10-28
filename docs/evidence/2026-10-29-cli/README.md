@@ -34,8 +34,27 @@
 不可购买本地拒绝且不发送、`config submit` 缺版本(2)/版本过期(4)、配置校验(2/0)、
 wait 满足(0)/超时(5)、协议不符(3)、场景通过(0)/失败(4)。
 
+## 协议 4 复测（DLL 0.3.4，进程 PID 5072）
+
+旧实例 30880 用 `taskkill /PID 30880` 正常结束（无参为优雅关闭，未用 `/F`），
+`npm run deploy` 成功写入 806400 字节，部署后 DLL SHA-256 与构建产物一致
+（`96f9c434294f37c7…`），直接启动游戏 EXE 后插件在约 11 秒内响应。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `node cli/mhr.mjs doctor --json` | **0** | 四层全 PASS：HTTP up、DLL 0.3.4、Lua 探针 module=0.3.4、业务 live，心跳 20→22，协议 DLL 4 / Lua 4 / 期望 4 |
+| `node cli/mhr.mjs probe --json` | 0 | sessions=1、pings=2、protocol=4 |
+| `node cli/mhr.mjs scenario run cli/scenarios/readiness.json` | **0** | 三步全过（状态可读 / protocol=4 / 有会话标识） |
+| `node cli/mhr.mjs ui` | 0 | 新 `state.ui` 分区已上线：`scene=unknown`、`loading=true`、`PlayerList=0`、`IsCanInvokeQuestBoard=false`——即标题/加载阶段，如实标 unknown，未伪造 village |
+
+证据文件：`doctor-live-v034.json`、`probe-live-v034.json`、`ui-title-v034.json`、
+`scenario-readiness-v034.json`。
+
+标题界面下 `scene=unknown` 是**正确结果**：视角传感器只覆盖"任务内/村内"判据，
+不区分标题与存档选择（第二阶段待做）。
+
 ## 未实机验证
 
-- 协议 4 的 DLL 0.3.4 与 bundle 已构建、页面已部署；DLL 替换被 30880 占用（EBUSY），
-  需退出游戏后 `npm run deploy` 再启动。协议 4 下的 doctor/wait/scenario 实跑待下一轮。
+- 进村后（PlayerList>0）的 `run.start` 与 `wave-cycle` 场景本轮未跑：重启后的新实例
+  停在标题/加载画面，没有存档已被载入。
 - 标题/存档/弹窗（第二阶段）、`enemy.kill(uid)`、回营传送（第三阶段）未实现。

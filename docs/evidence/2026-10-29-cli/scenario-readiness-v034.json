@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "scenario": "readiness",
+  "file": "C:\\TechProjects\\About_MyRepos\\About_Games\\mhr-roguelike-research\\cli\\scenarios\\readiness.json",
+  "baseUrl": "http://127.0.0.1:11777",
+  "bridgeId": "1-1793198992-f5fd3c51",
+  "startedAt": "2026-10-28T14:50:54.052Z",
+  "durationMs": 57,
+  "steps": [
+    {
+      "step": "业务状态可读",
+      "kind": "assert",
+      "ok": true,
+      "expect": "ok=true"
+    },
+    {
+      "step": "协议为 4",
+      "kind": "assert",
+      "ok": true,
+      "expect": "protocol=4"
+    },
+    {
+      "step": "有会话标识",
+      "kind": "assert",
+      "ok": true,
+      "expect": "bridgeId!="
+    }
+  ],
+  "failure": null
+}
