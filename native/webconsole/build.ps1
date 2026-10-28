@@ -1,3 +1,9 @@
+﻿# webconsole 构建入口（PowerShell）
+# 底层：CMake（native/webconsole/CMakeLists.txt）——lua54 静态库 + 插件 DLL
+# 用法：
+#   .\build.ps1 -Target Plugin -Configuration Release   # 构建 webconsole.dll
+#   .\build.ps1 -Target Standalone -Configuration Debug # 构建独立测试 exe
+#   .\build.ps1 -Configuration Debug                    # Debug 构建
 [CmdletBinding()]
 param(
     [ValidateSet('Plugin', 'Standalone')][string]$Target = 'Plugin',
@@ -28,61 +34,30 @@ if (-not $VisualStudioPath) {
         $VisualStudioPath = $env:VSINSTALLDIR
     }
 }
-if (-not $VisualStudioPath) {
-    throw 'Install Visual Studio / Build Tools with Desktop development with C++ and a Windows SDK, or pass -VisualStudioPath.'
-}
-$setup = Join-Path $VisualStudioPath 'VC\Auxiliary\Build\vcvarsall.bat'
-if (-not (Test-Path -LiteralPath $setup)) { throw "C++ environment setup not found: $setup" }
 
-if (-not [IO.Path]::IsPathRooted($OutputDirectory)) {
-    $OutputDirectory = Join-Path (Get-Location).Path $OutputDirectory
-}
-$OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 $work = Join-Path $PSScriptRoot ".build\$Target-$Configuration"
 New-Item -ItemType Directory -Force -Path $OutputDirectory, $work | Out-Null
 $stem = if ($Target -eq 'Plugin') { 'webconsole' } elseif ($Configuration -eq 'Debug') { 'webconsole_dbg' } else { 'webconsole_test' }
 $extension = if ($Target -eq 'Plugin') { 'dll' } else { 'exe' }
 $output = Join-Path $OutputDirectory "$stem.$extension"
-$flags = @('/nologo', '/std:c++20', '/utf-8', '/EHsc', '/W3',
-    ('"' + (Join-Path $PSScriptRoot 'src\plugin_main.cpp') + '"'),
-    ('"' + (Join-Path $PSScriptRoot 'src\http_server.cpp') + '"'),
-    ('/Fo"' + (Join-Path $work "$stem.obj") + '"'),
-    ('/Fd"' + (Join-Path $work 'compiler.pdb') + '"'), ('/Fe"' + $output + '"'))
-if ($Configuration -eq 'Debug') { $flags += @('/Od', '/Zi', '/MDd') }
-else { $flags += @('/O2', '/MD', '/DNDEBUG') }
-if ($Target -eq 'Plugin') { $flags += '/LD' }
-else { $flags += '/DWEBCONSOLE_STANDALONE' }
-$flags += @('/link', 'ws2_32.lib', 'crypt32.lib', '/MACHINE:X64', '/INCREMENTAL:NO',
-    ('/IMPLIB:"' + (Join-Path $work "$stem.lib") + '"'))
-if ($Configuration -eq 'Debug') {
-    $flags += @('/DEBUG', ('/PDB:"' + (Join-Path $work "$stem.pdb") + '"'), ('/MAP:"' + (Join-Path $work "$stem.map") + '"'))
-}
-if ($Target -eq 'Plugin') {
-    $flags += @('/EXPORT:reframework_plugin_required_version', '/EXPORT:reframework_plugin_initialize')
-}
-$responseFile = Join-Path $work 'compile.rsp'
-# A BOM makes Unicode source/output paths unambiguous to MSVC response-file parsing.
-[IO.File]::WriteAllText($responseFile, ($flags -join ' '), [Text.UTF8Encoding]::new($true))
-$commandFile = Join-Path $work 'compile.cmd'
-$commands = @('@echo off', 'call "%MHR_BUILD_SETUP%" x64 >nul',
-    'if errorlevel 1 exit /b %errorlevel%', 'cd /d "%MHR_BUILD_WORK%"',
-    'cl.exe @"%MHR_BUILD_RESPONSE%"', 'exit /b %errorlevel%')
-# Keep batch contents ASCII; Unicode paths travel in the child environment.
-[IO.File]::WriteAllLines($commandFile, $commands, [Text.Encoding]::ASCII)
+
 Write-Host "Building $Target / $Configuration (x64) with $VisualStudioPath"
-$start = [Diagnostics.ProcessStartInfo]::new()
-$start.FileName = $env:ComSpec
-$start.Arguments = '/d /c ""' + $commandFile + '""'
-$start.UseShellExecute = $false
-$start.EnvironmentVariables['MHR_BUILD_SETUP'] = $setup
-$start.EnvironmentVariables['MHR_BUILD_WORK'] = $work
-$start.EnvironmentVariables['MHR_BUILD_RESPONSE'] = $responseFile
-if ($VsWherePath -and (Test-Path -LiteralPath $VsWherePath)) {
-    $start.EnvironmentVariables['PATH'] = (Split-Path -Parent $VsWherePath) + ';' + $env:PATH
-}
-$compiler = [Diagnostics.Process]::Start($start)
-$compiler.WaitForExit()
-$code = $compiler.ExitCode
-$compiler.Dispose()
-if ($code -ne 0) { throw "MSVC build failed ($code). If the output DLL is loaded, close the game first." }
-Write-Host "Built $output"
+$configureInfo = [Diagnostics.ProcessStartInfo]::new()
+$configureInfo.FileName = 'cmake.exe'
+$configureInfo.Arguments = "-S `"$PSScriptRoot`" -B `"$work`""
+$configureInfo.UseShellExecute = $false
+$configure = [Diagnostics.Process]::Start($configureInfo)
+$configure.WaitForExit()
+if ($configure.ExitCode -ne 0) { throw "cmake configure failed with $($configure.ExitCode)" }
+
+$buildInfo = [Diagnostics.ProcessStartInfo]::new()
+$buildInfo.FileName = 'cmake.exe'
+$buildInfo.Arguments = "--build `"$work`" --config $Configuration --target $stem"
+$buildInfo.UseShellExecute = $false
+$buildProcess = [Diagnostics.Process]::Start($buildInfo)
+$buildProcess.WaitForExit()
+if ($buildProcess.ExitCode -ne 0) { throw "cmake build failed with $($buildProcess.ExitCode)" }
+
+# 构建产物拷贝到 OutputDirectory（dist/ 构建产物、游戏目录部署由上层 deploy.js 负责）
+Copy-Item -Path (Join-Path $work "$stem.$extension") -Destination $output -Force
+Write-Host "Output: $output"
