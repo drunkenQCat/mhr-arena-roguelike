@@ -1,17 +1,18 @@
-// webconsole 共享定义：版本、目录、日志、文件工具与缓存读。
-// 被 http_server.cpp（端点）与 plugin_main.cpp / standalone_main.cpp（入口）共用。
-// 线程模型：HTTP 在 cpp-httplib 线程池；文件写入用临时文件+MoveFileExW 原子替换；
-//   缓存读用自旋锁去重撞盘。handler 内任何未捕获异常都会 std::terminate
-//   带崩整个游戏进程（实机教训：全栈在本 DLL 的线程上 RaiseException），
-//   因此所有文件操作路径不抛异常（ifstream 失败只返回空）。
+// webconsole shared definitions: version, dirs, logging, file helpers, cached reads.
+// Shared by http_server.cpp (endpoints) and plugin_main.cpp / standalone_main.cpp.
+// Threading: HTTP runs on the cpp-httplib pool; writes go through a temp file plus
+// MoveFileExW; cached reads use a spin lock. Handlers must not throw, because an
+// escaping exception calls std::terminate and takes the game process down.
+// Keep this file pure ASCII: the toolchain here reads sources in the ANSI code page.
 #pragma once
-
-// winsock2.h 必须先于 Windows.h（否则 winsock.h 旧版被拉入导致 sockaddr 重定义）
+// winsock2.h must precede Windows.h (legacy winsock.h redefines sockaddr).
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <Windows.h>
 
 #include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <chrono>
 #include <deque>
 #include <fstream>
@@ -22,19 +23,40 @@
 
 namespace webconsole {
 
-inline constexpr const char* PLUGIN_VERSION = "0.3.1";
+inline constexpr const char* PLUGIN_VERSION = "0.3.2";
 inline unsigned short g_listen_port = 11777;
 
-// 日志汇点：插件入口指向 REFramework log，standalone 测试指向 printf。
-// 空汇点 = 静默（进程退出前的日志本就不保证可见）。
+// Process-wide DLL session id (pid + boot counter tail). Created at
+// DLL_PROCESS_ATTACH, stable across ScriptRunner Reset: Reset swaps the Lua
+// state, not the process, so consecutive resets share the DLL session while
+// each load gets a distinct Lua-side entry.
+inline std::string g_session_id;
+// /api/probe counters and the uptime origin (atomic, monotonic).
+inline std::chrono::steady_clock::time_point g_started_at = std::chrono::steady_clock::now();
+inline std::atomic<unsigned long long> g_ping_calls{0};
+inline std::atomic<unsigned long long> g_command_posts{0};
+
+inline void init_session_id()
+{
+    if (!g_session_id.empty()) return;
+    LARGE_INTEGER counter{};
+    QueryPerformanceCounter(&counter);
+    const unsigned long long started = static_cast<unsigned long long>(counter.QuadPart);
+    char buf[64] = {};
+    std::snprintf(buf, sizeof(buf), "%lu-%llu", GetCurrentProcessId(), started % 10000000000ull);
+    g_session_id = buf;
+}
+
+// Log sink: the plugin entry points it at the REFramework log, the standalone
+// test exe at printf. Empty sink = silent (logs before exit are not guaranteed
+// visible anyway).
 inline void (*log_sink)(const char*) = nullptr;
 inline void log_info(const char* msg) { if (log_sink) log_sink(msg); }
 
-// 数据目录 = <game>/reframework/data；模块目录 = reframework/plugins（console.html 所在）。
-// 由入口（DllMain / standalone main）设置一次，进程内只读。
+// Data dir = <game>/reframework/data; module dir = reframework/plugins where
+// console.html lives. Set once by the entry point, read-only afterwards.
 inline std::wstring g_data_dir;
 inline std::wstring g_module_dir;
-
 inline std::wstring data_path(const wchar_t* name) { return g_data_dir + L"\\" + name; }
 
 inline std::string read_text(const std::wstring& path) {
@@ -45,7 +67,7 @@ inline std::string read_text(const std::wstring& path) {
     return ss.str();
 }
 
-// 原子写文本：临时文件 + MoveFileExW（竞争/占用时限次重试）
+// Atomic text write: temp file plus MoveFileExW (bounded retries on contention).
 inline bool atomic_write_text(const std::wstring& path, const std::string& text) {
     const std::wstring tmp = path + L".tmp";
     {
@@ -62,8 +84,8 @@ inline bool atomic_write_text(const std::wstring& path, const std::string& text)
     return false;
 }
 
-// 缓存读：所有客户端共享同一份磁盘读，限频撞盘；自旋锁护住缓存体。
-// 注意：cpp-httplib 默认线程池并发调用 handler，静态缓存必须自加锁。
+// Cached read: all clients share one disk read, throttled by TTL; the spin lock
+// guards the cache body (cpp-httplib handlers run concurrently on its thread pool).
 struct CachedFile {
     std::atomic_flag spin = ATOMIC_FLAG_INIT;
     std::chrono::steady_clock::time_point last{};
@@ -79,7 +101,7 @@ inline std::string cached_read(CachedFile& c, const std::wstring& path, int ttl_
     } guard{c.spin};
     const auto now = std::chrono::steady_clock::now();
     if (!c.valid || now - c.last > std::chrono::milliseconds(ttl_ms)) {
-        c.body = read_text(path); // ifstream 读失败只返回空，不抛
+        c.body = read_text(path); // a failing ifstream returns empty, it never throws
         c.last = now;
         c.valid = true;
     }

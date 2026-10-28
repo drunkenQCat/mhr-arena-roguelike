@@ -16,6 +16,13 @@ export interface ConsoleState {
   capabilities?: { start: boolean; choose: boolean; stop: boolean };
   enemies?: { uid: number; typeId: number; dead: boolean; captured: boolean }[] | null;
 }
+/** GET /api/probe: DLL identity. Answering proves the native plugin is loaded, not that Lua runs. */
+export interface ProbeInfo {
+  ok: boolean; plugin: string; module: string; export: string; moduleVersion: string;
+  protocol: number; pid: number; session: string; uptimeMs: number; sessions: number;
+  stateSeq: number; queuedCommands: number; commands: number; pings: number; transport: string;
+}
+
 export interface CommandResult { id: string; status: string; message?: string; config?: unknown; activeConfig?: unknown; configVersion?: number; }
 export interface ReceiptPacket { bridgeId?: string; last?: CommandResult; history?: CommandResult[] | null; }
 

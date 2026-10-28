@@ -26,7 +26,7 @@ New-Item -ItemType Directory -Path (Join-Path $temporary 'testdata') -Force | Ou
 Copy-Item -LiteralPath $source -Destination (Join-Path $temporary $name)
 # Isolated fixtures: never read/write a user's game or checked-in testdata.
 [IO.File]::WriteAllText((Join-Path $temporary 'console.html'), '<!doctype html><title>Native smoke test</title>')
-foreach ($file in 'webconsole_state.json', 'webconsole_results.json', 'mhw_rogue_config.json') {
+foreach ($file in 'mhw_rogue_config.json') {
     [IO.File]::WriteAllText((Join-Path $temporary "testdata\$file"), '{"testMode":true}')
 }
 $stdout = Join-Path $temporary 'stdout.log'
@@ -50,7 +50,19 @@ try {
     if (-not $ready) { throw "Server did not become ready on port $Port." }
     Write-Host "PASS health on port $Port"
     if (-not $HealthOnly) {
-        foreach ($endpoint in 'api/state', 'api/results', 'api/config', 'console') {
+        $probe = (Request 'api/probe').Content | ConvertFrom-Json
+        if ($probe.module -ne 'webconsole' -or $probe.export -ne 'luaopen_webconsole') { throw 'api/probe does not describe the webconsole module.' }
+        if (-not $probe.session -or -not $probe.moduleVersion) { throw 'api/probe is missing the session id or module version.' }
+        Write-Host "PASS GET /api/probe module=$($probe.module) version=$($probe.moduleVersion) session=$($probe.session)"
+        # The state/results snapshots are memory-only: without Lua nothing has published yet,
+        # so 503 is the documented answer and a file in testdata must not fake it.
+        foreach ($endpoint in 'api/state', 'api/results') {
+            $empty = $false
+            try { $response = Request $endpoint } catch { $empty = $_.Exception.Response.StatusCode.value__ -eq 503 }
+            if (-not $empty) { throw "Expected 503 before Lua publishes, got $endpoint" }
+            Write-Host "PASS GET /$endpoint 503 until Lua publishes"
+        }
+        foreach ($endpoint in 'api/config', 'console') {
             $response = Request $endpoint
             if ($response.StatusCode -ne 200) { throw "Unexpected status for $endpoint" }
             Write-Host "PASS GET /$endpoint"
@@ -58,9 +70,10 @@ try {
         $body = '{"id":"native-smoke","cmd":"getConfig"}'
         $response = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/api/command" -Method POST -Body $body -ContentType 'application/json' -Headers @{ Origin = "http://127.0.0.1:$Port" } -UseBasicParsing -TimeoutSec 2
         if (-not ($response.Content | ConvertFrom-Json).queued) { throw 'Command was not queued.' }
-        $written = Get-Content -LiteralPath (Join-Path $temporary 'testdata\webconsole_cmd.json') -Raw | ConvertFrom-Json
-        if ($written.id -ne 'native-smoke') { throw 'Mailbox did not preserve the request.' }
-        Write-Host 'PASS POST /api/command and isolated mailbox'
+        $after = (Request 'api/probe').Content | ConvertFrom-Json
+        if ($after.commands -lt 1) { throw 'api/probe did not count the queued command.' }
+        if ($after.queuedCommands -lt 1) { throw 'api/probe did not report the queue depth.' }
+        Write-Host 'PASS POST /api/command reaches the in-memory queue'
     }
     if ($ObserveSeconds) { Start-Sleep -Seconds $ObserveSeconds }
     if ($process.HasExited) { throw "Server died during observation (code $($process.ExitCode))." }

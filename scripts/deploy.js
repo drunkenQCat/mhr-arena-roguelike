@@ -70,6 +70,12 @@ function main() {
   copyIfChanged(root, path.join("native", "webconsole", "webconsole.dll"), gameDir, path.join("reframework", "plugins", "webconsole.dll"), "游戏重启后生效（原生插件随启动加载）");
   copyIfChanged(root, path.join("console", "dist", "index.html"), gameDir, path.join("reframework", "plugins", "console.html"), "打开 http://127.0.0.1:11777/console");
 
+  // 探针（独立 autorun）：autorun 加载即跑，无需手输 Lua。
+  // autorun/lua/ 目录提供 require("lua.webconsole_probe") 的搜索路径
+  // （ScriptRunner 会把 <autorun>/?.lua 加入 package.path）。
+  copyIfChanged(root, path.join("reframework", "autorun", "webconsole_probe_auto.lua"), gameDir, path.join("reframework", "autorun", "webconsole_probe_auto.lua"), "每次脚本加载/Reset 自动执行");
+  copyIfChanged(root, path.join("reframework", "autorun", "lua", "webconsole_probe.lua"), gameDir, path.join("reframework", "autorun", "lua", "webconsole_probe.lua"), "探针本体（require 目标）");
+
   // REFramework 字体开关：该文件存在 => 默认 imgui 字体切到内嵌百度字体（中文可渲染）。
   const mode = path.join(gameDir, "reframework_pictographic.mode");
   if (!fs.existsSync(mode)) {

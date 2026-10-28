@@ -89,10 +89,16 @@ node scripts/deploy.js
 | `reframework/autorun/mhw_rogue.lua` | `reframework/autorun/mhw_rogue.lua` |
 | `native/webconsole/webconsole.dll` | `reframework/plugins/webconsole.dll` |
 | `console/dist/index.html` | `reframework/plugins/console.html` |
+| `reframework/autorun/webconsole_probe_auto.lua` | `reframework/autorun/webconsole_probe_auto.lua` |
+| `reframework/autorun/lua/webconsole_probe.lua` | `reframework/autorun/lua/webconsole_probe.lua` |
 
 这些文件由源码重新构建，不提交 Git。根目录的 `npm run build` 构建 Lua 并部署现有产物，**不会替你重新构建前端或 DLL**，修改它们后需先执行相应构建命令。
 
 游戏加载插件后打开 **http://127.0.0.1:11777/console**。可用 `/api/health` 检查插件是否启动；状态是否有效还需查看网页的 Lua 心跳。
+
+### 模块探针（DLL ↔ Lua 验收）
+
+`webconsole.dll` 同时是 REFramework 插件与 Lua C 模块：DLL 文件名 `webconsole.dll` == `require("webconsole")` == 导出 `luaopen_webconsole`。`autorun/webconsole_probe_auto.lua` 在每次脚本加载（含 Reset scripts）自动执行 `autorun/lua/webconsole_probe.lua`：require 模块 → 字符串往返（二进制安全 + UTF-8）→ `collectgarbage("collect")` 后再往返一次，结果（PASS/FAIL、本次耗时、模块版本、DLL 会话号、会话历史）写入 `reframework/data/webconsole_probe.json` 并经内存桥发布到 `GET /api/probe/report`；`GET /api/probe` 返回 DLL 本体标识（版本、进程、会话、计数）。网页控制台"模块探针"面板显示同一份数据，连续 Reset 的每次加载在历史中各占一条（同一 DLL 会话号只保留最新一条）。游戏内无需手输任何 Lua；本地语义验证跑 `python scripts/check-webconsole-probe.py`，DLL 导出契约验证跑 `python scripts/check-webconsole-dll-exports.py`。
 
 - 网页更新：重新构建、部署后刷新浏览器。
 - Lua 更新：覆盖文件后，在安全状态使用 `REFramework → ScriptRunner → Reset scripts`，刷新网页并从新局开始；不保留进行中的肉鸽状态。
@@ -148,6 +154,7 @@ M2a 显式测试 `EM1_HP=0`，其引擎时序必须实机核验。
 | `src/game/quest_transport.ts` | 原生柜台、单人选择、确认、出发、超时清理 |
 | `src/game/sdk.ts` | 唯一宿主 API 声明入口 |
 | `src/game/webconsole_bridge.ts` | Lua 命令信箱、状态发布、配置提交和交易回执 |
+| `reframework/autorun/lua/webconsole_probe.lua` | DLL↔Lua 验收探针（自动执行，PASS/FAIL 与会话历史） |
 | `src/game/shop_window.ts` | 网页与原生窗口共用的购买资格和交付流程 |
 | `console/src/` | Vue 控制台、策划编辑器与 HTTP 客户端 |
 | `native/webconsole/` | C++ HTTP 插件、PowerShell 构建与独立测试 |

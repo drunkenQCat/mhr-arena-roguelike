@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import ConfigEditor from "./ConfigEditor.vue";
-import { Freshness, SubmissionUncertain, downloadJson, getJson, postCommand, waitForReceipt, type ConsoleState, type CommandResult } from "./api";
+import { Freshness, SubmissionUncertain, downloadJson, getJson, postCommand, waitForReceipt, type ConsoleState, type CommandResult, type ProbeInfo } from "./api";
 
 const state = ref<ConsoleState | null>(null), stale = ref(true), busy = ref(false);
 const notice = ref("等待游戏状态"), lastSync = ref("—"), page = ref("play");
@@ -9,6 +9,34 @@ const results = ref<CommandResult[]>([]), filter = ref(""), category = ref("");
 const config = ref<unknown>(null), loadedVersion = ref(0), configMessage = ref("");
 const configBridgeId = ref("");
 const heartbeat = new Freshness();
+// 模块探针：DLL 本体 + Lua require/往返结果（PASS/FAIL），连续 Reset 的会话历史。
+const probe = ref<ProbeInfo | null>(null);
+const probeState = ref<ProbeReport | null>(null);
+const probeError = ref("");
+let probeDllVersion = "";
+interface ProbeCheck { id: string; ok: boolean; message: string; elapsedMs?: number; bytes?: number; gcMs?: number; }
+interface ProbeSession {
+  ok: boolean; session: string; sessionSource?: string; sessionSeq?: number;
+  at?: number; atIso?: string; localTime?: string; moduleVersion?: string; versionSource?: string;
+  durationMs?: number; checks?: ProbeCheck[]; errors?: string[];
+  dll?: { pid?: number; moduleVersion?: string; uptimeMs?: number; sessions?: number; commands?: number; pings?: number };
+}
+interface ProbeReport { schema?: number; ok: boolean; session: string; moduleVersion?: string; history: ProbeSession[]; result?: ProbeSession }
+// 连续 Reset 时每个会话只显示一次；会话号与 DLL 完全相同即“未重置”。
+const probeSessions = computed(() => {
+  const seen = new Set<string>();
+  return (probeState.value?.history ?? []).filter((entry) => {
+    if (!entry?.session || seen.has(entry.session)) return false;
+    seen.add(entry.session); return true;
+  }).reverse();
+});
+const probeLocal = computed(() => {
+  if (!probe.value) return "";
+  const readings = probeSessions.value.filter((entry) => entry.versionSource === "dll_required_version").length;
+  if (!readings) return "尚无 Lua 读取记录：模块初始化回调未执行，或探针脚本未部署到 reframework/autorun。";
+  if (readings === 1) return `Lua 已读取模块版本（${probe.value.moduleVersion}）。再按 Reset scripts 可验证连续重置的会话区分。`;
+  return `已记录 ${readings} 次加载（${readings - 1} 次 Reset）。`;
+});
 let alive = true, timer: ReturnType<typeof setTimeout> | undefined, loadedBridge = "";
 const connected = computed(() => !stale.value && state.value?.protocol === 3);
 const categoryOrder = ["基础补给", "弹药", "战术道具", "调和素材", "高阶药品", "翻盘服务"];
@@ -56,8 +84,26 @@ async function submitConfig(value: unknown, version: number) {
     config.value = value; loadedVersion.value = result.configVersion!;
   }
 }
+async function readProbe() {
+  try {
+    const info = await getJson<ProbeInfo>("/api/probe", AbortSignal.timeout(3000));
+    probe.value = info; probeError.value = "";
+    if (info.moduleVersion && info.moduleVersion !== probeDllVersion) {
+      probeDllVersion = info.moduleVersion;
+      probeState.value = null; // 换了 DLL：旧记录不再代表当前模块
+    }
+    if (info.stateSeq > 0) {
+      const report = await getJson<ProbeReport>("/api/probe/report", AbortSignal.timeout(3000));
+      probeState.value = report;
+    }
+  } catch (error) {
+    probeError.value = String(error).replace("Error: ", "");
+  }
+}
+
 async function poll() {
   if (!alive) return;
+  void readProbe();
   const responses = await Promise.allSettled([
     getJson<ConsoleState>("/api/state", AbortSignal.timeout(3000)),
     getJson<{ history?: CommandResult[] | null }>("/api/results", AbortSignal.timeout(3000)),
@@ -132,6 +178,33 @@ const f = (value: number | null | undefined) => value == null ? "—" : value.to
       </div>
       <p v-else class="panel empty">等待游戏内服务发布状态。请确认 Rise 和 webconsole 插件已运行。</p>
     </template>
+    <section class="panel full" id="module-probe">
+      <div class="section-heading"><h2>模块探针（DLL ↔ Lua）</h2>
+        <span :class="['badge', probeState?.ok ? 'live' : 'warning']">{{ probeState ? (probeState.ok ? 'PASS' : 'FAIL') : '等待 Lua' }}</span></div>
+      <p v-if="probeError" class="notice">原生服务未响应：{{ probeError }}（/api/probe 无应答）</p>
+      <template v-else-if="probe">
+        <div class="meta">DLL {{ probe.moduleVersion }} · 会话 {{ probe.session }} · 进程 {{ probe.pid }} · 运行 {{ Math.floor(probe.uptimeMs / 1000) }} 秒 ·
+          已服务 Lua 会话 {{ probe.sessions }} · ping {{ probe.pings }} · 命令 {{ probe.commands }} · 导出 {{ probe.export }}</div>
+        <p v-if="probeState?.result" class="mono">
+          {{ probeState.ok ? 'PASS' : 'FAIL' }} · require("{{ probe.module }}"): 字符串往返与 GC 后往返 ·
+          本次 {{ Math.round(probeState.result.durationMs ?? 0) }} ms · {{ probeState.result.atIso }}
+        </p>
+        <p v-else class="muted">{{ probeLocal }}</p>
+        <div v-if="probeState?.result?.checks?.length" class="meta">
+          <span v-for="check in probeState.result.checks" :key="check.id" :class="['badge', check.ok ? 'live' : 'warning']">
+            {{ check.ok ? 'PASS' : 'FAIL' }} {{ check.id }} · {{ check.bytes }} 字节 · {{ (check.elapsedMs ?? 0).toFixed(2) }} ms</span>
+        </div>
+        <p v-for="error in probeState?.result?.errors ?? []" :key="error" class="notice">{{ error }}</p>
+        <details v-if="probeSessions.length"><summary>连续 Reset 记录（{{ probeSessions.length }} 次加载，最新在上）</summary>
+          <div class="table-scroll"><table><thead><tr><th>会话</th><th>来源</th><th>时间</th><th>结果</th><th>耗时</th><th>模块版本</th></tr></thead><tbody>
+            <tr v-for="entry in probeSessions" :key="entry.session">
+              <td class="mono">{{ entry.session }}</td><td>{{ entry.sessionSource ?? '—' }}</td>
+              <td>{{ entry.localTime ?? entry.atIso }}</td>
+              <td><span :class="['badge', entry.ok ? 'live' : 'warning']">{{ entry.ok ? 'PASS' : 'FAIL' }}</span></td>
+              <td>{{ Math.round(entry.durationMs ?? 0) }} ms</td><td>{{ entry.moduleVersion ?? '—' }}</td>
+            </tr></tbody></table></div></details>
+    </template>
+    </section>
     <ConfigEditor v-show="page === 'design'" :config="config" :version="loadedVersion" :server-version="state?.configVersion ?? loadedVersion" :session-changed="!!configBridgeId && configBridgeId !== state?.bridgeId" :busy="busy" :connected="connected" :message="configMessage" @load="loadConfig" @submit="submitConfig" />
     <section v-if="page === 'events'" class="panel"><div class="section-heading"><h2>命令记录</h2><button @click="downloadJson('console-results.json', results)">导出记录</button></div><label>筛选记录 <input v-model="filter" placeholder="状态 / 请求 ID / 消息" /></label><p class="muted">applied 表示命令已执行；queued 仍需等待游戏结果；rejected 表示未执行。</p><article v-for="r in recent" :key="r.id" class="event"><span :class="['badge', r.status === 'rejected' ? 'warning' : 'live']">{{ r.status }}</span><span>{{ r.message ?? (r.config ? '已读取游戏配置' : '') }}</span><small class="mono">{{ r.id }}</small></article></section>
   </main>

@@ -1,13 +1,72 @@
-// HTTP 服务器实现：全部端点注册与 cpp-httplib 线程模型。
-// 路由注册必须逐个单路径——多路径 initializer_list 重载在请求处理时走 regex
-// 匹配路径，曾触发未捕获 regex_error 导致进程 terminate（实机崩溃教训）。
+// HTTP server: endpoint registration and the cpp-httplib threading model.
+// Routes are registered one path at a time: the multi-path initializer_list overload
+// matches paths with a regex at request time and once raised an uncaught regex_error.
 #include "http_server.h"
+
+#include "memory_bridge.h"
 
 #include "httplib.h"
 
 #include <sstream>
 
 namespace webconsole {
+
+// Process-wide singleton shared by HTTP threads and the Lua module functions.
+MemoryBridge& bridge()
+{
+    static MemoryBridge instance;
+    return instance;
+}
+
+namespace {
+
+// JSON string escaping for the short values this file assembles (versions, ids, names).
+std::string json_escape(const std::string& text)
+{
+    std::string out;
+    out.reserve(text.size() + 8);
+    for (const char ch : text) {
+        const auto byte = static_cast<unsigned char>(ch);
+        if (ch == '"' || ch == '\\') {
+            out += '\\';
+            out += ch;
+        } else if (byte < 0x20) {
+            char buf[8] = {};
+            std::snprintf(buf, sizeof(buf), "\\u%04x", byte);
+            out += buf;
+        } else {
+//  . ASCII .....UTF-8 ... JSON ......
+            out += ch;
+        }
+    }
+    return out;
+}
+
+std::string probe_json()
+{
+    auto& state = bridge();
+    const auto uptime = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - g_started_at).count();
+    std::ostringstream ss;
+    ss << "{\"ok\":true"
+       << ",\"plugin\":\"webconsole\""
+       << ",\"module\":\"webconsole\""
+       << ",\"export\":\"luaopen_webconsole\""
+       << ",\"moduleVersion\":\"" << json_escape(PLUGIN_VERSION) << "\""
+       << ",\"protocol\":3"
+       << ",\"pid\":" << GetCurrentProcessId()
+       << ",\"session\":\"" << json_escape(g_session_id) << "\""
+       << ",\"uptimeMs\":" << uptime
+       << ",\"sessions\":" << state.epoch()
+       << ",\"stateSeq\":" << state.state_sequence()
+       << ",\"queuedCommands\":" << state.queued_commands()
+       << ",\"commands\":" << g_command_posts.load(std::memory_order_relaxed)
+       << ",\"pings\":" << g_ping_calls.load(std::memory_order_relaxed)
+       << ",\"transport\":\"memory\"}";
+    return ss.str();
+}
+
+} // namespace
 
 void run_server()
 {
@@ -23,27 +82,42 @@ void run_server()
 
     svr.Get("/api/health", [](const httplib::Request&, httplib::Response& res) {
         std::ostringstream ss;
-        ss << "{\"ok\":true,\"plugin\":\"webconsole\",\"version\":\"" << PLUGIN_VERSION << "\"}";
+        ss << "{\"ok\":true,\"plugin\":\"webconsole\",\"version\":\"" << PLUGIN_VERSION
+           << "\",\"session\":\"" << json_escape(g_session_id) << "\"}";
         res.set_content(ss.str(), "application/json");
     });
 
-    svr.Get("/api/state", [&](const httplib::Request&, httplib::Response& res) {
-        static CachedFile cache;
-        const auto body = cached_read(cache, data_path(L"webconsole_state.json"), 200);
+    // DLL identity endpoint: lets the probe/page separate "DLL up" from "Lua loaded".
+    svr.Get("/api/probe", [](const httplib::Request&, httplib::Response& res) {
+        res.set_content(probe_json(), "application/json");
+    });
+
+    // Probe report published by the Lua probe (module load, roundtrip, GC, session history).
+    svr.Get("/api/probe/report", [](const httplib::Request&, httplib::Response& res) {
+        const auto body = bridge().probe_snapshot();
         if (body.empty()) {
             res.status = 503;
-            res.set_content("{\"ok\":false,\"error\":\"state file not written yet\"}", "application/json");
+            res.set_content("{\"ok\":false,\"error\":\"probe has not reported yet\"}", "application/json");
+        } else {
+            res.set_content(body, "application/json");
+        }
+    });
+
+    svr.Get("/api/state", [&](const httplib::Request&, httplib::Response& res) {
+        const auto body = bridge().state_snapshot(); // straight from process memory, no disk
+        if (body.empty()) {
+            res.status = 503;
+            res.set_content("{\"ok\":false,\"error\":\"Lua bridge has not published state yet\"}", "application/json");
         } else {
             res.set_content(body, "application/json");
         }
     });
 
     svr.Get("/api/results", [&](const httplib::Request&, httplib::Response& res) {
-        static CachedFile cache;
-        const auto body = cached_read(cache, data_path(L"webconsole_results.json"), 200);
+        const auto body = bridge().results_snapshot();
         if (body.empty()) {
             res.status = 503;
-            res.set_content("{\"ok\":false,\"error\":\"results file not written yet\"}", "application/json");
+            res.set_content("{\"ok\":false,\"error\":\"Lua bridge has not published results yet\"}", "application/json");
         } else {
             res.set_content(body, "application/json");
         }
@@ -60,8 +134,9 @@ void run_server()
         }
     });
 
-    // 单命令槽：POST 覆盖式写入；Lua 执行后写结果文件并清空槽。
-    // Origin 校验匹配真实目的接口而非任意客户端 Host；上限 256KB 容纳配置提交。
+    // Bounded command queue: POST enqueues; Lua pops and publishes results.
+    // Origin is checked against the real destination interface, not an arbitrary Host.
+    // 256 KB cap leaves room for config submissions.
     svr.Post("/api/command", [](const httplib::Request& req, httplib::Response& res) {
         const auto expected = std::string("http://127.0.0.1:") + std::to_string(g_listen_port);
         const auto local = std::string("http://localhost:") + std::to_string(g_listen_port);
@@ -84,30 +159,19 @@ void run_server()
             res.set_content("{\"ok\":false,\"error\":\"command too large\"}", "application/json");
             return;
         }
-        const std::wstring cmd = data_path(L"webconsole_cmd.json");
-        // One outstanding slot. Never acknowledge a request that overwrites another.
-        static std::mutex command_mutex;
-        std::lock_guard<std::mutex> lock(command_mutex);
-        auto pending = read_text(cmd);
-        pending.erase(std::remove_if(pending.begin(), pending.end(), [](unsigned char c) {
-            return c == ' ' || c == '\t' || c == '\r' || c == '\n';
-        }), pending.end());
-        if (!pending.empty() && pending != "{}" && pending != "null") {
-            res.status = 409;
-            res.set_content("{\"ok\":false,\"error\":\"another command is awaiting game acknowledgement\"}", "application/json");
+        // Bounded queue: full = 429 (overload guard), never overwrite an accepted command
+        if (!bridge().push_command(req.body)) {
+            res.status = 429;
+            res.set_content("{\"ok\":false,\"error\":\"command queue full; slow down\"}", "application/json");
             return;
         }
-        if (!atomic_write_text(cmd, req.body)) {
-            res.status = 500;
-            res.set_content("{\"ok\":false,\"error\":\"failed to write command slot\"}", "application/json");
-            return;
-        }
+        g_command_posts.fetch_add(1, std::memory_order_relaxed);
         std::ostringstream ss;
         ss << "{\"ok\":true,\"queued\":true,\"bytes\":" << req.body.size() << "}";
         res.set_content(ss.str(), "application/json");
     });
 
-    // Vue 单 HTML 控制台：与 API 同源（console.html 随 webconsole.dll 部署到 plugins/）。
+    // Single-file Vue console, same origin as the API (console.html sits next to the DLL).
     svr.Get("/console", [&](const httplib::Request&, httplib::Response& res) {
         std::string html = read_text(g_module_dir + L"\\console.html");
         if (html.empty()) {

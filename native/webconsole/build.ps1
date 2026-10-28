@@ -59,5 +59,10 @@ $buildProcess.WaitForExit()
 if ($buildProcess.ExitCode -ne 0) { throw "cmake build failed with $($buildProcess.ExitCode)" }
 
 # 构建产物拷贝到 OutputDirectory（dist/ 构建产物、游戏目录部署由上层 deploy.js 负责）
-Copy-Item -Path (Join-Path $work "$stem.$extension") -Destination $output -Force
+# Multi-config generators (Visual Studio) place the binary in a per-configuration
+# subdirectory; single-config layouts keep it at the build root.
+$built = Join-Path $work "Release\$stem.$extension"
+if (-not (Test-Path -LiteralPath $built)) { $built = Join-Path $work "$stem.$extension" }
+if (-not (Test-Path -LiteralPath $built)) { throw "Build produced no $stem.$extension under $work" }
+Copy-Item -Path $built -Destination $output -Force
 Write-Host "Output: $output"

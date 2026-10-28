@@ -1,12 +1,18 @@
-// 内存桥队列：HTTP 线程与 Lua 控制层之间的有界命令/状态交换。
-// 线程纪律（简报 §一/§二）：
-//   - HTTP 线程只 push 纯字符串；锁内只移动数据，不执行游戏调用或 JSON 解析。
-//   - Lua（游戏回调）take 时搬运并清空；不持有本锁再获取其他锁。
-// 有界性：命令 64 条 / 合计 1 MiB；满时 push 拒绝（HTTP 429），绝不覆盖已接收请求。
-// 生命周期：进程级单例，跨 ScriptRunner Reset 存活；Lua 侧重置后第一次
-//   begin_session(epoch) 视为新代（旧命令清除，由 Lua 侧触发）。
+// Memory bridge queue: bounded command/state exchange between HTTP threads and the
+// Lua control layer.
+// Thread discipline:
+//   - HTTP threads only push plain strings; the lock only moves data, never runs game
+//     calls or JSON parsing.
+//   - Lua (game callbacks) pops and clears under the same lock; never take another
+//     lock while holding this one.
+// Bounds: 64 commands / 1 MiB total; a full queue rejects the push (HTTP 429) and
+// never overwrites an already accepted request.
+// Lifetime: process-wide singleton that outlives ScriptRunner Reset; the first
+// begin_session(epoch) from a fresh Lua state starts the new generation and drops
+// stale commands.
 #pragma once
 
+#include <atomic>
 #include <deque>
 #include <mutex>
 #include <string>
@@ -17,10 +23,10 @@ class MemoryBridge
 {
 public:
     static constexpr size_t MAX_COMMANDS = 64;
-    static constexpr size_t MAX_COMMAND_BYTES = 1 << 20; // 1 MiB 合计预算内的单条上限
-    static constexpr size_t MAX_TOTAL_BYTES = 1 << 20;   // 1 MiB 队列合计预算
+    static constexpr size_t MAX_COMMAND_BYTES = 1 << 20; // per-command cap inside the total budget
+    static constexpr size_t MAX_TOTAL_BYTES = 1 << 20;   // whole-queue budget
 
-    // HTTP 线程：入队。满/超预算返回 false（调用方回 429）。
+    // HTTP threads: enqueue. Returns false when full/over budget (caller answers 429).
     bool push_command(std::string json)
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -30,25 +36,7 @@ public:
         return true;
     }
 
-    // Lua 回调：取走至多 maxCount 条（返回 JSON 数组文本，如 ["{...}","{...}"]）。
-    std::string take_commands(size_t maxCount)
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        std::string out = "[";
-        bool first = true;
-        while (!commands_.empty() && maxCount > 0) {
-            if (!first) out += ",";
-            out += commands_.front();
-            total_bytes_ -= commands_.front().size();
-            commands_.pop_front();
-            --maxCount;
-            first = false;
-        }
-        out += "]";
-        return out;
-    }
-
-    // Lua 回调：逐条弹出（返回 false = 队列空）。避免 JSON 数组文本的二次解析。
+    // Lua callback: pop one command (false = empty). Avoids re-parsing a JSON array text.
     bool pop_command(std::string& out)
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -59,8 +47,13 @@ public:
         return true;
     }
 
-    // Lua 回调：发布状态快照（覆盖式；HTTP 侧读走同一文本）。
-    void publish_state(std::string json) { publish_state_.assign(std::move(json)); }
+    // Lua callback: publish the state snapshot (overwrite; HTTP reads the same text).
+    void publish_state(std::string json)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        state_ = std::move(json);
+        state_seq_.fetch_add(1, std::memory_order_relaxed);
+    }
 
     std::string state_snapshot()
     {
@@ -68,8 +61,12 @@ public:
         return state_;
     }
 
-    // Lua 回调：结果表覆盖（有界——超长截断由 Lua 侧先做）。
-    void publish_results(std::string json) { publish_results_.assign(std::move(json)); }
+    // Lua callback: publish the result table (bounded; Lua truncates before publishing).
+    void publish_results(std::string json)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        results_ = std::move(json);
+    }
 
     std::string results_snapshot()
     {
@@ -77,8 +74,21 @@ public:
         return results_;
     }
 
-    // Lua 回调：新代会话（Reset scripts 后由 Lua 桥触发）——清空未执行命令。
-    // 已进槽未执行的命令按任务书语义作废（旧代），HTTP 侧下次 take 为空。
+    // Lua callback: publish the module probe report (overwrite; the console renders it).
+    void publish_probe(std::string json)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        probe_ = std::move(json);
+    }
+
+    std::string probe_snapshot()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return probe_;
+    }
+
+    // Lua callback: new generation (fired by the Lua bridge after Reset scripts).
+    // Queued commands that never executed belong to the old generation and are dropped.
     void begin_session(unsigned long long epoch)
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -93,13 +103,28 @@ public:
         return epoch_;
     }
 
+    size_t queued_commands()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return commands_.size();
+    }
+
+    // Monotonic count of published state snapshots; 0 means Lua never published.
+    unsigned long long state_sequence() const { return state_seq_.load(std::memory_order_relaxed); }
+
 private:
     std::mutex mutex_;
     std::deque<std::string> commands_;
     size_t total_bytes_ = 0;
     std::string state_;
     std::string results_;
+    std::string probe_;
     unsigned long long epoch_ = 0;
+    std::atomic<unsigned long long> state_seq_{0};
 };
+
+// Process-wide singleton: the plugin DLL and the standalone test exe each own one copy,
+// shared between HTTP handlers and the Lua module functions. Defined in http_server.cpp.
+MemoryBridge& bridge();
 
 } // namespace webconsole

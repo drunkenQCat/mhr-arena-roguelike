@@ -1,5 +1,6 @@
-// REFramework 原生插件入口：初始化目录、启动 HTTP 线程、记录模块目录。
-// 业务操作（游戏对象读写）不在这里——全部由 Lua 控制层经文件信箱执行。
+// REFramework native plugin entry: sets up directories, starts the HTTP thread,
+// and records the module directory. Game-object work lives in the Lua control
+// layer; this DLL only serves the transport.
 #include "common.h"
 #include "http_server.h"
 #include "../reframework/API.h"
@@ -16,57 +17,65 @@ extern "C" __declspec(dllexport) void reframework_plugin_required_version(REFram
 
 extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFrameworkPluginInitializeParam* param) {
     if (!param || !param->functions) return false;
-    // 安装版（5bae4701）的 log_info 为 varargs 签名；桥侧 log_sink 为定参指针，
-    // 通过转发包装对齐（调用只传单参，合法）。
-    static void (*const sink)(const char*) = [](const char* msg) { param->functions->log_info("%s", msg); };
+    // The installed build (5bae4701) declares log_info as varargs; log_sink is a
+    // fixed-signature pointer, so forward through a wrapper. Only one argument
+    // is ever passed, which is a legal varargs call.
+    // lambdas convert to plain function pointers only when they capture nothing,
+    // so stash the table in a static and read it inside the wrapper.
+    static const REFrameworkPluginFunctions* functions = param->functions;
+    static void (*const sink)(const char*) = [](const char* msg) { functions->log_info("%s", msg); };
     webconsole::log_sink = sink;
 
-    // 数据目录 = <game>/reframework/data（与 json.dump_file 的落点一致）
+    // Data dir: <game>/reframework/data, the same target json.dump_file writes to.
     char exe_dir[MAX_PATH] = {};
     GetModuleFileNameA(nullptr, exe_dir, MAX_PATH);
     std::string root = exe_dir;
     const auto slash = root.find_last_of('\\');
     if (slash != std::string::npos) root = root.substr(0, slash);
-    g_data_dir = std::wstring(root.begin(), root.end()) + L"\\reframework\\data";
-    std::filesystem::create_directories(g_data_dir);
+    webconsole::g_data_dir = std::wstring(root.begin(), root.end()) + L"\\reframework\\data";
+    std::filesystem::create_directories(webconsole::g_data_dir);
 
-    start_http_server();
-    log_info("initialized; http thread starting");
+    webconsole::start_http_server();
+    webconsole::log_info("initialized; http thread starting");
     return true;
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
-        // 记录插件自身所在目录（reframework/plugins）——console.html 的分发位置
+        // The session id must exist before the first require call or api/probe
+        // read; DLL_PROCESS_ATTACH runs before anything else in this DLL.
+        webconsole::init_session_id();
+        // Record the plugin directory reframework/plugins, where console.html lives.
         wchar_t buf[MAX_PATH] = {};
         if (GetModuleFileNameW(hModule, buf, MAX_PATH) > 0) {
             std::wstring full = buf;
             const auto slash = full.find_last_of(L'\\');
-            if (slash != std::wstring::npos) g_module_dir = full.substr(0, slash);
+            if (slash != std::wstring::npos) webconsole::g_module_dir = full.substr(0, slash);
         }
     } else if (reason == DLL_PROCESS_DETACH) {
-        // 插件常驻进程生命周期；不做运行时卸载
+        // The plugin lives for the whole process; nothing is unloaded at runtime.
     }
     return TRUE;
 }
 
 #else
 
-// 独立测试进程：不依赖游戏/REFramework，可复现全部端点行为。
-// 用法：webconsole_test.exe [端口]
+// Standalone test process: no game and no REFramework, reproduces every endpoint.
+// Usage: webconsole_test.exe [port]
 int main(int argc, char** argv)
 {
-    if (argc > 1) g_listen_port = static_cast<unsigned short>(std::stoi(argv[1]));
+    if (argc > 1) webconsole::g_listen_port = static_cast<unsigned short>(std::stoi(argv[1]));
     wchar_t buf[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, buf, MAX_PATH);
     std::wstring full = buf;
-    const auto sl = full.find_last_of(L'\\');
-    g_module_dir = full.substr(0, sl);
-    g_data_dir = g_module_dir + L"\\testdata";
-    _wmkdir((g_module_dir + L"\\testdata").c_str());
-    log_info("standalone webconsole (test mode)");
-    start_http_server();
-    // 阻塞主线程保持服务运行
+    const auto slash = full.find_last_of(L"\\");
+    webconsole::g_module_dir = slash == std::wstring::npos ? full : full.substr(0, slash);
+    webconsole::g_data_dir = webconsole::g_module_dir + L"\\testdata";
+    _wmkdir(webconsole::g_data_dir.c_str());
+    webconsole::init_session_id();
+    webconsole::log_info("standalone webconsole (test mode)");
+    webconsole::start_http_server();
+    // Block the main thread so the server keeps running.
     for (;;) std::this_thread::sleep_for(std::chrono::seconds(60));
     return 0;
 }
