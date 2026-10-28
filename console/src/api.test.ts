@@ -62,3 +62,9 @@ it("treats HTTP 409 as a definitive slot rejection, rather than an accepted comm
   fetchMock.mockResolvedValue(reply({ ok: false }, 409));
   await expect(postCommand(state, "buy")).rejects.toMatchObject({ status: 409 });
 });
+
+it("submits on LAN HTTP where crypto.randomUUID is unavailable", async () => {
+  vi.stubGlobal("crypto", { getRandomValues: (bytes: Uint8Array) => bytes.fill(123) });
+  fetchMock.mockResolvedValue(reply({ ok: true, queued: true }));
+  expect(await postCommand(state, "getConfig")).toMatch(/^web-[0-9a-f]{32}$/);
+});

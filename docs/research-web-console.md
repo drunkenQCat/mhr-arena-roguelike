@@ -163,3 +163,21 @@ Lua 和 HTML 已复制到游戏目录，但实际游戏仍在运行协议 2。�
 界面证据：[改造前](evidence/2026-10-28-webconsole/01-before.png)、[清波集结后商店（隔离）](evidence/2026-10-28-webconsole/04-next-wave-shop.png)、[心跳冻结（隔离）](evidence/2026-10-28-webconsole/05-stale.png)、[怪池编辑（隔离）](evidence/2026-10-28-webconsole/07-monster-editor.png)、[真实游戏等待重载](evidence/2026-10-28-webconsole/08-live-await-reset.png)。
 
 补充回归（2026-10-28）：修复回执文件的暂时不完整 JSON、短暂 503 和网络超时误报。POST 确认丢失时保留原 request ID，只查询该请求，不自动重发购买；提交请求增加 3 秒超时，回执轮询有总时限；脚本换会话立即结束旧请求。新增 6 条定向测试，前端重新构建并部署；本项不改变实机仍待重载的状态。
+# 2026-10-28：LAN 与 M3 增量审查
+
+- 审查提交 `0728c1b` / `4252b3a`；保留补满、猫车恢复和已有商店统一资格逻辑。
+- 修复猫车恢复 P1：原生写入后异常或不一致变更属于 uncertain，不能退款后重复购买；现在保留预扣并锁交易。无变更的读回失败结果仍可退款。增加原生计数的三项回归测试。
+- 背包隔离仍是未接线原型：没有可识别分类仍返回成功，重复 begin 会覆盖引擎备份，部分清空异常没有恢复，end 没有读回核验；不要接入正式开局/结束流程后就宣称存档隔离完成。现有两个测试只验证调用顺序。
+- fill 的真实携带容量、首次创建物品槽、部分发货与猫车失败链仍需要游戏内验收；通过 mock 不证明原生语义。
+- DLL 0.3.1 监听 `0.0.0.0:11777`；命令来源允许实际目标网卡 IP 的同源 HTTP，继续拒绝外站来源，不放开任意 CORS。
+- 手机 LAN HTTP 使用 `crypto.getRandomValues` 生成请求 ID；`randomUUID` 依赖安全上下文，参考 [MDN randomUUID](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID) 与 [getRandomValues](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues)。
+- 138 项测试、Vue 类型/单 HTML 构建、Lua runtime 检查通过。独立 native 实例验证 `10.10.40.21:11879` 的 HTML、同源 POST 和外站 403，测试进程已停止；不等于手机跨设备或真实游戏验收。
+- 新 DLL/Lua/HTML 已部署，游戏仍关闭。启动游戏后手机访问 `http://10.10.40.21:11777/console`（同一路由可达网络）。
+- 添加本机防火墙规则返回 Access denied，需管理员 PowerShell 执行：
+
+```powershell
+New-NetFirewallRule -DisplayName 'MHR Webconsole LAN 11777' -Direction Inbound -Action Allow -Protocol TCP -LocalPort 11777 -RemoteAddress LocalSubnet -Profile Any
+```
+
+服务没有登录鉴权，仅用于可信局域网；这条规则只放行同网段，勿设置公网端口转发。
+

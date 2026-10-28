@@ -46,7 +46,9 @@ export async function getJson<T>(path: string, signal?: AbortSignal): Promise<T>
 }
 
 export async function postCommand(state: ConsoleState, cmd: string, extra: Record<string, unknown> = {}): Promise<string> {
-  const id = `web-${crypto.randomUUID()}`;
+  // LAN HTTP is not a secure context: randomUUID may be absent, getRandomValues is available.
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const id = `web-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
   let r: Response;
   try { r = await fetch("/api/command", { method: "POST", signal: AbortSignal.timeout(3000), headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, bridgeId: state.bridgeId, questUnique: state.questUnique,

@@ -153,6 +153,9 @@ export class ShopWindow
       const native = restoreNativeCart();
       if (native.ok) {
         this.settle(true, `猫车恢复完成：原生死亡计数 ${native.before} → ${native.after}，剩余猫车 ${this.core.state.cartsLeft}/${this.core.config.maxCarts}`);
+      } else if (native.uncertain) {
+        this.unresolved = true;
+        this.settle(false, "猫车恢复结果不明：PT 已预扣、商店已锁定，请核实原生死亡计数后处理。");
       } else {
         this.settle(false, `猫车恢复未完成（${native.reason ?? "原因未知"}）；PT 与限购记录已恢复。`, snapshot);
       }

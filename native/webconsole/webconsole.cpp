@@ -1,6 +1,6 @@
 // webconsole — REFramework 原生插件（Phase-2：HTTP 服务 + 文件信箱 + 控制台分发）
 // 职责边界（架构定案）：
-//   - HTTP 线程（cpp-httplib）监听 127.0.0.1:11777，仅本机
+//   - HTTP 线程（cpp-httplib）监听 0.0.0.0:11777，可通过局域网 IP 访问
 //   - GET  / | /console   → console.html（Vue 单 HTML，与 API 同源分发）
 //   - GET  /api/health    → 插件存活 + 版本
 //   - GET  /api/state     → webconsole_state.json（Lua 桥 ~2Hz 写出，200ms 缓存共享）
@@ -37,7 +37,7 @@
 #endif
 
 namespace {
-constexpr const char* PLUGIN_VERSION = "0.3.0";
+constexpr const char* PLUGIN_VERSION = "0.3.1";
 unsigned short g_listen_port = 11777;
 std::mutex g_command_mutex;
 
@@ -160,8 +160,10 @@ void run_server() {
     svr.Post("/api/command", [](const httplib::Request& req, httplib::Response& res) {
         const auto expected = std::string("http://127.0.0.1:") + std::to_string(g_listen_port);
         const auto local = std::string("http://localhost:") + std::to_string(g_listen_port);
+        // Match the actual destination interface, not an arbitrary client-supplied Host.
+        const auto interface_origin = std::string("http://") + req.local_addr + ":" + std::to_string(g_listen_port);
         const auto origin = req.get_header_value("Origin");
-        if (!origin.empty() && origin != expected && origin != local &&
+        if (!origin.empty() && origin != expected && origin != local && origin != interface_origin &&
             origin != "http://localhost:5173" && origin != "http://127.0.0.1:5173") {
             res.status = 403;
             res.set_content("{\"ok\":false,\"error\":\"origin rejected\"}", "application/json");
@@ -218,8 +220,8 @@ void run_server() {
         res.set_content(html, "text/html; charset=utf-8");
     });
 
-    if (!svr.listen("127.0.0.1", g_listen_port)) {
-        log_info("listen failed on 127.0.0.1:11777");
+    if (!svr.listen("0.0.0.0", g_listen_port)) {
+        log_info("listen failed on 0.0.0.0");
     }
 }
 
@@ -247,7 +249,7 @@ extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFram
     std::filesystem::create_directories(g_data_dir);
 
     g_server_thread = std::thread(run_server);
-    log_info("initialized; http thread starting on 127.0.0.1:11777");
+    log_info("initialized; http thread starting on 0.0.0.0:11777");
     return true;
 }
 
@@ -278,7 +280,7 @@ int main(int argc, char** argv) {
     g_module_dir = full.substr(0, sl);
     g_data_dir = g_module_dir + L"\\testdata";
     _wmkdir((g_module_dir + L"\\testdata").c_str());
-    printf("standalone webconsole on 127.0.0.1:%u\n", g_listen_port);
+    printf("standalone webconsole on 0.0.0.0:%u\n", g_listen_port);
     run_server();
     return 0;
 }

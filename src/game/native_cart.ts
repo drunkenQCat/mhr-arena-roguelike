@@ -22,6 +22,7 @@ function questManager(): REManagedObject | null {
 
 export interface NativeCartReport {
   ok: boolean;
+  uncertain?: boolean;
   before?: number;
   after?: number;
   reason?: string;
@@ -44,18 +45,20 @@ export function nativeDeathNum(): number | null {
 export function restoreNativeCart(): NativeCartReport {
   const qm = questManager();
   if (!qm) return { ok: false, reason: "QuestManager unavailable" };
+  let attempted = false;
   try {
     const before = qm.call("getDeathNum") as number;
     if (!Number.isInteger(before) || before <= 0) {
       return { ok: false, before, reason: "原生死亡计数为 0，无需恢复" };
     }
+    attempted = true;
     qm.call("setDeathNum", before - 1);
     const after = qm.call("getDeathNum") as number;
     const ok = after === before - 1;
     if (!ok) relog.error(`[MhwRogue] native cart restore mismatch: ${before} -> ${after}`);
-    return { ok, before, after, reason: ok ? undefined : "setDeathNum 读回不一致" };
+    return { ok, before, after, uncertain: !ok && after !== before, reason: ok ? undefined : "setDeathNum 读回不一致" };
   } catch (error) {
     relog.error(`[MhwRogue] native cart restore threw: ${String(error)}`);
-    return { ok: false, reason: String(error) };
+    return { ok: false, uncertain: attempted, reason: String(error) };
   }
 }
