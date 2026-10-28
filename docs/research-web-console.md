@@ -150,7 +150,7 @@ Vite+Vue 单 HTML 前端（第三阶段）、热调参生效点（第四阶段�
 - 浏览器隔离联调实际运行编译后的 Lua、原生 HTTP 和 Vue；游戏接口为测试替身。验证了改开局 PT 后新局生效、搜索添加眠狗龙王并提交保存、非法输入禁止提交、位置变化、战斗禁购、第二层整备恢复购买与数量 0→1、Lua 心跳冻结时页面禁用操作。
 - 隔离状态文件约 12 KB，每秒发布一次；这不是实际战斗帧时间测量，不能据此宣称实机不卡。
 
-复现：先根目录 `npm run build:nocopy`、console 目录 `npm run build`、native/webconsole 目录运行 `build-standalone.bat`，再根目录运行 `python scripts/review-webconsole.py --port 11877`。该脚本不操作真实游戏。`control.json` 可改变测试玩家位置或冻结 Lua。不要把隔离联调当作实机证据。
+复现：先根目录 `npm run build:nocopy`、console 目录 `npm run build`、native/webconsole 目录运行 `.\build.ps1 -Target Standalone`，再根目录运行 `python scripts/review-webconsole.py --port 11877`。该脚本不操作真实游戏。`control.json` 可改变测试玩家位置或冻结 Lua。不要把隔离联调当作实机证据。
 
 ### 部署与剩余验收
 

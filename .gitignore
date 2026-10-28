@@ -22,3 +22,10 @@ src/game/gen/
 *.lib
 *.pdb
 *.ilk
+
+# Native build intermediates
+/native/**/.build/
+/native/**/*.log
+
+# logs
+*.log
