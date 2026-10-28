@@ -1,0 +1,32 @@
+{
+"bridgeId": "1793162755-2ca8d777",
+"configVersion": 0,
+"history": [
+{
+"id": "smoke-1",
+"message": "Error: 连接会话已更换，请等待同步后重试",
+"status": "rejected"
+},
+{
+"id": "smoke-2",
+"message": "Error: 连接会话已更换，请等待同步后重试",
+"status": "rejected"
+},
+{
+"id": "smoke-1b",
+"message": "Invincible ON (solo custom arena only)",
+"status": "applied"
+},
+{
+"id": "smoke-2b",
+"message": "Error: 未知命令：tp",
+"status": "rejected"
+}
+],
+"last": {
+"id": "smoke-2b",
+"message": "Error: 未知命令：tp",
+"status": "rejected"
+},
+"lastId": "smoke-2b"
+}
