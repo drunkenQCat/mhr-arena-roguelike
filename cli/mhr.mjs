@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { EXIT, CliError, usage, unavailable, rejected } from "./lib/exit.mjs";
 import { normalizeBaseUrl, getRaw } from "./lib/http.mjs";
 import { captureIdentity, submit, requireReceipt, waitForReceipt, sleep } from "./lib/session.mjs";
-import { doctor, readState, readProbe, capabilitiesFrom, COMMAND_CATALOGUE } from "./lib/observe.mjs";
+import { doctor, readState, readProbe, capabilitiesFrom, COMMAND_CATALOGUE, uiSection } from "./lib/observe.mjs";
 import { createOutput, runMain } from "./lib/output.mjs";
 import { createValidator } from "./lib/config-validate.mjs";
 
@@ -24,6 +24,7 @@ const HELP = `用法: node cli/mhr.mjs <命令> [选项]
   state [--json]                         当前业务快照
   probe [--json]                         DLL 身份 + Lua 探针报告
   capabilities [--json]                  命令/动作的 implemented 与 allowed
+  ui [--json]                            视角/场景观察（原生界面分类，未识别即 unknown）
   shop list [--json] [--category X]      商店目录与购买资格
   config get [--json]                    读取当前生效配置
 
@@ -169,6 +170,19 @@ async function main() {
         `探针   : ${value.lua.ok ? "PASS" : value.lua.unreported ? "未上报" : "FAIL"} ${fmt(value.lua.session)} ${fmt(value.lua.atIso)}`,
       ].join("\n"));
       return report.lua.ok === true ? EXIT.OK : EXIT.UNAVAILABLE;
+    }
+    case "ui": {
+      const state = await snapshot();
+      const ui = uiSection(state);
+      output.result(ui, (value) => [
+        `场景   : ${fmt(value.scene)}   token ${fmt(value.sceneToken)}`,
+        `地图   : ${fmt(value.mapNo)}   加载中 ${fmt(value.loading)}   忙碌 ${fmt(value.busy)}`,
+        `弹窗   : ${value.dialogsKnown === false ? "未观察（该能力未实现）" : `${(value.dialogs ?? []).length} 个`}`,
+        `可操作 : ${(value.allowedActions ?? []).join(", ") || "—"}`,
+        `证据   : ${(value.evidence ?? []).map((e) => `${e.source}=${JSON.stringify(e.value)}`).join("; ")}`,
+        ...(value.reason ? [`说明   : ${value.reason}`] : []),
+      ].join("\n"));
+      return EXIT.OK;
     }
     case "capabilities": {
       const state = await snapshot();

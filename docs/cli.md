@@ -7,6 +7,7 @@
 node cli/mhr.mjs doctor --json          # 分层健康：HTTP / DLL / Lua 探针 / 业务心跳 / 协议
 node cli/mhr.mjs state                  # 业务快照（阶段、层数、PT、任务、波次）
 node cli/mhr.mjs probe                  # DLL 身份 + Lua 探针报告
+node cli/mhr.mjs ui                     # 视角/场景观察（未识别即 unknown，附证据）
 node cli/mhr.mjs capabilities           # 每条命令 implemented / allowed / 阻塞原因
 node cli/mhr.mjs shop list              # 目录、价格、实际持有、购买资格
 node cli/mhr.mjs run start --armor "骨套（均衡）"
@@ -81,6 +82,17 @@ npm run test:cli
 ```
 
 契约测试不依赖游戏进程；真实游戏结果需另跑并通过报告区分。
+
+## ui 观察的边界
+
+`state.ui` 由 Lua 侧 `WebConsoleBridge.uiSection()` 发布：`scene`（quest / quest_ready /
+village / unknown）、`mapNo`、`loading`、`busy`、`questStatus`、`allowedActions` 与逐项
+`evidence`（`QuestManager.isActiveQuest`、`StageManager.get_MapNo`、
+`GuiManager.IsCanInvokeQuestBoard`、`PlayerManager.PlayerList`）。
+
+它是"视角传感器"，不是窗口分类器：标题、存档选择、原生弹窗都看不到，
+因此 `dialogsKnown=false`、`dialogs=[]`，`scene=unknown` 时不推断。
+旧版 bundle 没有该分区时，CLI 明确报告"未发布 ui 分区"而不是给默认值。
 
 ## 当前未支持
 

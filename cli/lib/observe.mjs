@@ -98,6 +98,19 @@ export async function doctor(baseUrl, { timeoutMs = 3000, sampleMs = 1600, expec
   return report;
 }
 
+/**
+ * UI layer: the game publishes a viewpoint sensor in state.ui. It reports
+ * scene/mapNo/dialogs; absence means an older bundle, so we say unknown rather
+ * than guessing. `scene=unknown` is a valid answer and blocks scene-dependent acts.
+ */
+export function uiSection(state) {
+  const ui = state?.ui;
+  if (!ui) {
+    return { scene: "unknown", sceneToken: null, reason: "旧版 Lua 未发布 ui 分区：部署新 bundle 并 Reset scripts" };
+  }
+  return { ...ui, scene: ui.scene ?? "unknown" };
+}
+
 export async function readState(baseUrl, { timeoutMs = 3000 } = {}) {
   const { status, body } = await getRaw(baseUrl, "/api/state", timeoutMs);
   if (status !== 200 || !body) {

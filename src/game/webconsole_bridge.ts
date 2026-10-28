@@ -3,22 +3,7 @@ import { validateConfig } from "../core/config";
 import type { RunSession } from "../core/run_session";
 import type { NativeRuntime } from "./native_runtime";
 import type { ShopWindow } from "./shop_window";
-import { clockSeconds, refFs, rejson } from "./sdk";
-
-/**
- * 原生内存桥（webconsole_bridge.dll，Lua C 模块）。
- * TSTL 编译为 require("webconsole_bridge")：bundle shim 未命中时 fallback 到
- * 宿主 require → package.cpath（autorun/?.dll）→ 本 DLL 的 luaopen。
- * 符号安全：DLL 内静态编译与 REFramework 同源（5bae4701）的 Lua 5.4.3 实现，
- * 操作宿主传入的 lua_State 属同源 ABI（spike 待实机 ping 验证）。
- */
-declare const webconsole_bridge: {
-    ping(s: string): string;
-    take_commands(maxCount: number): string[];
-    publish_state(json: string): void;
-    publish_results(json: string): void;
-    begin_session(epoch: number): number;
-};
+import { clockSeconds, getSingleton, refFs, rejson, loadWebconsole, type NativeWebconsole } from "./sdk";
 
 interface Command {
   id?: string; bridgeId?: string; cmd?: string; armor?: string; index?: number;
@@ -28,7 +13,9 @@ interface Command {
 type Outcome = Record<string, unknown>;
 
 export class WebConsoleBridge {
-  readonly bridgeId = `${clockSeconds()}-${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
+  readonly bridgeId: string;
+  private readonly transport: NativeWebconsole;
+  private pendingReceipt: Outcome | null = null;
   configVersion = 0;
   private frames = 0;
   private sampledAt = -1;
@@ -38,28 +25,21 @@ export class WebConsoleBridge {
   private purchase: { id: string; version: number } | null = null;
 
   constructor(private readonly session: RunSession, private readonly runtime: NativeRuntime,
-    private readonly shop: ShopWindow) {}
+    private readonly shop: ShopWindow) {
+    this.transport = loadWebconsole();
+    this.bridgeId = `${this.transport.epoch()}-${clockSeconds()}-${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
+    this.writeResults({ id: "", status: "ready" });
+  }
 
   newScriptSession(): void {
     this.closed = true;
-    rejson.dump_file("webconsole_state.json", { ok: false, closed: true, bridgeId: this.bridgeId }, 0);
+    this.transport.publish_state(rejson.dump_string({ ok: false, closed: true, bridgeId: this.bridgeId }, 0));
   }
 
-  private selfTestDone = false;
-
   tick(): void {
-    if (!this.selfTestDone) {
-      this.selfTestDone = true;
-      // DLL↔Lua 互通自检：ping 原样返回 = 符号解析与调用约定成立。结果落盘供验收核对。
-      try {
-        const echo = webconsole_bridge.ping("webconsole-selftest");
-        refFs.write("webconsole_ping.json", JSON.stringify({ ok: echo === "webconsole-selftest", echo }, null, 2));
-      } catch (e) {
-        refFs.write("webconsole_ping.json", JSON.stringify({ ok: false, error: String(e) }, null, 2));
-      }
-    }
     if (this.closed) return;
     try {
+      if (this.pendingReceipt && !this.writeResults(this.pendingReceipt)) return;
       if (this.purchase && this.shop.transactionVersion > this.purchase.version && this.shop.lastTransaction) {
         const result = this.results.find((entry) => entry.id === this.purchase!.id);
         if (result) {
@@ -76,11 +56,14 @@ export class WebConsoleBridge {
   }
 
   private poll(): void {
-    const text = refFs.read("webconsole_cmd.json");
+    // At most one mutation per poll; pending purchases settle before later commands.
+    for (const text of this.transport.take_commands(1)) this.consume(text);
+  }
+
+  private consume(text: string): void {
     if (!text || text.length > 262144) return;
     const cmd = rejson.load_string(text) as Command | null;
     if (!cmd || typeof cmd.id !== "string" || cmd.id.length === 0 || cmd.id.length > 128) {
-      if (text !== "{}" && text !== "null") rejson.dump_file("webconsole_cmd.json", {}, 0);
       return;
     }
     const old = this.results.find((entry) => entry.id === cmd.id);
@@ -101,14 +84,18 @@ export class WebConsoleBridge {
       this.results.push(result);
       if (this.results.length > 30) this.results.shift();
     }
-    if (this.writeResults(result))
-      rejson.dump_file("webconsole_cmd.json", {}, 0);
+    this.writeResults(result);
   }
 
   private writeResults(last: Outcome): boolean {
-    return rejson.dump_file("webconsole_results.json", { bridgeId: this.bridgeId,
-      configVersion: this.configVersion, lastId: last.id, last,
-      history: this.results }, 0);
+    try {
+      const text = rejson.dump_string({ bridgeId: this.bridgeId,
+        configVersion: this.configVersion, lastId: last.id, last, history: this.results }, 0);
+      if (!text) throw new Error("结果序列化失败");
+      this.transport.publish_results(text);
+      this.pendingReceipt = null;
+      return true;
+    } catch { this.pendingReceipt = last; return false; }
   }
 
   private execute(cmd: Command): Outcome {
@@ -172,10 +159,58 @@ export class WebConsoleBridge {
     }
   }
 
+  /**
+   * Native UI/viewpoint observation for the CLI and the console. Every field is
+   * read from documented StateObject sources; unknown stays null. This is a
+   * viewpoint sensor, not a window classifier: it cannot see title, save select or
+   * dialogs, so the CLI reports scene=unknown with the evidence that would raise it.
+   */
+  private uiSection(): Record<string, unknown> {
+    const r = this.session.readingSnapshot;
+    // The installed StageManager exposes no get_MapNo (its members are the
+    // warp/area/time state, see sdk-dump). Do not invent an accessor: report null
+    // until a verified map accessor exists.
+    const mapNo: number | null = null;
+    const players = r?.players ?? [];
+    const position = players[0]?.position ?? null;
+    const inQuest = r?.quest !== null && r?.quest !== undefined;
+    const scene = inQuest ? (r?.quest?.playing ? "quest" : "quest_ready")
+      : (r?.canPost ? "village" : "unknown");
+    return {
+      scene,
+      // Scene instance token: quest unique when inside one; the wave token and
+      // bridgeId keep the two apart after a reload.
+      sceneToken: inQuest ? `quest:${r?.quest?.unique ?? 0}` : `bridge:${this.bridgeId}:${mapNo ?? "?"}`,
+      mapNo,
+      loading: position === null,
+      busy: this.shop.busy,
+      questStatus: r?.quest?.status ?? null,
+      online: r?.online ?? false,
+      canPost: r?.canPost ?? false,
+      dialogs: [],
+      allowedActions: [
+        ...(["Idle", "Finished", "Fault"].includes(this.session.stage) && r?.canPost && !inQuest ? ["run.start"] : []),
+        ...(this.session.canShop() && !this.shop.busy ? ["run.choose", "shop.buy"] : []),
+        ...(["AwaitQuest", "Fault"].includes(this.session.stage) ? ["run.retry"] : []),
+        ...(inQuest && r?.quest?.playing ? ["test.killAll"] : []),
+      ],
+      evidence: [
+        { source: "snow.QuestManager.isActiveQuest", value: inQuest },
+        { source: "snow.stage.StageManager", value: "no verified map accessor in the installed SDK" },
+        { source: "snow.gui.GuiManager.IsCanInvokeQuestBoard", value: r?.canPost ?? null },
+        { source: "snow.player.PlayerManager.PlayerList", value: players.length },
+      ],
+      dialogsKnown: false,
+      note: "Viewpoint sensor only: title, save select and dialogs are not observed.",
+    };
+  }
+
   private publish(): void {
     const s = this.session, core = s.core, r = s.readingSnapshot;
     const listing = this.shop.catalogue();
-    rejson.dump_file("webconsole_state.json", { ok: true, protocol: 3, bridgeId: this.bridgeId,
+    // Wire protocol for CLI/UI compatibility checks. A typo cannot be caught by the
+    // transpiler, so the native tests read this literal back from the Lua module.
+    this.transport.publish_state(rejson.dump_string({ ok: true, protocol: 4, bridgeId: this.bridgeId,
       counter: ++this.counter, sampledAt: r?.time ?? null, publishedAt: clockSeconds(),
       configVersion: this.configVersion, sessionStage: s.stage, corePhase: core.state.phase,
       questId: r?.quest?.id ?? null, questUnique: r?.quest?.unique ?? null,
@@ -188,8 +223,9 @@ export class WebConsoleBridge {
       shop: listing.categories, shopAvailable: listing.available, shopReason: listing.reason,
       shopBusy: this.shop.busy, shopNotice: this.shop.notice, message: s.message,
       runtimeStatus: this.runtime.status(),
+      ui: this.uiSection(),
       capabilities: { start: ["Idle", "Finished", "Fault"].includes(s.stage) && !!r?.canPost && !r?.quest,
         choose: s.canShop() && !this.shop.busy, stop: !["Idle", "Finished"].includes(s.stage) },
-    }, 0);
+    }, 0));
   }
 }
