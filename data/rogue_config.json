@@ -622,6 +622,7 @@
     "CarveSeconds": 20,
     "CampRadius": 15,
     "CampDwellSeconds": 2,
-    "PostTimeoutSeconds": 45
+    "PostTimeoutSeconds": 45,
+    "DebugMode": false
   }
 }

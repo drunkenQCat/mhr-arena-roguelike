@@ -44,7 +44,8 @@ $stem = if ($Target -eq 'Plugin') { 'webconsole' } elseif ($Configuration -eq 'D
 $extension = if ($Target -eq 'Plugin') { 'dll' } else { 'exe' }
 $output = Join-Path $OutputDirectory "$stem.$extension"
 $flags = @('/nologo', '/std:c++20', '/utf-8', '/EHsc', '/W3',
-    ('"' + (Join-Path $PSScriptRoot 'webconsole.cpp') + '"'),
+    ('"' + (Join-Path $PSScriptRoot 'src\plugin_main.cpp') + '"'),
+    ('"' + (Join-Path $PSScriptRoot 'src\http_server.cpp') + '"'),
     ('/Fo"' + (Join-Path $work "$stem.obj") + '"'),
     ('/Fd"' + (Join-Path $work 'compiler.pdb') + '"'), ('/Fe"' + $output + '"'))
 if ($Configuration -eq 'Debug') { $flags += @('/Od', '/Zi', '/MDd') }

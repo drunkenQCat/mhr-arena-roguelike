@@ -48,3 +48,38 @@
 ## 第三方依赖
 
 REFramework 的 `API.h` 随源码固定版本分发，来源、提交、校验值和修改记录见 [依赖说明](webconsole/reframework/README.md)，完整上游 MIT 许可证见 [LICENSE](webconsole/reframework/LICENSE)。发布插件时应将该许可证纳入第三方声明；更新头文件需重新验证加载及 ABI 兼容性。
+
+
+### cpp-httplib
+
+`webconsole/httplib.h` 来自 [yhirose/cpp-httplib](https://github.com/yhirose/cpp-httplib)，用于原生插件的 HTTP 服务，采用 MIT 许可证。头文件保留其版权声明 `Copyright (c) 2026 Yuji Hirose. All rights reserved.`。
+
+当前文件的版本宏为 `0.63.0`，但内容与上游 `v0.63.0` 标签存在差异；确切上游提交及差异来源尚未确认，因此不声明为该标签的未修改副本。本次仅补依赖说明，不替换头文件。
+
+MIT 允许使用、修改及再分发，需保留版权与许可声明。分发源码或插件时，请随包携带本节完整声明（也可收录到第三方许可证文件）；仅提供上游链接不足以代替许可文本。此处使用 MIT 不代表本项目自身已选择 MIT 许可证。
+
+以下为[上游完整许可文本](https://github.com/yhirose/cpp-httplib/blob/master/LICENSE)：
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2017 yhirose
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

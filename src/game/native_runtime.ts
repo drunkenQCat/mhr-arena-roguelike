@@ -11,7 +11,7 @@ import { snow_quest_FailReason } from "./gen/enums/snow_quest_FailReason";
 import { snow_enemy_EnemyDef_VitalCategory } from "./gen/enums/snow_enemy_EnemyDef_VitalCategory";
 import { snow_enemy_EnemyDef_NandoGetType } from "./gen/enums/snow_enemy_EnemyDef_NandoGetType";
 import {
-  clockSeconds, findTypeDefinition, floatToPtr, getSingleton, hookMethod, PRE_HOOK,
+  clockSeconds, createInstance, findTypeDefinition, floatToPtr, getSingleton, hookMethod, PRE_HOOK,
   questManager, reframework, rejson, relog, toFloat, toInt64, toManagedObject, toPtr,
   type REManagedArray, type REManagedObject,
 } from "./sdk";
@@ -69,6 +69,54 @@ export class NativeRuntime implements SessionPort {
   cancelPost(): void { this.transport.cancel(); }
   postingError(): string | null { return this.transport.getError(); }
   takeDeaths(): DeathReading[] { const events = this.deaths; this.deaths = []; return events; }
+  /**
+   * 传送玩家到指定位置（debug 命令用）。通过 via.vec3 临时对象写 _PosAfterMotionUpdate；
+   * 位置 struct 由引擎在下次运动帧吸收，无需额外调用。
+   */
+  teleportPlayer(target: { x: number; y: number; z: number }): void
+  {
+    const player = (this.read().players[0] !== undefined) ? this.playerRef() : null;
+    if (!player) throw new Error("teleport: player not available");
+    const vec = this.vec3(target.x, target.y, target.z);
+    player.set_field("_PosAfterMotionUpdate", vec);
+  }
+
+  /** 最近存活大型怪的位置（tp-to-monster 用）；无怪返回 null。 */
+  nearestAliveMonsterPosition(): { x: number; y: number; z: number } | null
+  {
+    const manager = getSingleton("snow.enemy.EnemyManager");
+    if (!manager) return null;
+    const count = callNative(manager, "getBossEnemyCount") as number;
+    for (let i = 0; i < count; i++) {
+      const enemy = callNative(manager, "getBossEnemy", i) as REManagedObject | null;
+      if (!enemy) continue;
+      if (callNative(enemy, "isCapture") === true) continue;
+      const pos = enemy.get_field("_PosAfterMotionUpdate") as { x: number; y: number; z: number } | null;
+      if (pos && [pos.x, pos.y, pos.z].every((v) => typeof v === "number")) return { x: pos.x, y: pos.y, z: pos.z };
+    }
+    return null;
+  }
+
+  private playerRef(): REManagedObject | null
+  {
+    const playerManager = getSingleton("snow.player.PlayerManager");
+    const array = playerManager?.get_field("PlayerList") as REManagedArray | null;
+    if (!playerManager || !array) return null;
+    for (let i = 0; i < array.get_size(); i++) {
+      const player = array.get_element(i) as REManagedObject | null;
+      if (player && playerManager.call("isReadyPlayer", i) === true) return player;
+    }
+    return null;
+  }
+
+  private vec3(x: number, y: number, z: number): REManagedObject
+  {
+    const v = createInstance("via.vec3", true);
+    if (!v) throw new Error("via.vec3 allocation failed");
+    v.set_field("x", x); v.set_field("y", y); v.set_field("z", z);
+    return v;
+  }
+
   shutdown(): void { this.testTools.shutdown(); this.policy(null, false); this.transport.cancel(); }
 
   now(): number { return clockSeconds(); }
@@ -96,7 +144,7 @@ export class NativeRuntime implements SessionPort {
       if (!player) continue;
       if (playerManager?.call("isReadyPlayer", i) !== true) continue;
       const position = player.get_field("_PosAfterMotionUpdate") as { x: number; y: number; z: number } | null;
-      if (position && [position.x, position.y, position.z].every((value) => Number.isFinite(value))) {
+      if (position && [position.x, position.y, position.z].every((value) => typeof value === "number")) {
         players.push({ id: i, position: { x: position.x, y: position.y, z: position.z } });
       }
     }
@@ -117,15 +165,18 @@ export class NativeRuntime implements SessionPort {
         if (!health) continue;
         const hp = health.hp;
         const maxHp = health.maxHp;
-        if (!Number.isFinite(uid) || !Number.isFinite(typeId)) throw new Error("Invalid native enemy identity");
-        if (!Number.isFinite(hp) || !Number.isFinite(maxHp) || maxHp <= 0) continue;
+        if (typeof uid !== "number" || typeof typeId !== "number") throw new Error("Invalid native enemy identity");
+        if (typeof hp !== "number" || typeof maxHp !== "number" || maxHp <= 0) continue;
         const nativeDead = qm.get_field("_QuestTargetEmDieUidList") as REManagedObject | null;
         const captured = !!callNative(enemy, "isCapture");
         const dead = !!nativeDead?.call("Contains", uid) || (maxHp > 0 && hp <= 0 && !!callNative(enemy, "isDieBehaviorActive"));
         // Native death callbacks are not guaranteed on every dynamically registered actor.
         // Feed the same conservative evidence used by RunSession into the sequential queue.
         if (captured || dead) this.inplace.death(uid);
-        enemies.push({ uid, typeId, captured, dead });
+        const position = enemy.get_field("_PosAfterMotionUpdate") as { x: number; y: number; z: number } | null;
+        const pos = position && [position.x, position.y, position.z].every((v) => Number.isFinite(v))
+          ? { x: position.x, y: position.y, z: position.z } : undefined;
+        enemies.push({ uid, typeId, captured, dead, position: pos });
       }
     }
     const gui = getSingleton("snow.gui.GuiManager");

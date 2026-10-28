@@ -49,6 +49,7 @@ function fixture() {
   const actor = (type: number, uid = 7) => ({
     get_field: () => type,
     call: (name: string) => name === "get_UniqueId" ? uid : type,
+    get_field: () => null,
   });
   return { runtime, plan, qm, hooks, actor, foreign: () => { questId = 101; } };
 }
@@ -121,7 +122,8 @@ it("feeds polled death evidence into the inPlace queue even without a questEnemy
   runtime.policy(plan, true);
   qm.call.mockImplementation((name: string) => name === "isActiveQuest" || name === "isPlayQuest" ? true : name === "get_ActiveQuestNo" ? plan.questId : null);
   Object.assign(qm, { get_field: () => null });
-  const enemy = { call: (name: string) => name === "get_UniqueId" ? 700 : name === "get_EnemyType" ? plan.monsterIds[0] : name === "isDieBehaviorActive" };
+  const enemy = { call: (name: string) => name === "get_UniqueId" ? 700 : name === "get_EnemyType" ? plan.monsterIds[0] : name === "isDieBehaviorActive",
+    get_field: () => null };
   const manager = { call: (name: string) => name === "getBossEnemyCount" ? 1 : enemy };
   mock.singleton.mockImplementation((name: string) => name === "snow.enemy.EnemyManager" ? manager : name === "snow.stage.StageManager" ? { call: () => false } : null);
   vi.spyOn(runtime.testTools, "getHealth").mockReturnValue({ hp: 0, maxHp: 100 });

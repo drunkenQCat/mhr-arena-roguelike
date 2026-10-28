@@ -11,10 +11,13 @@ export interface RuntimeSettings {
   campRadius: number;
   campDwellSeconds: number;
   postTimeoutSeconds: number;
+  /** debug=true 才接受 tp/killAll/setInvincible 等调试命令（release 裁剪埋点与调试面） */
+  debugMode: boolean;
 }
 
 export const DEFAULT_RUNTIME: RuntimeSettings = {
   route: "inPlace", spawnMode: "sequential", autoPost: true,
+  debugMode: false,
   pollSeconds: 1, spawnTimeoutSeconds: 90, carveSeconds: 20,
   campRadius: 15, campDwellSeconds: 2, postTimeoutSeconds: 45,
 };

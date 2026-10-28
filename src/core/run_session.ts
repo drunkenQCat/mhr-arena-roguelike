@@ -5,7 +5,10 @@ import type { RogueConfig } from "./config";
 
 export interface Position { x: number; y: number; z: number }
 export interface PlayerReading { id: number; position: Position }
-export interface EnemyReading { uid: number; typeId: number; dead: boolean; captured: boolean }
+export interface EnemyReading {
+  uid: number; typeId: number; dead: boolean; captured: boolean;
+  position?: { x: number; y: number; z: number };
+}
 export interface QuestReading { id: number; unique: number; playing: boolean; status: "ready" | "play" | "success" | "failed" | "return" }
 export interface RuntimeReading {
   time: number;
@@ -82,6 +85,9 @@ export class RunSession {
 
   /** 当前任务实例号快照（状态发布用；null=未在任务中）。 */
   get questUniqueSnapshot(): number | null { return this.questUnique; }
+
+  /** 入场时记录的起始点位置（tp-to-camp 用；null=本局尚无记录）。 */
+  get campSnapshot(): { x: number; y: number; z: number } | null { return this.camp; }
 
   preparation() {
     const reading = this.readingSnapshot;
