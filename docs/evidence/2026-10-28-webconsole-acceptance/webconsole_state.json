@@ -1,0 +1,713 @@
+{
+"armorOptions": [
+"骨套（均衡）",
+"铁套（攻高防低）"
+],
+"bridgeId": "1793173053-3f9b09ba",
+"capabilities": {
+"choose": false,
+"start": false,
+"stop": false
+},
+"cartsLeft": 3,
+"choices": null,
+"configVersion": 0,
+"corePhase": "Idle",
+"counter": 87,
+"enemies": null,
+"invincible": true,
+"layer": 0,
+"maxCarts": 3,
+"message": "在村庄开始。M2 使用你当前的装备。",
+"ok": true,
+"online": false,
+"preparation": {
+"carveRemaining": 0,
+"dwellRemaining": 2,
+"expected": 0,
+"gathered": false,
+"players": null,
+"radius": 15,
+"resolved": 0,
+"seen": 0
+},
+"protocol": 3,
+"pt": 150,
+"publishedAt": 1793173139,
+"route": "inPlace",
+"runtimeStatus": "Quest 900102: layer 1, monsters 98 / 54 / counter: Idle / inPlace inactive",
+"sampledAt": 1793173139,
+"sessionStage": "Idle",
+"shop": {
+"基础补给": [
+{
+"canBuy": false,
+"cap": 10,
+"category": "基础补给",
+"id": "potion",
+"mode": "perUnit",
+"name": "回复药",
+"owned": 6,
+"price": 10,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 10,
+"category": "基础补给",
+"id": "honey",
+"mode": "perUnit",
+"name": "蜂蜜",
+"owned": 0,
+"price": 15,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 10,
+"category": "基础补给",
+"id": "mega_potion",
+"mode": "perUnit",
+"name": "大回复药",
+"owned": 0,
+"price": 25,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 5,
+"category": "基础补给",
+"desc": "高速磨刀消耗品；基础砥石免费无限",
+"id": "fishscale",
+"mode": "perUnit",
+"name": "磨刀鱼鳞",
+"owned": 0,
+"price": 30,
+"reason": "清波后返回集结点，等待进入整备阶段"
+}
+],
+"弹药": [
+{
+"canBuy": false,
+"cap": 60,
+"category": "弹药",
+"id": "ammo_n1",
+"mode": "fill",
+"name": "通常弹1",
+"owned": 0,
+"price": 8,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 50,
+"category": "弹药",
+"id": "ammo_n2",
+"mode": "fill",
+"name": "通常弹2",
+"owned": 99,
+"price": 18,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 60,
+"category": "弹药",
+"id": "ammo_thunder",
+"mode": "fill",
+"name": "电击弹",
+"owned": 0,
+"price": 22,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 60,
+"category": "弹药",
+"id": "ammo_water",
+"mode": "fill",
+"name": "水冷弹",
+"owned": 0,
+"price": 22,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 60,
+"category": "弹药",
+"id": "ammo_ice",
+"mode": "fill",
+"name": "冰结弹",
+"owned": 0,
+"price": 22,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 60,
+"category": "弹药",
+"id": "ammo_fire",
+"mode": "fill",
+"name": "火炎弹",
+"owned": 0,
+"price": 22,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 30,
+"category": "弹药",
+"id": "ammo_n3",
+"mode": "fill",
+"name": "通常弹3",
+"owned": 0,
+"price": 25,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 50,
+"category": "弹药",
+"id": "bottle_close",
+"mode": "fill",
+"name": "弓接击瓶",
+"owned": 0,
+"price": 28,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 8,
+"category": "弹药",
+"id": "ammo_tranq",
+"mode": "fill",
+"name": "捕获用麻醉弹",
+"owned": 0,
+"price": 28,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 30,
+"category": "弹药",
+"id": "ammo_s2",
+"mode": "fill",
+"name": "散弹2",
+"owned": 60,
+"price": 30,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 30,
+"category": "弹药",
+"id": "ammo_p2",
+"mode": "fill",
+"name": "贯通弹2",
+"owned": 60,
+"price": 30,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 50,
+"category": "弹药",
+"id": "bottle_pow",
+"mode": "fill",
+"name": "弓强击瓶",
+"owned": 50,
+"price": 32,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 12,
+"category": "弹药",
+"id": "ammo_poison",
+"mode": "fill",
+"name": "毒弹",
+"owned": 12,
+"price": 35,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 30,
+"category": "弹药",
+"id": "ammo_slic",
+"mode": "fill",
+"name": "斩裂弹",
+"owned": 30,
+"price": 35,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 30,
+"category": "弹药",
+"id": "bottle_status",
+"mode": "fill",
+"name": "弓异常瓶（麻/眠/毒）",
+"owned": 0,
+"price": 35,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 20,
+"category": "弹药",
+"id": "ammo_p3",
+"mode": "fill",
+"name": "贯通弹3",
+"owned": 0,
+"price": 38,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 20,
+"category": "弹药",
+"id": "ammo_s3",
+"mode": "fill",
+"name": "散弹3",
+"owned": 0,
+"price": 38,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 12,
+"category": "弹药",
+"id": "ammo_sleep",
+"mode": "fill",
+"name": "睡眠弹",
+"owned": 0,
+"price": 40,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 12,
+"category": "弹药",
+"id": "ammo_para",
+"mode": "fill",
+"name": "麻痹弹",
+"owned": 0,
+"price": 40,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 19,
+"category": "弹药",
+"id": "ammo_c2",
+"mode": "fill",
+"name": "彻甲榴弹2",
+"owned": 0,
+"price": 45,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 12,
+"category": "弹药",
+"id": "ammo_cl2",
+"mode": "fill",
+"name": "扩散弹2",
+"owned": 0,
+"price": 50,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 12,
+"category": "弹药",
+"id": "ammo_c3",
+"mode": "fill",
+"name": "彻甲榴弹3",
+"owned": 0,
+"price": 55,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 8,
+"category": "弹药",
+"id": "ammo_cl3",
+"mode": "fill",
+"name": "扩散弹3",
+"owned": 0,
+"price": 60,
+"reason": "清波后返回集结点，等待进入整备阶段"
+}
+],
+"战术道具": [
+{
+"canBuy": false,
+"cap": 5,
+"category": "战术道具",
+"id": "seed_any",
+"mode": "perUnit",
+"name": "种子类（忍耐/硬化/鬼人）",
+"owned": 0,
+"price": 30,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 3,
+"category": "战术道具",
+"desc": "一次购买3个",
+"id": "flash",
+"mode": "perUnit",
+"name": "闪光弹",
+"owned": 0,
+"price": 50,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 2,
+"category": "战术道具",
+"id": "trap_pit",
+"mode": "perUnit",
+"name": "落穴陷阱",
+"owned": 0,
+"price": 60,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 2,
+"category": "战术道具",
+"id": "trap_shock",
+"mode": "perUnit",
+"name": "麻痹陷阱",
+"owned": 0,
+"price": 70,
+"reason": "清波后返回集结点，等待进入整备阶段"
+}
+],
+"翻盘服务": [
+{
+"canBuy": false,
+"cap": 0,
+"category": "翻盘服务",
+"desc": "仅下一场狩猎生效",
+"id": "buff_def",
+"mode": "service",
+"name": "单轮防御UP",
+"owned": 0,
+"price": 80,
+"reason": "游戏效果接线完成前暂不开放"
+},
+{
+"canBuy": false,
+"cap": 0,
+"category": "翻盘服务",
+"desc": "仅下一场狩猎生效",
+"id": "buff_atk",
+"mode": "service",
+"name": "单轮攻击UP",
+"owned": 0,
+"price": 80,
+"reason": "游戏效果接线完成前暂不开放"
+},
+{
+"canBuy": false,
+"cap": 0,
+"category": "翻盘服务",
+"desc": "仅下一场狩猎生效",
+"id": "buff_crit",
+"mode": "service",
+"name": "单轮会心UP",
+"owned": 0,
+"price": 100,
+"reason": "游戏效果接线完成前暂不开放"
+},
+{
+"canBuy": false,
+"cap": 0,
+"category": "翻盘服务",
+"id": "gacha_1",
+"mode": "service",
+"name": "初级装备抽取",
+"owned": 0,
+"price": 120,
+"reason": "游戏效果接线完成前暂不开放"
+},
+{
+"canBuy": false,
+"cap": 0,
+"category": "翻盘服务",
+"id": "gacha_2",
+"mode": "service",
+"name": "中级装备抽取",
+"owned": 0,
+"price": 250,
+"reason": "游戏效果接线完成前暂不开放"
+},
+{
+"canBuy": false,
+"cap": 0,
+"category": "翻盘服务",
+"desc": "清除1次猫车记录，整局仅限1次",
+"id": "cart_restore",
+"mode": "service",
+"name": "猫车恢复",
+"owned": 0,
+"price": 400,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 0,
+"category": "翻盘服务",
+"id": "gacha_3",
+"mode": "service",
+"name": "高级装备抽取",
+"owned": 0,
+"price": 450,
+"reason": "游戏效果接线完成前暂不开放"
+},
+{
+"canBuy": false,
+"cap": 0,
+"category": "翻盘服务",
+"id": "gacha_4",
+"mode": "service",
+"name": "顶级装备抽取",
+"owned": 0,
+"price": 700,
+"reason": "游戏效果接线完成前暂不开放"
+}
+],
+"调和素材": [
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_husk",
+"mode": "fill",
+"name": "空心果",
+"owned": 0,
+"price": 8,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_bottle",
+"mode": "fill",
+"name": "空瓶",
+"owned": 0,
+"price": 8,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_mush_para",
+"mode": "fill",
+"name": "麻痹蘑菇",
+"owned": 0,
+"price": 10,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_herb_sleep",
+"mode": "fill",
+"name": "睡眠草",
+"owned": 0,
+"price": 10,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_mush_poison",
+"mode": "fill",
+"name": "毒蘑菇",
+"owned": 0,
+"price": 10,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_burst",
+"mode": "fill",
+"name": "爆裂果",
+"owned": 0,
+"price": 10,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_ice",
+"mode": "fill",
+"name": "冰结晶",
+"owned": 0,
+"price": 12,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_nitro",
+"mode": "fill",
+"name": "硝化结晶",
+"owned": 0,
+"price": 12,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_powder",
+"mode": "fill",
+"name": "火药粉",
+"owned": 0,
+"price": 12,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_thunder",
+"mode": "fill",
+"name": "雷光虫",
+"owned": 0,
+"price": 12,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_fire",
+"mode": "fill",
+"name": "火炎结晶",
+"owned": 0,
+"price": 12,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_water",
+"mode": "fill",
+"name": "水结晶",
+"owned": 0,
+"price": 12,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_pow_fruit",
+"mode": "fill",
+"name": "强击果实",
+"owned": 0,
+"price": 14,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 99,
+"category": "调和素材",
+"id": "mat_slic_fruit",
+"mode": "fill",
+"name": "斩裂果实",
+"owned": 0,
+"price": 15,
+"reason": "清波后返回集结点，等待进入整备阶段"
+}
+],
+"高阶药品": [
+{
+"canBuy": false,
+"cap": 4,
+"category": "高阶药品",
+"id": "dust_life",
+"mode": "perUnit",
+"name": "生命粉尘",
+"owned": 0,
+"price": 45,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 3,
+"category": "高阶药品",
+"id": "dust_atk",
+"mode": "perUnit",
+"name": "鬼人粉尘",
+"owned": 0,
+"price": 70,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 3,
+"category": "高阶药品",
+"id": "dust_def",
+"mode": "perUnit",
+"name": "硬化粉尘",
+"owned": 0,
+"price": 70,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 2,
+"category": "高阶药品",
+"id": "secret",
+"mode": "perUnit",
+"name": "秘药",
+"owned": 0,
+"price": 80,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 2,
+"category": "高阶药品",
+"id": "dust_life_l",
+"mode": "perUnit",
+"name": "大生命粉尘",
+"owned": 0,
+"price": 90,
+"reason": "清波后返回集结点，等待进入整备阶段"
+},
+{
+"canBuy": false,
+"cap": 1,
+"category": "高阶药品",
+"id": "ancient",
+"mode": "perUnit",
+"name": "远古秘药",
+"owned": 0,
+"price": 140,
+"reason": "清波后返回集结点，等待进入整备阶段"
+}
+]
+},
+"shopAvailable": false,
+"shopBusy": false,
+"shopReason": "清波后返回集结点，等待进入整备阶段"
+}
