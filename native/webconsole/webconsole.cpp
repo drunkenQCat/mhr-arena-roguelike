@@ -20,10 +20,12 @@
 #include <Windows.h>
 
 #include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -35,8 +37,9 @@
 #endif
 
 namespace {
-constexpr const char* PLUGIN_VERSION = "0.2.0";
-constexpr unsigned short LISTEN_PORT = 11777;
+constexpr const char* PLUGIN_VERSION = "0.3.0";
+unsigned short g_listen_port = 11777;
+std::mutex g_command_mutex;
 
 std::thread g_server_thread;
 std::wstring g_data_dir;
@@ -104,6 +107,14 @@ std::string cached_read(CachedFile& c, const std::wstring& path, int ttl_ms) {
 
 void run_server() {
     httplib::Server svr;
+    svr.set_payload_max_length(262144);
+    svr.set_read_timeout(3);
+    svr.set_write_timeout(3);
+    svr.set_default_headers({{"Cache-Control", "no-store"}});
+    svr.set_exception_handler([](const httplib::Request&, httplib::Response& res, std::exception_ptr) {
+        res.status = 500;
+        res.set_content("{\"ok\":false,\"error\":\"request failed\"}", "application/json");
+    });
 
     svr.Get("/api/health", [](const httplib::Request&, httplib::Response& res) {
         std::ostringstream ss;
@@ -147,12 +158,37 @@ void run_server() {
     // 单命令槽：POST 覆盖式写入；Lua 执行后写结果文件并清空槽。
     // 上限 256KB：容纳 submitConfig 的完整配置提交
     svr.Post("/api/command", [](const httplib::Request& req, httplib::Response& res) {
+        const auto expected = std::string("http://127.0.0.1:") + std::to_string(g_listen_port);
+        const auto local = std::string("http://localhost:") + std::to_string(g_listen_port);
+        const auto origin = req.get_header_value("Origin");
+        if (!origin.empty() && origin != expected && origin != local &&
+            origin != "http://localhost:5173" && origin != "http://127.0.0.1:5173") {
+            res.status = 403;
+            res.set_content("{\"ok\":false,\"error\":\"origin rejected\"}", "application/json");
+            return;
+        }
+        if (req.get_header_value("Content-Type").find("application/json") != 0) {
+            res.status = 415;
+            res.set_content("{\"ok\":false,\"error\":\"application/json required\"}", "application/json");
+            return;
+        }
         if (req.body.size() > 262144) {
             res.status = 413;
             res.set_content("{\"ok\":false,\"error\":\"command too large\"}", "application/json");
             return;
         }
         const std::wstring cmd = data_path(L"webconsole_cmd.json");
+        // One outstanding slot. Never acknowledge a request that overwrites another.
+        std::lock_guard<std::mutex> lock(g_command_mutex);
+        auto pending = read_text(cmd);
+        pending.erase(std::remove_if(pending.begin(), pending.end(), [](unsigned char c) {
+            return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+        }), pending.end());
+        if (!pending.empty() && pending != "{}" && pending != "null") {
+            res.status = 409;
+            res.set_content("{\"ok\":false,\"error\":\"another command is awaiting game acknowledgement\"}", "application/json");
+            return;
+        }
         if (!atomic_write_text(cmd, req.body)) {
             res.status = 500;
             res.set_content("{\"ok\":false,\"error\":\"failed to write command slot\"}", "application/json");
@@ -182,7 +218,7 @@ void run_server() {
         res.set_content(html, "text/html; charset=utf-8");
     });
 
-    if (!svr.listen("127.0.0.1", LISTEN_PORT)) {
+    if (!svr.listen("127.0.0.1", g_listen_port)) {
         log_info("listen failed on 127.0.0.1:11777");
     }
 }
@@ -233,7 +269,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID) {
 #else
 
 #include <direct.h>
-int main() {
+int main(int argc, char** argv) {
+    if (argc > 1) g_listen_port = static_cast<unsigned short>(std::stoi(argv[1]));
     wchar_t buf[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, buf, MAX_PATH);
     std::wstring full = buf;
@@ -241,10 +278,7 @@ int main() {
     g_module_dir = full.substr(0, sl);
     g_data_dir = g_module_dir + L"\\testdata";
     _wmkdir((g_module_dir + L"\\testdata").c_str());
-    std::ofstream(data_path(L"webconsole_state.json")) << "{\"ok\":true,\"protocol\":2}";
-    std::ofstream(data_path(L"webconsole_results.json")) << "{\"history\":[]}";
-    std::ofstream(data_path(L"mhw_rogue_config.json")) << "{\"startPt\":150}";
-    printf("standalone webconsole on 127.0.0.1:11777\n");
+    printf("standalone webconsole on 127.0.0.1:%u\n", g_listen_port);
     run_server();
     return 0;
 }

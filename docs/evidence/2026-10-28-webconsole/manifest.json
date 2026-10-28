@@ -1,0 +1,13 @@
+{
+  "environment": "Isolated emitted Lua + real native HTTP + Vue; simulated game API, NOT live game acceptance",
+  "tests": 126,
+  "screenshots": {
+    "01-before.png": "505dba54fde1db16dc82f9839583d95a09ca7f7bcea8a71c38ca867aa7258ce4",
+    "04-next-wave-shop.png": "87d510b18078e0d37f830d121bc5132563f74ab4399340d5d86bbc8b3510aa38",
+    "05-stale.png": "0f1b270640d61f8b95764a6aa365d3c7cd83450824444cf23cd468188cc8dcae",
+    "06-difficulty-final.png": "baa433f3841725f3d4dadc1c476bbc5a3ec128f2b888d7a4c3ae4f431f600337",
+    "07-monster-editor.png": "7635d46820112fdd164f067459ef6bdf5ecea363db66afcff395e0dcc1352546",
+    "08-live-await-reset.png": "b6a8e48cf60429d2d62e99ce39f23022a47b4933b2855325fe8b71d6dcadf5f8"
+  },
+  "liveStatus": "Observed protocol 2 still loaded; new Lua and HTML deployed; DLL replacement blocked by EBUSY."
+}

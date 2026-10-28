@@ -1,0 +1,20 @@
+{
+  "concurrent": [
+    [
+      200,
+      {
+        "ok": true,
+        "queued": true,
+        "bytes": 79
+      }
+    ],
+    [
+      409,
+      "{\"ok\":false,\"error\":\"another command is awaiting game acknowledgement\"}"
+    ]
+  ],
+  "origin": 403,
+  "contentType": 415,
+  "oversize": 413,
+  "cacheControl": "no-store"
+}
