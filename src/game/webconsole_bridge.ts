@@ -167,14 +167,17 @@ export class WebConsoleBridge {
    */
   private uiSection(): Record<string, unknown> {
     const r = this.session.readingSnapshot;
-    // The installed StageManager exposes no get_MapNo (its members are the
-    // warp/area/time state, see sdk-dump). Do not invent an accessor: report null
-    // until a verified map accessor exists.
+    // stage 是安装版 QuestManager 的状态枚举：失败/成功但未回村时，任务对象仍注册。
+    // 这不是"另一局正在进行"，RuntimeReading.staleQuest 与这里用同一判据。
+    const stageValue = r?.quest?.status ?? null;
+    const staleQuest = r?.quest != null && (stageValue === "failed" || stageValue === "success") && !r.quest.playing;
+    // 安装版 StageManager 无 get_MapNo（sdk-dump 只有 warp/area/time 成员），不猜访问器。
     const mapNo: number | null = null;
     const players = r?.players ?? [];
     const position = players[0]?.position ?? null;
     const inQuest = r?.quest !== null && r?.quest !== undefined;
-    const scene = inQuest ? (r?.quest?.playing ? "quest" : "quest_ready")
+    const scene = inQuest ? (r?.quest?.playing ? "quest"
+      : staleQuest ? "village" : "quest_ready")
       : (r?.canPost ? "village" : "unknown");
     return {
       scene,
@@ -189,7 +192,8 @@ export class WebConsoleBridge {
       canPost: r?.canPost ?? false,
       dialogs: [],
       allowedActions: [
-        ...(["Idle", "Finished", "Fault"].includes(this.session.stage) && r?.canPost && !inQuest ? ["run.start"] : []),
+        ...(["Idle", "Finished", "Fault"].includes(this.session.stage) && r?.canPost &&
+          (!inQuest || staleQuest) ? ["run.start"] : []),
         ...(this.session.canShop() && !this.shop.busy ? ["run.choose", "shop.buy"] : []),
         ...(["AwaitQuest", "Fault"].includes(this.session.stage) ? ["run.retry"] : []),
         ...(inQuest && r?.quest?.playing ? ["test.killAll"] : []),

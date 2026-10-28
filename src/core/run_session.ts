@@ -18,6 +18,8 @@ export interface RuntimeReading {
   deaths: number;
   online: boolean;
   canPost: boolean;
+  /** True when the arena quest object of a stopped/failed run is still registered. */
+  staleQuest?: boolean;
 }
 export interface DeathReading { uid: number; typeId: number; kind: "kill" | "capture" }
 
@@ -30,6 +32,8 @@ export interface SessionPort {
   policy(plan: QuestPlan | null, holdClear: boolean): void;
   post(questId: number): void;
   cancelPost(): void;
+  /** Optional: re-point the transport after a stopped run left its quest registered. */
+  retarget?(questId: number): void;
   postingError(): string | null;
   finish(failed: boolean): void;
   takeDeaths(): DeathReading[];
@@ -143,7 +147,11 @@ export class RunSession {
       const reading = this.port.read();
       if (!this.port.ready()) return fail("任务安装器尚未就绪");
       if (reading.online) return fail("M2 is solo-only; online quest data/state synchronization is not implemented");
-      if (reading.quest !== null || !reading.canPost) return fail("请在村庄且未接任务的状态开始");
+      // A stopped run leaves its quest object registered until the counter is invoked
+      // again; that is not "another quest is running". A live quest or a pending post
+      // still blocks, and start() cancels a stale registration through the transport.
+      if ((reading.quest !== null && !reading.staleQuest) || !reading.canPost)
+        return fail("请在村庄且未接任务的状态开始");
       if (!["Idle", "Finished", "Fault"].includes(this.stage)) return fail("会话已在进行中");
       if (this.core.state.phase !== "Idle" && this.core.state.phase !== "GameOver") this.core.abortRun("Starting a new session");
       if (this.nextRunConfig) {
@@ -153,9 +161,16 @@ export class RunSession {
       }
       const result = this.core.startRun(armor);
       if (!result.ok) return result;
+      // startRun resets layer/PT but keeps the combat log; the new session must not
+      // inherit the previous run's log lines.
+      this.core.state.log = [];
       this.testOnly = spike;
       this.route = this.settings.route;
       this.port.cancelPost();
+      // A stopped run can leave its quest registered (status failed/return) until the
+      // counter takes another quest. Retarget the transport at ours so the next post
+      // is not refused as "another quest was accepted".
+      if (reading.staleQuest && this.port.retarget) this.port.retarget(this.core.config.quest.id);
       this.port.policy(null, false);
       this.plan = null;
       this.retryWave = false;

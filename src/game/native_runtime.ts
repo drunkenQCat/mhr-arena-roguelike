@@ -26,6 +26,8 @@ interface Diagnostic { time: number; event: string; detail: unknown }
 export class NativeRuntime implements SessionPort {
   readonly transport: QuestTransport;
   readonly testTools = new TestTools((event, detail) => this.report(event, detail));
+  /** Test-only seam: lets the CLI verify the started-run flow without native menus. */
+  readonly questTransport: QuestTransport;
   private readonly inplace = new InplaceWaves((event, detail) => this.report(event, detail));
   private activePlan: QuestPlan | null = null;
   private holdClear = false;
@@ -39,6 +41,7 @@ export class NativeRuntime implements SessionPort {
   constructor(private readonly cfg: RogueConfig, readonly installer: QuestInstaller) {
     this.transport = new QuestTransport(() => installer.getQuest(),
       (cfg.runtime ?? DEFAULT_RUNTIME).postTimeoutSeconds);
+    this.questTransport = this.transport;
   }
 
   tick(): void {
@@ -67,6 +70,7 @@ export class NativeRuntime implements SessionPort {
   }
   post(questId: number): void { this.transport.request(questId); }
   cancelPost(): void { this.transport.cancel(); }
+  retarget(questId: number): void { this.transport.retarget(questId); }
   postingError(): string | null { return this.transport.getError(); }
   takeDeaths(): DeathReading[] { const events = this.deaths; this.deaths = []; return events; }
   /**
@@ -150,6 +154,12 @@ export class NativeRuntime implements SessionPort {
     }
     const stage = getSingleton("snow.stage.StageManager");
     const online = !!stage?.call("get_IsQuestOnline") || players.length > 1;
+    // A prior quest lives in QuestManager until the village counter is invoked again.
+    // Without this, start is refused forever after one stop and the CLI would dead-end.
+    const staleQuest =
+      (active ? callNative(qm, "get_ActiveQuestNo") : -1) === this.cfg.quest.id &&
+      (!playing || status === snow_QuestManager_Status.Failed || status === snow_QuestManager_Status.Success) &&
+      !this.questTransport.isActive();
     const enemies: EnemyReading[] = [];
     if (playing && quest?.id === this.cfg.quest.id) {
       const manager = getSingleton("snow.enemy.EnemyManager");
@@ -180,7 +190,7 @@ export class NativeRuntime implements SessionPort {
       }
     }
     const gui = getSingleton("snow.gui.GuiManager");
-    return { time, quest, players, enemies, online,
+    return { time, quest, players, enemies, online, staleQuest,
       deaths: active ? callNative(qm, "getDeathNum") as number : 0,
       canPost: !active && (!!gui?.call("IsCanInvokeQuestBoard") || !!getSingleton("snow.gui.fsm.questcounter.GuiQuestCounterFsmManager")) };
   }

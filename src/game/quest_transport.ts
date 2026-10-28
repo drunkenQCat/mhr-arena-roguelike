@@ -31,6 +31,15 @@ export class QuestTransport {
 
   constructor(private readonly currentQuest: () => REManagedObject | null, private readonly timeout: number) {}
   isActive(): boolean { return this.stage !== "Idle"; }
+
+  /**
+   * Re-point the transport at the configured quest after a stopped run left its
+   * quest registered (status failed/return). Keeps hooks/retained refs intact.
+   */
+  retarget(id: number): void {
+    if (this.isActive()) return;
+    this.target = id;
+  }
   getError(): string | null { return this.error; }
   getStatus(): string { return this.error ?? this.stage; }
 
@@ -38,7 +47,9 @@ export class QuestTransport {
     if (this.isActive()) throw new Error("Quest post already running");
     const qm = questManager();
     const gui = getSingleton("snow.gui.GuiManager");
-    if (!qm || !gui || callNative(qm, "isActiveQuest") === true || (callNative(gui, "IsCanInvokeQuestBoard") !== true && !getSingleton(COUNTER))) {
+    // isActiveQuest still reports a stopped run's quest until the counter is invoked
+    // again; the counter path can replace it, so only the UI availability matters here.
+    if (!qm || !gui || (callNative(gui, "IsCanInvokeQuestBoard") !== true && !getSingleton(COUNTER))) {
       throw new Error("Quest counter is not available; retry from the village");
     }
     this.installHooks();
@@ -82,7 +93,8 @@ export class QuestTransport {
       const gui = getSingleton("snow.gui.GuiManager");
       const facility = getSingleton("snow.LobbyFacilityUIManager");
       if (!qm || !gui || !facility) return;
-      if (callNative(qm, "isActiveQuest") && callNative(qm, "get_ActiveQuestNo") !== this.target) {
+      if (callNative(qm, "isActiveQuest") && callNative(qm, "get_ActiveQuestNo") !== this.target &&
+          callNative(qm, "isPlayQuest") === true) {
         throw new Error("Another quest was accepted; stopping automatic transport");
       }
       if (this.stage === "Open") {

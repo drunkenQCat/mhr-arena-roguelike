@@ -108,11 +108,22 @@ describe("bounded native quest transport", () => {
   it("stops when a different quest is accepted instead of auto-departing", () => {
     const { state, transport, flow } = fixture();
     transport.request(900102); transport.tick();
-    state.active = true; state.questId = 101;
+    state.active = true; state.questId = 101; state.playing = true;
     transport.tick();
     expect(transport.isActive()).toBe(false);
     expect(transport.getError()).toContain("Another quest");
     expect(flow.call).not.toHaveBeenCalled();
+  });
+
+  it("keeps driving the counter past a stopped quest that is still registered", () => {
+    // A failed/stopped run leaves isActiveQuest=true with isPlayQuest=false until the
+    // counter takes the next quest; that must not be read as "another quest started".
+    const { state, transport } = fixture();
+    transport.request(900102); transport.tick();
+    state.active = true; state.questId = 213754756; state.playing = false;
+    transport.tick();
+    expect(transport.isActive()).toBe(true);
+    expect(transport.getError()).toBeNull();
   });
 
   it("distinguishes routine isExecute errors and cleans up on failure", () => {
