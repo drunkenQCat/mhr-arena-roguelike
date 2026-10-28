@@ -1,4 +1,4 @@
-// TSTL emits a trailing space on bundle module headers. Keep committed builds reproducible.
+// TSTL emits a trailing space on bundle module headers. Normalize the generated bundle.
 const fs = require("node:fs");
 const path = require("node:path");
 const file = path.resolve(__dirname, "../reframework/autorun/mhw_rogue.lua");

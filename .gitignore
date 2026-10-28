@@ -7,6 +7,9 @@ src/game/default_config.ts
 # 生成的 SDK（npm run build / npm run gen 随时可再生成）
 src/game/gen/
 
+# TypeScriptToLua bundle (npm run build:nocopy regenerates it)
+/reframework/autorun/mhw_rogue.lua
+
 # Frontend build output
 /console/dist/
 
