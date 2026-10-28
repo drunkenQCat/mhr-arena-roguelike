@@ -1,0 +1,9 @@
+{
+  "name": "contract-ok",
+  "timeoutSeconds": 15,
+  "steps": [
+    { "name": "状态可读", "kind": "assert", "expect": "ok=true" },
+    { "name": "会话存在", "kind": "assert", "expect": "bridgeId!=" },
+    { "name": "路由命令", "kind": "action", "cmd": "setRoute", "route": "inPlace" }
+  ]
+}

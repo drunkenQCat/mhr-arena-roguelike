@@ -1,0 +1,57 @@
+{
+  "ok": false,
+  "baseUrl": "http://127.0.0.1:11777",
+  "layers": {
+    "http": {
+      "state": "up",
+      "status": 200
+    },
+    "dll": {
+      "state": "up",
+      "plugin": "webconsole",
+      "version": "0.3.3",
+      "pid": 30880,
+      "session": "30880-403530972",
+      "uptimeMs": 10506536,
+      "transport": "memory",
+      "luaSessions": 8,
+      "pings": 16,
+      "commands": 21,
+      "queuedCommands": 0
+    },
+    "lua": {
+      "state": "pass",
+      "moduleVersion": "0.3.3",
+      "session": "30880-403530972:lua-8",
+      "at": "2026-10-28T11:38:10Z",
+      "errors": []
+    },
+    "business": {
+      "state": "live",
+      "protocol": 3,
+      "sessionStage": "Finished",
+      "corePhase": "GameOver",
+      "layer": 2,
+      "questUnique": 213754756,
+      "sampledAt": 1793194583
+    }
+  },
+  "protocol": {
+    "expected": 4,
+    "actual": 3,
+    "compatible": false
+  },
+  "liveness": {
+    "state": "live",
+    "bridgeId": "8-1793187490-4649aafc",
+    "counter": {
+      "from": 7093,
+      "to": 7094
+    },
+    "sampleWindowMs": 1603
+  },
+  "blockers": [
+    "DLL 协议 3 与 CLI 期望 4 不一致：更新 DLL/页面后重启游戏",
+    "Lua 协议 3 与 CLI 期望 4 不一致：部署新 bundle 并 Reset scripts"
+  ]
+}

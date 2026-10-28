@@ -1,0 +1,121 @@
+{
+  "protocol": 4,
+  "dllProtocol": 3,
+  "commands": [
+    {
+      "cmd": "getConfig",
+      "writes": false,
+      "summary": "读取当前生效配置与版本",
+      "implemented": true
+    },
+    {
+      "cmd": "submitConfig",
+      "writes": true,
+      "summary": "提交配置（需显式 configVersion）",
+      "implemented": true
+    },
+    {
+      "cmd": "startRun",
+      "writes": true,
+      "summary": "开局（Idle/Finished/Fault 且村庄未接任务）",
+      "implemented": true
+    },
+    {
+      "cmd": "choose",
+      "writes": true,
+      "summary": "选择下一波（需完成集结且无未决交易）",
+      "implemented": true
+    },
+    {
+      "cmd": "buy",
+      "writes": true,
+      "summary": "购买/补满/服务（共用游戏内资格）",
+      "implemented": true
+    },
+    {
+      "cmd": "setInvincible",
+      "writes": true,
+      "summary": "测试用无敌开关（单人测试任务）",
+      "implemented": true
+    },
+    {
+      "cmd": "killAll",
+      "writes": true,
+      "summary": "请求击杀当前已出场怪物",
+      "implemented": true
+    },
+    {
+      "cmd": "retryPost",
+      "writes": true,
+      "summary": "重试原生接取",
+      "implemented": true
+    },
+    {
+      "cmd": "stop",
+      "writes": true,
+      "summary": "停止本局并恢复原生结算",
+      "implemented": true
+    },
+    {
+      "cmd": "setRoute",
+      "writes": true,
+      "summary": "切换 inPlace/reentry（仅开局前）",
+      "implemented": true
+    }
+  ],
+  "actions": [
+    {
+      "action": "run.start",
+      "implemented": true,
+      "allowed": false,
+      "reason": "当前阶段 Finished 不允许开局"
+    },
+    {
+      "action": "run.choose",
+      "implemented": true,
+      "allowed": false,
+      "reason": "需完成清波与集结"
+    },
+    {
+      "action": "run.stop",
+      "implemented": true,
+      "allowed": false,
+      "reason": "未开局"
+    },
+    {
+      "action": "run.retry",
+      "implemented": true,
+      "allowed": false,
+      "reason": "仅等待接取或故障阶段"
+    },
+    {
+      "action": "run.route",
+      "implemented": true,
+      "allowed": true,
+      "reason": "路线只能在开局前切换"
+    },
+    {
+      "action": "test.invincible",
+      "implemented": true,
+      "allowed": false,
+      "reason": "仅战斗阶段（单人测试任务）"
+    },
+    {
+      "action": "test.killAll",
+      "implemented": true,
+      "allowed": false,
+      "reason": "仅战斗阶段"
+    },
+    {
+      "action": "shop.buy",
+      "implemented": true,
+      "allowed": false,
+      "reason": "清波后返回集结点，等待进入整备阶段"
+    }
+  ],
+  "orders": [
+    "DLL 协议 3 ≠ 4：CLI 写入命令可能被旧版 Lua 拒绝"
+  ],
+  "sessionStage": "Finished",
+  "note": "allowed 与 Lua 侧前置条件同源展示；最终以回执和状态后置条件为准。"
+}

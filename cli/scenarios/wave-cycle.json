@@ -1,0 +1,16 @@
+{
+  "name": "wave-cycle",
+  "description": "单怪：开局 → 选波 → 等待出怪 → 击杀 → 原生清波 → 集结 → 下一层可选；每步都有状态后置条件",
+  "timeoutSeconds": 240,
+  "steps": [
+    { "name": "阶段允许开局", "kind": "wait", "expect": "capabilities.start=true", "timeoutSeconds": 10 },
+    { "name": "开局", "kind": "action", "cmd": "startRun", "expect": "sessionStage=Selecting", "timeoutSeconds": 20 },
+    { "name": "选择第 1 个波次", "kind": "action", "cmd": "choose", "index": 0,
+      "expect": "sessionStage=Combat", "timeoutSeconds": 60 },
+    { "name": "原生出怪", "kind": "wait", "expect": "enemies.0.dead=false", "timeoutSeconds": 90 },
+    { "name": "请求击杀", "kind": "action", "cmd": "killAll", "settleQueued": true,
+      "expect": "sessionStage=Carve", "timeoutSeconds": 60 },
+    { "name": "回到集结点并可购买", "kind": "wait", "expect": "shopAvailable=true", "timeoutSeconds": 180 },
+    { "name": "进入下一层选择", "kind": "assert", "expect": "sessionStage=Selecting", "timeoutSeconds": 60 }
+  ]
+}

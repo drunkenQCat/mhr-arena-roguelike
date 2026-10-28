@@ -14,7 +14,9 @@
     "test": "vitest run",
     "check": "node scripts/check-lua.js",
     "check:runtime": "python scripts/check-lua-runtime.py",
-    "gen": "node scripts/gen-enums.js && node scripts/gen-types.js"
+    "gen": "node scripts/gen-enums.js && node scripts/gen-types.js",
+    "test:cli": "node cli/tests/contract.mjs",
+    "cli": "node cli/mhr.mjs"
   },
   "devDependencies": {
     "@typescript-to-lua/language-extensions": "^1.19.0",

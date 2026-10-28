@@ -1,0 +1,10 @@
+{
+  "name": "readiness",
+  "description": "区分服务未启动、DLL 有响应但 Lua 未发布、业务就绪三种情况",
+  "timeoutSeconds": 30,
+  "steps": [
+    { "name": "业务状态可读", "kind": "assert", "expect": "ok=true" },
+    { "name": "协议为 4", "kind": "assert", "expect": "protocol=4" },
+    { "name": "有会话标识", "kind": "assert", "expect": "bridgeId!=" }
+  ]
+}

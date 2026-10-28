@@ -1,0 +1,398 @@
+#!/usr/bin/env node
+// Agent-facing control CLI for the in-game webconsole plugin.
+//
+// Commands and exit codes are documented in docs/cli.md. Every mutation goes
+// through the same submit protocol: fresh identity -> unique request id -> POST ->
+// wait for a terminal receipt. Nothing here retries a command automatically.
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { EXIT, CliError, usage, unavailable, rejected } from "./lib/exit.mjs";
+import { normalizeBaseUrl, getRaw } from "./lib/http.mjs";
+import { captureIdentity, submit, requireReceipt, waitForReceipt, sleep } from "./lib/session.mjs";
+import { doctor, readState, readProbe, capabilitiesFrom, COMMAND_CATALOGUE } from "./lib/observe.mjs";
+import { createOutput, runMain } from "./lib/output.mjs";
+import { createValidator } from "./lib/config-validate.mjs";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const PROTOCOL = 4;
+
+const HELP = `用法: node cli/mhr.mjs <命令> [选项]
+
+只读:
+  doctor [--json] [--sample-ms N]        分层健康报告（HTTP/DLL/Lua/业务心跳）
+  state [--json]                         当前业务快照
+  probe [--json]                         DLL 身份 + Lua 探针报告
+  capabilities [--json]                  命令/动作的 implemented 与 allowed
+  shop list [--json] [--category X]      商店目录与购买资格
+  config get [--json]                    读取当前生效配置
+
+写入（提交后等待终态回执）:
+  run start --armor <名称>               开局
+  run choose --index <N>                 选择波次
+  run route <inPlace|reentry>            切换路线（仅开局前）
+  run retry                              重试原生接取
+  run stop                               停止本局
+  test invincible <on|off>               无敌开关
+  test kill-all                          请求击杀已出场怪物
+  shop buy --item <商品ID>               购买/补满/服务
+  config validate --file <路径>          本地校验（复用 src/core/config.ts）
+  config submit --file <路径> --version <当前版本>
+
+等待与场景:
+  wait --stage <stage> [--layer N] [--quest-unique N] [--wave-token N]
+       [--uid-alive N] [--uid-dead N] [--shop] [--timeout S]
+  scenario run <文件.json> [--report <输出>]
+
+通用选项:
+  --base-url URL     默认 http://127.0.0.1:11777（或 MHR_CLI_BASE_URL）
+  --json             机器可读输出（stdout 单文档）
+  --timeout S        HTTP 单次超时（默认 3）
+  --receipt-timeout S 回执等待（默认 15）
+
+退出码: 0 成功 / 1 内部错误 / 2 参数错误 / 3 未就绪或未支持 /
+        4 前置条件或命令被拒绝 / 5 超时 / 6 结果不确定`;
+
+function parseArgs(argv) {
+  const words = [];
+  const options = { json: false, baseUrl: undefined, timeoutS: 3, receiptTimeoutS: 15,
+    sampleMs: 1600, armor: undefined, index: undefined, item: undefined, file: undefined,
+    version: undefined, stage: undefined, layer: undefined, questUnique: undefined,
+    waveToken: undefined, uidAlive: [], uidDead: [], shop: false, timeout: undefined,
+    report: undefined, category: undefined, probeTimeoutS: undefined };
+  const valueFlags = {
+    "--base-url": (v) => { options.baseUrl = v; },
+    "--timeout": (v) => { options.timeoutS = Number(v); },
+    "--receipt-timeout": (v) => { options.receiptTimeoutS = Number(v); },
+    "--sample-ms": (v) => { options.sampleMs = Number(v); },
+    "--armor": (v) => { options.armor = v; },
+    "--index": (v) => { options.index = Number(v); },
+    "--item": (v) => { options.item = v; },
+    "--file": (v) => { options.file = v; },
+    "--version": (v) => { options.version = Number(v); },
+    "--stage": (v) => { options.stage = v; },
+    "--layer": (v) => { options.layer = Number(v); },
+    "--quest-unique": (v) => { options.questUnique = Number(v); },
+    "--wave-token": (v) => { options.waveToken = Number(v); },
+    "--uid-alive": (v) => { options.uidAlive.push(Number(v)); },
+    "--uid-dead": (v) => { options.uidDead.push(Number(v)); },
+    "--report": (v) => { options.report = v; },
+    "--category": (v) => { options.category = v; },
+  };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--json") { options.json = true; continue; }
+    if (arg === "--shop") { options.shop = true; continue; }
+    if (arg === "-h" || arg === "--help") { options.help = true; continue; }
+    if (arg in valueFlags) {
+      const value = argv[++i];
+      if (value === undefined) throw usage(`${arg} 缺少参数值`);
+      valueFlags[arg](value);
+      continue;
+    }
+    if (arg.startsWith("--")) throw usage(`未知选项：${arg}`);
+    words.push(arg);
+  }
+  for (const key of ["timeoutS", "receiptTimeoutS", "sampleMs"]) {
+    if (!Number.isFinite(options[key]) || options[key] <= 0) throw usage(`选项 ${key} 必须是正数`);
+  }
+  return { words, options };
+}
+
+const fmt = (value) => value === null || value === undefined ? "—" : String(value);
+
+/** Reads a JSON file, mapping IO/parse failures to exit 2 (bad input) not 1. */
+function readJsonFile(path) {
+  const absolute = resolve(path);
+  let text;
+  try { text = readFileSync(absolute, "utf8"); }
+  catch { throw usage(`文件不可读：${absolute}`); }
+  try { return JSON.parse(text); }
+  catch (error) { throw usage(`JSON 解析失败：${absolute} (${error.message})`); }
+}
+
+function printDoctor(report) {
+  const lines = [
+    `HTTP   : ${report.layers.http.state}${report.layers.http.detail ? ` (${report.layers.http.detail})` : ""}`,
+    `DLL    : ${report.layers.dll.state} ${fmt(report.layers.dll.version)} pid=${fmt(report.layers.dll.pid)} session=${fmt(report.layers.dll.session)}`,
+    `Lua    : ${report.layers.lua.state}${report.layers.lua.moduleVersion ? ` module=${report.layers.lua.moduleVersion}` : ""}${report.layers.lua.detail ? ` (${report.layers.lua.detail})` : ""}`,
+    `业务   : ${report.layers.business.state} stage=${fmt(report.layers.business.sessionStage)} layer=${fmt(report.layers.business.layer)} quest=${fmt(report.layers.business.questUnique)}`,
+    `心跳   : ${report.liveness.state} counter ${fmt(report.liveness.counter?.from)}→${fmt(report.liveness.counter?.to)} (${fmt(report.liveness.sampleWindowMs)}ms)`,
+    `协议   : DLL ${fmt(report.protocol.actual)} / Lua ${fmt(report.layers.business.protocol)} / 期望 ${report.protocol.expected}`,
+  ];
+  if (report.liveness.hint) lines.push(`提示   : ${report.liveness.hint}`);
+  for (const blocker of report.blockers) lines.push(`阻塞   : ${blocker}`);
+  return `${report.ok ? "PASS" : "FAIL"}\n${lines.join("\n")}`;
+}
+
+async function main() {
+  const { words, options } = parseArgs(process.argv.slice(2));
+  const output = createOutput({ json: options.json });
+  if (options.help || words.length === 0) {
+    process.stdout.write(`${HELP}\n`);
+    return options.help ? EXIT.OK : EXIT.USAGE;
+  }
+  const baseUrl = normalizeBaseUrl(options.baseUrl);
+  const timeoutMs = options.timeoutS * 1000;
+  const receiptTimeoutMs = options.receiptTimeoutS * 1000;
+  const [group, sub] = words;
+
+  const snapshot = async () => {
+    const result = await readState(baseUrl, { timeoutMs });
+    if (!result.ok) throw unavailable(result.error);
+    return result.state;
+  };
+
+  switch (group) {
+    case "doctor": {
+      const report = await doctor(baseUrl, { timeoutMs, sampleMs: options.sampleMs, expectProtocol: PROTOCOL });
+      output.result(report, printDoctor);
+      return report.ok ? EXIT.OK : EXIT.UNAVAILABLE;
+    }
+    case "state": {
+      const state = await snapshot();
+      output.result(state, (value) => [
+        `阶段   : ${fmt(value.sessionStage)} / 核心 ${fmt(value.corePhase)}`,
+        `层数   : ${fmt(value.layer)}   PT ${fmt(value.pt)}   猫车 ${fmt(value.cartsLeft)}/${fmt(value.maxCarts)}`,
+        `任务   : ${fmt(value.questId)} / 实例 ${fmt(value.questUnique)}   波次 ${fmt(value.preparation?.waveToken)}`,
+        `桥     : ${fmt(value.bridgeId)}   协议 ${fmt(value.protocol)}   配置 v${fmt(value.configVersion)}`,
+        `消息   : ${fmt(value.message)}`,
+      ].join("\n"));
+      return EXIT.OK;
+    }
+    case "probe": {
+      const report = await readProbe(baseUrl, { timeoutMs });
+      if (!report.ok) throw unavailable(report.error);
+      output.result(report, (value) => [
+        `DLL    : ${fmt(value.dll.moduleVersion)} protocol=${fmt(value.dll.protocol)} pid=${fmt(value.dll.pid)} session=${fmt(value.dll.session)}`,
+        `计数   : sessions=${fmt(value.dll.sessions)} pings=${fmt(value.dll.pings)} commands=${fmt(value.dll.commands)} queued=${fmt(value.dll.queuedCommands)}`,
+        `探针   : ${value.lua.ok ? "PASS" : value.lua.unreported ? "未上报" : "FAIL"} ${fmt(value.lua.session)} ${fmt(value.lua.atIso)}`,
+      ].join("\n"));
+      return report.lua.ok === true ? EXIT.OK : EXIT.UNAVAILABLE;
+    }
+    case "capabilities": {
+      const state = await snapshot();
+      const dll = await getRaw(baseUrl, "/api/probe", timeoutMs);
+      const matrix = capabilitiesFrom(state, dll.body?.protocol ?? null);
+      output.result(matrix, (value) => value.actions
+        .map((a) => `${a.allowed ? "OK  " : "NO  "} ${a.action}${a.reason ? ` — ${a.reason}` : ""}`).join("\n"));
+      return EXIT.OK;
+    }
+    case "shop": {
+      const state = await snapshot();
+      if (sub === "list") {
+        const listing = state.shop ?? {};
+        const categories = options.category ? [options.category] : Object.keys(listing);
+        const rows = categories.flatMap((category) => (listing[category] ?? []).map((entry) => ({ category, ...entry })));
+        output.result({ ok: true, available: state.shopAvailable === true,
+          reason: state.shopReason ?? null, busy: state.shopBusy === true, items: rows },
+        (value) => [
+          `商店   : ${value.available ? "可购买" : "不可购买"}${value.reason ? ` — ${value.reason}` : ""}${value.busy ? "（交易中）" : ""}`,
+          ...value.items.map((entry) => `${entry.canBuy ? "OK  " : "NO  "} [${entry.category}] ${entry.id} ${entry.name} ${entry.price}PT ${entry.mode === "service" ? "" : `${entry.owned}/${entry.cap}`}${entry.reason ? ` — ${entry.reason}` : ""}`),
+        ].join("\n"));
+        return EXIT.OK;
+      }
+      if (sub === "buy") {
+        if (!options.item) throw usage("shop buy 需要 --item <商品ID>");
+        const identity = await captureIdentity(baseUrl, timeoutMs);
+        const listing = identity.state.shop ?? {};
+        const entry = Object.values(listing).flat().find((item) => item.id === options.item);
+        if (!entry) throw usage(`商店没有商品 ${options.item}（先运行 shop list）`);
+        if (entry.canBuy !== true) throw rejected(`${options.item} 当前不可购买：${entry.reason ?? "资格不足"}`);
+        output.progress(`商品 ${entry.name} 价格 ${entry.price} PT，持有 ${entry.owned}/${entry.cap}`);
+        const { id, receipt } = await submit(baseUrl, { cmd: "buy", itemId: options.item },
+          { identity, timeoutMs, receiptTimeoutMs, settleQueued: true });
+        output.progress(`回执 ${id}: ${receipt.status}`);
+        requireReceipt(receipt);
+        // Purchase receipts are re-published after the native delivery result, so an
+        // `applied` receipt here is the trade conclusion, not just the queue ack.
+        const after = await snapshot();
+        const afterItem = Object.values(after.shop ?? {}).flat().find((item) => item.id === options.item);
+        output.result({ ok: true, receipt, before: { owned: entry.owned, pt: identity.state.pt },
+          after: { owned: afterItem?.owned ?? null, pt: after.pt ?? null } },
+        (value) => `已购买 ${options.item}：${value.receipt.message ?? ""}\n持有 ${value.before.owned} → ${fmt(value.after.owned)}，PT ${value.before.pt} → ${fmt(value.after.pt)}`);
+        return EXIT.OK;
+      }
+      throw usage(`未知 shop 子命令：${fmt(sub)}`);
+    }
+    case "run": {
+      const identity = await captureIdentity(baseUrl, timeoutMs);
+      const send = async (command, label) => {
+        if (command.cmd === "startRun" && options.armor &&
+            !(identity.state.armorOptions ?? []).includes(options.armor)) {
+          throw usage(`未知护甲 ${options.armor}；可选：${(identity.state.armorOptions ?? []).join(", ")}`);
+        }
+        if (command.cmd === "choose" && !Number.isInteger(options.index)) throw usage("run choose 需要 --index");
+        const { id, receipt } = await submit(baseUrl, command, { identity, timeoutMs, receiptTimeoutMs });
+        output.progress(`回执 ${id}: ${receipt.status}`);
+        requireReceipt(receipt);
+        output.result({ ok: true, command, receipt },
+          (value) => `${label}: ${value.receipt.message ?? "applied"}`);
+        return EXIT.OK;
+      };
+      if (sub === "start") {
+        return send({ cmd: "startRun", armor: options.armor ?? identity.state.armorOptions?.[0] },
+          `开局 ${options.armor ?? identity.state.armorOptions?.[0] ?? ""}`);
+      }
+      if (sub === "choose") return send({ cmd: "choose", index: options.index }, `选择波次 ${options.index}`);
+      if (sub === "retry") return send({ cmd: "retryPost" }, "重试接取");
+      if (sub === "stop") return send({ cmd: "stop" }, "停止本局");
+      if (sub === "route") {
+        const route = words[2];
+        if (route !== "inPlace" && route !== "reentry") throw usage("run route 需要 inPlace 或 reentry");
+        return send({ cmd: "setRoute", route }, `路线 ${route}`);
+      }
+      throw usage(`未知 run 子命令：${fmt(sub)}`);
+    }
+    case "test": {
+      const identity = await captureIdentity(baseUrl, timeoutMs);
+      if (sub === "invincible") {
+        const value = words[2];
+        if (value !== "on" && value !== "off") throw usage("test invincible 需要 on 或 off");
+        const { id, receipt } = await submit(baseUrl, { cmd: "setInvincible", value: value === "on" },
+          { identity, timeoutMs, receiptTimeoutMs });
+        output.progress(`回执 ${id}: ${receipt.status}`);
+        requireReceipt(receipt);
+        output.result({ ok: true, invincible: value === "on", receipt },
+          () => `无敌 ${value === "on" ? "已开" : "已关"}：${receipt.message ?? ""}`);
+        return EXIT.OK;
+      }
+      if (sub === "kill-all") {
+        // killAll is acknowledged as queued; the native kill happens on a later frame.
+        // Waiting for a second receipt never terminates, so require an observable
+        // post-condition instead of claiming success from the queue ack.
+        const { id, receipt } = await submit(baseUrl, { cmd: "killAll" },
+          { identity, timeoutMs, receiptTimeoutMs });
+        output.progress(`回执 ${id}: ${receipt.status}`);
+        requireReceipt(receipt);
+        const deadline = Date.now() + 10000;
+        let last = identity.state;
+        while (Date.now() < deadline) {
+          await sleep(250);
+          const state = await snapshot();
+          last = state;
+          const enemies = state.enemies ?? [];
+          if (enemies.length > 0 && enemies.every((enemy) => enemy.dead || enemy.captured)) break;
+        }
+        const enemies = last.enemies ?? [];
+        const allDown = enemies.length > 0 && enemies.every((enemy) => enemy.dead || enemy.captured);
+        output.result({ ok: allDown, receipt, enemies: enemies.map((enemy) => ({ uid: enemy.uid, dead: enemy.dead, captured: enemy.captured })) },
+          (value) => `击杀请求已执行；在场 ${value.enemies.length} 只，${allDown ? "全部死亡/捕获" : "仍有存活"}`);
+        return allDown ? EXIT.OK : EXIT.TIMEOUT;
+      }
+      throw usage(`未知 test 子命令：${fmt(sub)}`);
+    }
+    case "config": {
+      if (sub === "get") {
+        const identity = await captureIdentity(baseUrl, timeoutMs);
+        const { receipt } = await submit(baseUrl, { cmd: "getConfig" }, { identity, timeoutMs, receiptTimeoutMs });
+        requireReceipt(receipt);
+        output.result({ ok: true, configVersion: receipt.configVersion, config: receipt.config,
+          activeRules: receipt.activeRules }, (value) => JSON.stringify(value.config, null, 2));
+        return EXIT.OK;
+      }
+      if (sub === "validate") {
+        if (!options.file) throw usage("config validate 需要 --file");
+        const raw = readJsonFile(options.file);
+        const validator = createValidator(ROOT);
+        const config = await validator.validate(raw);
+        output.result({ ok: true, path: resolve(options.file), quest: config.quest,
+          armorOptions: config.armorOptions }, (value) => `本地校验通过：${value.path}（任务 ${value.quest.id}）`);
+        return EXIT.OK;
+      }
+      if (sub === "submit") {
+        if (!options.file) throw usage("config submit 需要 --file");
+        if (!Number.isInteger(options.version)) throw usage("config submit 需要 --version <当前版本>（来自 config get / state）");
+        const raw = readJsonFile(options.file);
+        const validator = createValidator(ROOT);
+        await validator.validate(raw); // local shape check first; Lua still re-validates
+        const identity = await captureIdentity(baseUrl, timeoutMs);
+        if (identity.configVersion !== options.version) {
+          throw rejected(`配置版本已变化（${identity.configVersion} ≠ ${options.version}）：请重新载入后再合并`);
+        }
+        const { id, receipt } = await submit(baseUrl, { cmd: "submitConfig", config: raw,
+          configVersion: options.version }, { identity, timeoutMs, receiptTimeoutMs });
+        output.progress(`回执 ${id}: ${receipt.status}`);
+        requireReceipt(receipt);
+        output.result({ ok: true, receipt }, () => `已提交：v${receipt.configVersion} ${receipt.message ?? ""}`);
+        return EXIT.OK;
+      }
+      throw usage(`未知 config 子命令：${fmt(sub)}`);
+    }
+    case "wait": {
+      const conditions = buildWaitConditions(options, words.slice(1));
+      const deadline = Date.now() + (options.timeout ?? 120) * 1000;
+      const startedBridge = (await readState(baseUrl, { timeoutMs })).state?.bridgeId ?? null;
+      let last = null;
+      while (Date.now() < deadline) {
+        const state = await snapshot();
+        last = state;
+        if (startedBridge && state.bridgeId !== startedBridge) {
+          throw rejected(`等待期间脚本会话变化（${startedBridge} → ${state.bridgeId}）：旧条件已失效`);
+        }
+        const unmet = conditions.filter((condition) => !condition.test(state));
+        if (unmet.length === 0) {
+          output.result({ ok: true, waitedMs: Date.now() - (deadline - (options.timeout ?? 120) * 1000),
+            state: summarise(state) }, (value) => `满足：${value.waitedMs}ms 内条件成立`);
+          return EXIT.OK;
+        }
+        await sleep(500);
+      }
+      const unmet = conditions.filter((condition) => !condition.test(last));
+      throw new CliError(EXIT.TIMEOUT,
+        `等待超时，未满足：${unmet.map((c) => c.label).join("；")}`,
+        { last: summarise(last), unmet: unmet.map((c) => c.label) });
+    }
+    case "scenario":
+      if (sub === "run") {
+        const file = words[2];
+        if (!file) throw usage("scenario run 需要场景文件路径");
+        const { runScenario } = await import("./lib/scenario.mjs");
+        return runScenario({ baseUrl, file: resolve(file), options, output, root: ROOT });
+      }
+      throw usage(`未知 scenario 子命令：${fmt(sub)}`);
+    default:
+      throw usage(`未知命令：${group}`);
+  }
+}
+
+function summarise(state) {
+  if (!state) return null;
+  return {
+    bridgeId: state.bridgeId, sessionStage: state.sessionStage, corePhase: state.corePhase,
+    layer: state.layer, pt: state.pt, questUnique: state.questUnique,
+    waveToken: state.preparation?.waveToken ?? null,
+    enemies: (state.enemies ?? []).map((e) => ({ uid: e.uid, dead: e.dead, captured: e.captured })),
+    shopAvailable: state.shopAvailable ?? null,
+  };
+}
+
+/** --stage/--layer/... map to explicit predicates; unknown options are rejected above. */
+function buildWaitConditions(options, trailing) {
+  const conditions = [];
+  if (options.stage) conditions.push({ label: `stage=${options.stage}`,
+    test: (s) => s.sessionStage === options.stage });
+  if (Number.isFinite(options.layer)) conditions.push({ label: `layer=${options.layer}`,
+    test: (s) => s.layer === options.layer });
+  if (Number.isFinite(options.questUnique)) conditions.push({ label: `questUnique=${options.questUnique}`,
+    test: (s) => s.questUnique === options.questUnique });
+  if (Number.isFinite(options.waveToken)) conditions.push({ label: `waveToken=${options.waveToken}`,
+    test: (s) => (s.preparation?.waveToken ?? null) === options.waveToken });
+  for (const uid of options.uidAlive) conditions.push({ label: `uid ${uid} alive`,
+    test: (s) => (s.enemies ?? []).some((e) => e.uid === uid && !e.dead && !e.captured) });
+  for (const uid of options.uidDead) conditions.push({ label: `uid ${uid} dead`,
+    test: (s) => (s.enemies ?? []).some((e) => e.uid === uid && (e.dead || e.captured)) });
+  if (options.shop) conditions.push({ label: "shopAvailable", test: (s) => s.shopAvailable === true });
+  if (conditions.length === 0) throw usage(`wait 需要至少一个条件（--stage/--layer/--uid-alive/--uid-dead/--shop）`);
+  return conditions;
+}
+
+// Output must exist before main() so a thrown CliError still prints a JSON body.
+// Exit through process.exitCode rather than process.exit(): the game endpoint is a
+// Windows socket and libuv aborts when handles are torn down mid-close.
+const early = parseArgsSafely(process.argv.slice(2));
+process.exitCode = await runMain(main, createOutput({ json: early }));
+
+function parseArgsSafely(argv) {
+  try { return parseArgs(argv).options.json; } catch { return argv.includes("--json"); }
+}

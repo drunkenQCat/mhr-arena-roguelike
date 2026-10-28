@@ -1,0 +1,7 @@
+{
+  "name": "contract-fail",
+  "timeoutSeconds": 5,
+  "steps": [
+    { "name": "不存在的条件", "kind": "assert", "expect": "sessionStage=Combat" }
+  ]
+}
