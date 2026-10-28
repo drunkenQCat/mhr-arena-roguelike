@@ -6,12 +6,19 @@
 //   因此所有文件操作路径不抛异常（ifstream 失败只返回空）。
 #pragma once
 
+// winsock2.h 必须先于 Windows.h（否则 winsock.h 旧版被拉入导致 sockaddr 重定义）
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <Windows.h>
+
 #include <atomic>
 #include <chrono>
+#include <deque>
+#include <fstream>
+#include <mutex>
+#include <sstream>
 #include <string>
 #include <thread>
-
-#include <Windows.h>
 
 namespace webconsole {
 

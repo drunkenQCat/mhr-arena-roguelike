@@ -2,6 +2,7 @@
 // 业务操作（游戏对象读写）不在这里——全部由 Lua 控制层经文件信箱执行。
 #include "common.h"
 #include "http_server.h"
+#include "../reframework/API.h"
 
 #include <filesystem>
 
@@ -15,7 +16,10 @@ extern "C" __declspec(dllexport) void reframework_plugin_required_version(REFram
 
 extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFrameworkPluginInitializeParam* param) {
     if (!param || !param->functions) return false;
-    log_sink = param->functions->log_info;
+    // 安装版（5bae4701）的 log_info 为 varargs 签名；桥侧 log_sink 为定参指针，
+    // 通过转发包装对齐（调用只传单参，合法）。
+    static void (*const sink)(const char*) = [](const char* msg) { param->functions->log_info("%s", msg); };
+    webconsole::log_sink = sink;
 
     // 数据目录 = <game>/reframework/data（与 json.dump_file 的落点一致）
     char exe_dir[MAX_PATH] = {};

@@ -5,6 +5,21 @@ import type { NativeRuntime } from "./native_runtime";
 import type { ShopWindow } from "./shop_window";
 import { clockSeconds, refFs, rejson } from "./sdk";
 
+/**
+ * 原生内存桥（webconsole_bridge.dll，Lua C 模块）。
+ * TSTL 编译为 require("webconsole_bridge")：bundle shim 未命中时 fallback 到
+ * 宿主 require → package.cpath（autorun/?.dll）→ 本 DLL 的 luaopen。
+ * 符号安全：DLL 内静态编译与 REFramework 同源（5bae4701）的 Lua 5.4.3 实现，
+ * 操作宿主传入的 lua_State 属同源 ABI（spike 待实机 ping 验证）。
+ */
+declare const webconsole_bridge: {
+    ping(s: string): string;
+    take_commands(maxCount: number): string[];
+    publish_state(json: string): void;
+    publish_results(json: string): void;
+    begin_session(epoch: number): number;
+};
+
 interface Command {
   id?: string; bridgeId?: string; cmd?: string; armor?: string; index?: number;
   value?: boolean; itemId?: string; route?: string; config?: unknown;
@@ -30,7 +45,19 @@ export class WebConsoleBridge {
     rejson.dump_file("webconsole_state.json", { ok: false, closed: true, bridgeId: this.bridgeId }, 0);
   }
 
+  private selfTestDone = false;
+
   tick(): void {
+    if (!this.selfTestDone) {
+      this.selfTestDone = true;
+      // DLL↔Lua 互通自检：ping 原样返回 = 符号解析与调用约定成立。结果落盘供验收核对。
+      try {
+        const echo = webconsole_bridge.ping("webconsole-selftest");
+        refFs.write("webconsole_ping.json", JSON.stringify({ ok: echo === "webconsole-selftest", echo }, null, 2));
+      } catch (e) {
+        refFs.write("webconsole_ping.json", JSON.stringify({ ok: false, error: String(e) }, null, 2));
+      }
+    }
     if (this.closed) return;
     try {
       if (this.purchase && this.shop.transactionVersion > this.purchase.version && this.shop.lastTransaction) {

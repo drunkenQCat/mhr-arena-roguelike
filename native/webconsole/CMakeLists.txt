@@ -2,6 +2,7 @@
 # - lua54：Lua 5.4.3 静态库（与 REFramework dependencies/lua 同源同版本），
 #   排除 lua.c（解释器入口）与 luac.c（编译器入口）
 # - webconsole：REFramework 插件 DLL（同时导出 luaopen_webconsole 供 Lua require）
+# - webconsole_test：独立测试 exe（游戏外复现全部端点行为；不含 REFramework 插件入口）
 # 运行库：/MT（静态 CRT）——插件不依赖 VC Redist，与宿主 CRT 隔离
 cmake_minimum_required(VERSION 3.20)
 project(webconsole LANGUAGES C CXX)
@@ -20,7 +21,6 @@ list(FILTER LUA_SOURCES EXCLUDE REGEX "/lua\\.c$|/luac\\.c$")
 add_library(lua54 STATIC ${LUA_SOURCES})
 target_include_directories(lua54 PUBLIC ${LUA_DIR})
 target_compile_definitions(lua54 PRIVATE LUA_LIB)
-# Lua 5.4 在 MSVC 下需要对齐的编译配置；不启用 HOST 相关扩展
 target_compile_options(lua54 PRIVATE /W3)
 
 # ---- webconsole 插件 DLL（REFramework 插件入口 + Lua C 模块）----
@@ -34,18 +34,6 @@ target_include_directories(webconsole PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 target_link_libraries(webconsole PRIVATE lua54 ws2_32.lib crypt32.lib)
-
-# ---- 独立测试 exe（游戏外复现全部端点行为；不含 REFramework 插件入口） ----
-add_executable(webconsole_test
-    src/http_server.cpp
-    src/standalone_main.cpp
-)
-target_include_directories(webconsole_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}
-)
-target_compile_definitions(webconsole_test PRIVATE WEBCONSOLE_STANDALONE)
-target_link_libraries(webconsole_test PRIVATE lua54 ws2_32.lib crypt32.lib)
 
 # ---- 独立测试 exe（游戏外复现全部端点行为；不含 REFramework 插件入口） ----
 add_executable(webconsole_test

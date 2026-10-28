@@ -3,6 +3,8 @@
 // 匹配路径，曾触发未捕获 regex_error 导致进程 terminate（实机崩溃教训）。
 #include "http_server.h"
 
+#include "httplib.h"
+
 #include <sstream>
 
 namespace webconsole {
