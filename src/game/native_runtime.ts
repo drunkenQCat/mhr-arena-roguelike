@@ -71,6 +71,8 @@ export class NativeRuntime implements SessionPort {
   takeDeaths(): DeathReading[] { const events = this.deaths; this.deaths = []; return events; }
   shutdown(): void { this.testTools.shutdown(); this.policy(null, false); this.transport.cancel(); }
 
+  now(): number { return clockSeconds(); }
+
   read(): RuntimeReading {
     const time = clockSeconds();
     const qm = questManager();

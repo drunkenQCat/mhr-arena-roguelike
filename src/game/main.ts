@@ -20,8 +20,8 @@ try {
   const installer = new QuestInstaller(config, initial);
   const runtime = new NativeRuntime(config, installer);
   const session = new RunSession(core, monsterCatalog, runtime);
-  const shopWindow = new ShopWindow(session.core, () => session.stage === "Selecting", () => session.shopQuest());
-const webConsole = new WebConsoleBridge(session, runtime, shopWindow);
+  const shopWindow = new ShopWindow(session.core, () => session.canShop(), () => session.shopQuest());
+  const webConsole = new WebConsoleBridge(session, runtime, shopWindow);
   reframework.onFrame(() => {
     try { runtime.tick(); shopWindow.tick(); session.tick(); }
     catch (error) {
@@ -32,7 +32,7 @@ const webConsole = new WebConsoleBridge(session, runtime, shopWindow);
     }
   });
   reframework.onDrawUi(() => drawHud(session, runtime, shopWindow));
-reframework.onFrame(() => webConsole.tick());
+  reframework.onFrame(() => webConsole.tick());
   reframework.onFrame(() => {
     try { shopWindow.draw(); }
     catch (error) { relog.error(`[MhwRogue] shop window: ${String(error)}`); }

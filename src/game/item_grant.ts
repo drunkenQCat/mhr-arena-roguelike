@@ -86,7 +86,7 @@ export function grantItem(shopItemId: string, count: number, context?: TradeQues
     relog.warn(`[MhwRogue] 无 ${shopItemId} 的游戏道具 ID 映射`);
     return base;
   }
-  if (!Number.isInteger(count) || count !== 1) return base;
+  if (!Number.isInteger(count) || count < 1) return base;
   const pouch = itemPouch();
   if (!pouch) {
     relog.warn("[MhwRogue] DataManager/_ItemPouch 不可用（未进村？）");
@@ -107,5 +107,80 @@ export function grantItem(shopItemId: string, count: number, context?: TradeQues
     const after = pouchCount(shopItemId);
     return { ...base, before, after, granted: after - before === count,
       uncertain: after !== before && after - before !== count };
+  } catch { return { ...base, before, uncertain: true }; }
+}
+
+/**
+ * 补满发货（V1.3 fill 模式：一次付款补到携带上限）。
+ * 文档 §5.1 规则：算缺口 → 一次原生添加 → 读回实际增量 → 由调用方提交 PT。
+ * 上限来源是运行时 ItemInventoryData.getRemainingCount()（当前容量语义），
+ * 不使用配置常量——Rise 的上限以游戏内为准（design doc §5.1）。
+ *
+ * granted = 实际增量 === 请求缺口；uncertain = 增量为正但不足（部分添加，绝不重试）；
+ * full = 已满（delta 为 0 且调用前就是满）——调用方应视作"无需交易"而非失败。
+ */
+export interface FillReport extends GrantReport {
+  full: boolean;
+  gap: number;
+}
+
+export function grantFill(shopItemId: string, cap: number, context?: TradeQuest): FillReport {
+  const gameId = gameIdOf(shopItemId);
+  const gameName = gameNameOf(shopItemId) ?? shopItemId;
+  const base: FillReport = { shopItemId, gameName, requested: 0, granted: false, full: false, gap: 0, method: ADD_ITEM };
+  if (gameId === null) {
+    relog.warn(`[MhwRogue] 无 ${shopItemId} 的游戏道具 ID 映射`);
+    return base;
+  }
+  if (!Number.isInteger(cap) || cap < 1) return { ...base, reason: "Invalid configured cap" };
+  const pouch = itemPouch();
+  if (!pouch) {
+    relog.warn("[MhwRogue] DataManager/_ItemPouch 不可用（未进村？）");
+    return base;
+  }
+  let slot: REManagedObject | null = null;
+  let before: number;
+  try {
+    if (!pouch.get_type_definition().get_method(ADD_ITEM)) {
+      return { ...base, reason: "Required two-argument native overload is unavailable" };
+    }
+    if (!canTrade(context)) return base;
+    if (pouch.call("canAddItem", gameId) !== true) {
+      // canAddItem false = 袋已无法容纳该物品（满/格子不足）。区分"已满"与"无空格"需要读槽：
+      slot = pouch.call("findInventoryData", gameId) as REManagedObject | null;
+      const current = slot ? slot.call("get_Count") as number : 0;
+      if (slot && (slot.call("isFull") as boolean)) {
+        return { ...base, before: current, after: current, full: true, gap: 0 };
+      }
+      return { ...base, before: current, reason: "canAddItem=false and slot not full (no free slot?)" };
+    }
+    before = pouchCount(shopItemId);
+    // 缺口以运行时 remaining 为准；cap 只作上界（RemainingCount 语义为"还能再加多少"）
+    slot = pouch.call("findInventoryData", gameId) as REManagedObject | null;
+    if (slot) {
+      const remaining = slot.call("getRemainingCount") as number;
+      if (!Number.isInteger(remaining) || remaining < 0) {
+        return { ...base, before, reason: "Invalid getRemainingCount result" };
+      }
+      base.gap = Math.min(cap - before, remaining);
+    } else {
+      // 尚无该物品的槽：无 remaining 可读，用配置 cap 作为缺口（新槽默认从 0 开始）
+      base.gap = cap;
+    }
+    if (base.gap <= 0) {
+      return { ...base, before, after: before, full: true, gap: 0 };
+    }
+    base.requested = base.gap;
+  } catch (error) {
+    relog.error(`[MhwRogue] fill precheck failed ${gameName}: ${String(error)}`);
+    return base;
+  }
+  try { pouch.call(ADD_ITEM, gameId, base.gap); }
+  catch (error) { relog.error(`[MhwRogue] native fill threw; checking delivery: ${String(error)}`); }
+  try {
+    const after = pouchCount(shopItemId);
+    const delta = after - before;
+    return { ...base, before, after, granted: delta === base.gap,
+      uncertain: delta > 0 && delta !== base.gap };
   } catch { return { ...base, before, uncertain: true }; }
 }

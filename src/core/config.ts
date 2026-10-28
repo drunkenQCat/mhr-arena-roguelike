@@ -71,6 +71,7 @@ export interface QuestSpec {
 }
 
 export interface RogueConfig {
+  simultaneousBalance?: { reward: number; hp: number; damage: number };
   startPt: number;
   maxCarts: number;
   cartRestorePrice: number;
@@ -134,6 +135,12 @@ export function validateConfig(raw: unknown): RogueConfig {
   };
 
   const c = object(normalized, "root");
+  if (c.simultaneousBalance !== undefined) {
+    const balance = object(c.simultaneousBalance, "simultaneousBalance");
+    for (const key of ["reward", "hp", "damage"]) {
+      if (number(balance[key], `simultaneousBalance.${key}`, 0) === 0) fail(`simultaneousBalance.${key}`);
+    }
+  }
   number(c.startPt, "startPt", 0, true);
   number(c.maxCarts, "maxCarts", 1, true);
   number(c.cartRestorePrice, "cartRestorePrice", 0, true);
@@ -210,7 +217,10 @@ export function validateConfig(raw: unknown): RogueConfig {
     if (from !== nextLayer) fail(`${path}.from (gap or overlap)`);
     nextLayer = to + 1;
     if (!["low", "mid", "adv", "ultimate"].includes(pool.tier as string)) fail(`${path}.tier`);
+    if (pool.weak == null && pool.tier === "ultimate") pool.weak = [];
     strings(pool.weak, `${path}.weak`, pool.tier !== "ultimate");
+    if (pool.strong === undefined) pool.strong = null;
+    if (pool.ultimate === undefined) pool.ultimate = null;
     const strong = pool.strong === null ? [] : strings(pool.strong, `${path}.strong`);
     const ultimate = pool.ultimate === null ? [] : strings(pool.ultimate, `${path}.ultimate`);
     const types = strings(pool.types, `${path}.types`, true);

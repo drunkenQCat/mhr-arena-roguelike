@@ -61,6 +61,27 @@ function setup(route: "reentry" | "inPlace" = "reentry") {
 }
 
 describe("real-event session", () => {
+  it("samples idle position changes with the same clock gate used for progression", () => {
+    const { session, game, tick } = setup();
+    let reads = 0;
+    game.read = () => { reads++; return game.reading; };
+    Object.assign(game, { now: () => game.reading.time });
+    tick(); expect(reads).toBe(1);
+    session.tick(); session.tick(); expect(reads).toBe(1);
+    game.reading.players[0]!.position.x = 75;
+    tick(); expect(session.readingSnapshot!.players[0]!.position.x).toBe(75);
+    expect(reads).toBe(2);
+  });
+
+  it("does not capture an uninitialised origin as camp and reports a bounded entry failure", () => {
+    const { session, game, tick, start, config } = setup();
+    start();
+    game.reading.quest = { id: config.quest.id, unique: 7, playing: true, status: "play" };
+    game.reading.players[0]!.position = { x: 0, y: 0, z: 0 };
+    tick(); expect(session.stage).toBe("AwaitQuest"); expect(session.preparation().camp).toBe(null);
+    tick(21); expect(session.stage).toBe("Fault"); expect(session.message).toContain("位置");
+  });
+
   it("waits for every expected monster across empty spawn gaps and rewards exactly once", () => {
     const { core, game, session, tick, start, enter } = setup();
     start(true); enter();

@@ -263,7 +263,8 @@ export class RunCore {
       }
       const baseRewardMul = this.config.typeRewardMul[type as RewardType];
       const mode = composed.monsters.length === 1 ? "single" : requestedMode === "single" ? "sequential" : requestedMode;
-      const rewardMul = baseRewardMul * (mode === "simultaneous" ? SIMULTANEOUS_BALANCE.reward : 1);
+      const balance = this.config.simultaneousBalance ?? SIMULTANEOUS_BALANCE;
+      const rewardMul = baseRewardMul * (mode === "simultaneous" ? balance.reward : 1);
       const pt = sum * rewardMul;
       const modeLabel = mode === "single" ? "Single" : mode === "sequential" ? "Sequential" : "Simultaneous";
       opts.push({
@@ -274,8 +275,8 @@ export class RunCore {
         monsters: composed.monsters,
         tier: composed.tier,
         rewardMul,
-        hpMul: mode === "simultaneous" ? Math.round(hp * SIMULTANEOUS_BALANCE.hp * 10000) / 10000 : hp,
-        dmgMul: mode === "simultaneous" ? Math.round(dmg * SIMULTANEOUS_BALANCE.damage * 10000) / 10000 : dmg,
+        hpMul: mode === "simultaneous" ? Math.round(hp * balance.hp * 10000) / 10000 : hp,
+        dmgMul: mode === "simultaneous" ? Math.round(dmg * balance.damage * 10000) / 10000 : dmg,
         rewardPt: Math.trunc(pt),
       });
     }

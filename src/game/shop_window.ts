@@ -1,8 +1,14 @@
-/** M3 prototype: single-item purchases, native readback, frame-queued mutations. */
-import type { RunCore } from "../core/run_core";
+/** M3 商店窗口：单件 + 补满 + 猫车恢复；读回验证、事务日志、失败恢复。 */
+import type { RunCore, ShopEntry } from "../core/run_core";
 import { replaceOrAdd } from "../core/run_state";
-import { canTrade, grantItem, pouchCount, type TradeQuest } from "./item_grant";
-import { imguiApi, rejson } from "./sdk";
+import { canTrade, grantFill, grantItem, pouchCount, type TradeQuest } from "./item_grant";
+import { restoreNativeCart } from "./native_cart";
+import { clockSeconds, imguiApi, rejson } from "./sdk";
+
+type Pending =
+  | { kind: "item"; id: string }
+  | { kind: "fill"; id: string }
+  | { kind: "cartRestore" };
 
 export class ShopWindow
 {
@@ -10,65 +16,153 @@ export class ShopWindow
   private _notice: string | null = null;
   get notice(): string | null { return this._notice; }
   private set notice(v: string | null) { this._notice = v; }
-  private pending: string | null = null;
+  private pending: Pending | null = null;
   private unresolved = false;
   private visible = false;
   private wasSelecting = false;
+  private catalogueAt = -1;
+  private catalogueKey = "";
+  private catalogueConfig: RunCore["config"] | null = null;
+  private cachedCatalogue: { available: boolean; reason: string | null; categories: Record<string, ShopEntry[]> } | null = null;
+  transactionVersion = 0;
+  lastTransaction: { status: string; message: string } | null = null;
+
+  private complete(status: string, message: string): void {
+    this.transactionVersion++;
+    this.lastTransaction = { status, message };
+  }
 
   constructor(private readonly core: RunCore, private readonly selecting: () => boolean,
     private readonly questContext: () => TradeQuest | undefined = () => undefined) {}
 
   get busy(): boolean { return this.pending !== null || this.unresolved; }
 
+  /** One source of truth for native UI, web UI and purchase validation. No phase cache. */
+  catalogue(fresh = false): { available: boolean; reason: string | null; categories: Record<string, ShopEntry[]> } {
+    const now = clockSeconds(), selecting = this.selecting();
+    const key = `${this.core.state.phase}:${this.core.state.layer}:${this.core.state.wallet.pt}:${this.busy}:${selecting}:${this.core.state.cartsLeft}`;
+    if (!fresh && this.cachedCatalogue && this.catalogueAt === now && this.catalogueKey === key && this.catalogueConfig === this.core.config)
+      return this.cachedCatalogue;
+    const available = selecting && !this.busy && canTrade(this.questContext());
+    const reason = this.busy ? "交易处理中或结果待核实" : !this.selecting()
+      ? "清波后返回集结点，等待进入整备阶段" : !available ? "等待单人任务和原生发货条件就绪" : null;
+    const unreadable: string[] = [];
+    for (const item of this.core.config.shop) if (item.mode !== "service") {
+      try {
+        const owned = pouchCount(item.id);
+        this.core.state.wallet.bag = replaceOrAdd(this.core.state.wallet.bag, item.id, owned);
+      } catch { unreadable.push(item.id); }
+    }
+    const categories = this.core.getShop();
+    for (const category of Object.keys(categories)) for (const item of categories[category]!) {
+      // service 现开放猫车恢复；抽取/单轮增益等仍需游戏效果接线（design doc §5.3/§4.2）
+      const serviceOpen = item.id === "cart_restore";
+      if (item.mode === "service" && !serviceOpen) { item.canBuy = false; item.reason = "游戏效果接线完成前暂不开放"; continue; }
+      if (unreadable.includes(item.id)) { item.canBuy = false; item.reason = "道具映射或背包尚未就绪"; }
+      if (!available) { item.canBuy = false; item.reason = reason; }
+    }
+    this.catalogueAt = now; this.catalogueKey = key; this.catalogueConfig = this.core.config;
+    this.cachedCatalogue = { available, reason, categories };
+    return this.cachedCatalogue;
+  }
+
   /** 网页/脚本购买入口：走与点击相同的 pending→tick 执行路径与全部校验。 */
   requestPurchase(id: string): { ok: boolean; message: string }
   {
     if (this.busy) return { ok: false, message: "商店交易进行中" };
+    const listing = this.catalogue(true);
+    const entry = Object.keys(listing.categories).map((key) => listing.categories[key]!)
+      .reduce((all, items) => all.concat(items), [] as ShopEntry[]).find((item) => item.id === id);
+    if (!entry?.canBuy) return { ok: false, message: entry?.reason ?? listing.reason ?? "无此商品" };
     const item = this.core.config.shop.find((entry) => entry.id === id);
     if (!item) return { ok: false, message: "无此商品" };
-    if (item.mode !== "perUnit") return { ok: false, message: "补满与服务类暂未开放购买" };
     const pt = this.core.state.wallet.pt;
     if (pt < item.price) return { ok: false, message: `PT不足（需要 ${item.price}，持有 ${pt}）` };
-    this.pending = id;
+    if (item.mode === "fill") this.pending = { kind: "fill", id };
+    else if (item.id === "cart_restore") this.pending = { kind: "cartRestore" };
+    else this.pending = { kind: "item", id };
     return { ok: true, message: "queued" };
   }
 
   open(): void { if (this.selecting()) this.visible = true; }
 
+  private settle(ok: boolean, notice: string, snapshot?: { wallet: RunCore["state"]["wallet"]; log: string[]; cartsLeft: number }): void {
+    if (!ok && snapshot) {
+      // 未发货：恢复扣款与限购记录（Core.buy 已做的变更全部回滚）
+      this.core.state.wallet = snapshot.wallet;
+      this.core.state.log = snapshot.log;
+      this.core.state.cartsLeft = snapshot.cartsLeft;
+    }
+    this.notice = notice;
+    this.complete(this.unresolved ? "uncertain" : ok ? "applied" : "rejected", notice);
+    try { rejson.dump_file("mhw_rogue_shop_transaction.json",
+      { notice, pt: this.core.state.wallet.pt, unresolved: this.unresolved }, 2); } catch { /* Diagnostic only. */ }
+  }
+
   tick(): void {
-    const id = this.pending;
+    const req = this.pending;
     this.pending = null;
-    if (!id || this.unresolved) return;
+    if (req) this.catalogueAt = -1;
+    if (!req || this.unresolved) return;
+    let debited = false;
     try {
       const context = this.questContext();
-      if (!this.selecting() || !canTrade(context)) throw new Error("Shop requires solo preparation or cleared arena between waves");
-      const item = this.core.config.shop.find((entry) => entry.id === id);
-      if (!item || item.mode !== "perUnit") throw new Error("Fill/services are awaiting game integration");
-      const owned = pouchCount(id);
-      this.core.state.wallet = { ...this.core.state.wallet,
-        bag: replaceOrAdd(this.core.state.wallet.bag, id, owned) };
-      const wallet = this.core.state.wallet;
-      const log = this.core.state.log.slice();
-      const result = this.core.buy(id);
-      if (!result.ok) { this.notice = result.message; return; }
-      let report;
-      try { report = grantItem(id, 1, context); }
-      catch { report = { granted: false, uncertain: true, gameName: id }; }
-      if (report.granted) this.notice = `已购买 ${report.gameName} ×1（${report.before} → ${report.after}）`;
-      else if (report.uncertain) {
-        this.unresolved = true;
-        this.notice = "发货结果不明：PT 已预扣、商店已锁定，请先查交易日志再重试。";
-      } else {
-        this.core.state.wallet = wallet;
-        this.core.state.log = log;
-        this.notice = "未发货；PT 与限购记录已恢复。";
+      if (!this.selecting() || !canTrade(context)) throw new Error("需要在村庄整备或清波后的斗技场波次间购买");
+      const item = this.core.config.shop.find((entry) => entry.id === (req.kind === "cartRestore" ? "cart_restore" : req.id));
+      if (!item) throw new Error("无此商品");
+      if (req.kind !== "cartRestore") {
+        const owned = pouchCount(req.id);
+        this.core.state.wallet = { ...this.core.state.wallet,
+          bag: replaceOrAdd(this.core.state.wallet.bag, req.id, owned) };
       }
-      rejson.dump_file("mhw_rogue_shop_transaction.json", { id, report, pt: this.core.state.wallet.pt,
-        unresolved: this.unresolved, message: this.notice }, 2);
+      // 快照用于"未发货即回滚扣款与限购"
+      const snapshot = { wallet: this.core.state.wallet, log: this.core.state.log.slice(), cartsLeft: this.core.state.cartsLeft };
+      const result = this.core.buy(item.id);
+      if (!result.ok) { this.notice = result.message; this.complete("rejected", result.message ?? "购买未完成"); return; }
+      debited = true;
+
+      if (req.kind === "item") {
+        const report = grantItem(req.id, 1, context);
+        if (report.granted) {
+          this.settle(true, `已购买 ${report.gameName} ×1（${report.before} → ${report.after}）`);
+        } else if (report.uncertain) {
+          this.unresolved = true;
+          this.settle(false, "发货结果不明：PT 已预扣、商店已锁定，请先查交易日志再重试。");
+        } else {
+          this.settle(false, `未发货（${report.reason ?? "原因未知"}）；PT 与限购记录已恢复。`, snapshot);
+        }
+        return;
+      }
+
+      if (req.kind === "fill") {
+        const report = grantFill(req.id, item.cap, context);
+        if (report.granted) {
+          this.settle(true, `已补满 ${report.gameName}（${report.before} → ${report.after}，补 ${report.gap}）`);
+        } else if (report.full) {
+          this.settle(false, `${report.gameName} 已是满的；PT 未扣（Core 记录已回滚）。`, snapshot);
+        } else if (report.uncertain) {
+          this.unresolved = true;
+          this.settle(false, "补满结果不明：PT 已预扣、商店已锁定，请先查交易日志再重试。");
+        } else {
+          this.settle(false, `补满未完成（${report.reason ?? "原因未知"}）；PT 与限购记录已恢复。`, snapshot);
+        }
+        return;
+      }
+
+      // cartRestore：Core 记账 + 原生计数对齐（design doc §5.2）
+      const native = restoreNativeCart();
+      if (native.ok) {
+        this.settle(true, `猫车恢复完成：原生死亡计数 ${native.before} → ${native.after}，剩余猫车 ${this.core.state.cartsLeft}/${this.core.config.maxCarts}`);
+      } else {
+        this.settle(false, `猫车恢复未完成（${native.reason ?? "原因未知"}）；PT 与限购记录已恢复。`, snapshot);
+      }
     } catch (error) {
-      this.notice = String(error);
-      rejson.dump_file("mhw_rogue_shop_transaction.json", { id, blocked: true,
-        message: this.notice, pt: this.core.state.wallet.pt }, 2);
+      // Once debited, an unexpected wrapper failure cannot prove the native mutation absent.
+      if (debited) this.unresolved = true;
+      this.notice = debited ? `交付结果待核实，禁止自动重试：${String(error)}` : String(error);
+      this.complete(debited ? "uncertain" : "rejected", this.notice);
+      try { rejson.dump_file("mhw_rogue_shop_transaction.json", { blocked: true,
+        message: this.notice, pt: this.core.state.wallet.pt }, 2); } catch { /* Diagnostic only. */ }
     }
   }
 
@@ -92,7 +186,7 @@ export class ShopWindow
     imguiApi.text("鼠标操作请保持 REFramework 菜单开启，主面板可以收起。");
     imguiApi.separator();
 
-    const shop = this.core.getShop();
+      const shop = this.catalogue().categories;
     const categories = Object.keys(shop);
     if (!this.category || !categories.includes(this.category)) this.category = categories[0] ?? "";
 
@@ -103,16 +197,16 @@ export class ShopWindow
       if (imguiApi.button(c === this.category ? `[${c}]` : c)) this.category = c;
     }
     imguiApi.separator();
-    imguiApi.text("村庄整备或单人斗技场波次间可购买单件；补满和服务暂未开放。");
+    imguiApi.text("单件直接购买；弹药/素材为补满（一次补到携带上限）；猫车恢复对齐原生计数。");
 
     const list = shop[this.category] ?? [];
     for (const e of list) {
-      let owned: number | null = null;
-      try { if (e.mode === "perUnit") owned = pouchCount(e.id); } catch { /* unavailable */ }
-      const enabled = !this.busy && this.selecting() && e.mode === "perUnit" && owned !== null &&
-        owned < e.cap && this.core.state.wallet.pt >= e.price && e.reason !== "全局限购已达";
-      const label = `${e.name}  ${e.price}PT  (${owned ?? "?"}/${e.cap})`;
-      if (imguiApi.button(enabled ? label : `${label} [unavailable]`) && enabled) this.pending = e.id;
+      const owned: number | null = e.mode === "service" ? null : e.owned;
+      const enabled = e.canBuy;
+      const label = e.mode === "service"
+        ? `${e.name}  ${e.price}PT`
+        : `${e.name}  ${e.price}PT  (${owned ?? "?"}/${e.cap}${e.mode === "fill" ? " 补满" : ""})`;
+      if (imguiApi.button(enabled ? label : `${label} [unavailable]`) && enabled) this.requestPurchase(e.id);
       imguiApi.same_line();
       imguiApi.text(e.desc ?? e.mode);
     }

@@ -1,6 +1,7 @@
 import { RunCore, fail, ok, type Result } from "./run_core";
 import { DEFAULT_RUNTIME, makeQuestPlan, type MonsterCatalog, type QuestPlan, type RuntimeSettings } from "./quest_plan";
 import type { WaveOption } from "./run_state";
+import type { RogueConfig } from "./config";
 
 export interface Position { x: number; y: number; z: number }
 export interface PlayerReading { id: number; position: Position }
@@ -19,6 +20,7 @@ export interface DeathReading { uid: number; typeId: number; kind: "kill" | "cap
 
 /** The session knows no REFramework globals. Tests drive the same event loop as the game. */
 export interface SessionPort {
+  now?(): number;
   ready(): boolean;
   read(): RuntimeReading;
   publish(plan: QuestPlan, inPlace: boolean): void;
@@ -34,6 +36,8 @@ export interface SessionPort {
 export type SessionStage = "Idle" | "Selecting" | "AwaitQuest" | "Combat" | "Carve" | "Returning" | "Finished" | "Fault";
 
 export class RunSession {
+  /** The same sampled reading drives both progression and the web console. */
+  readingSnapshot: RuntimeReading | null = null;
   stage: SessionStage = "Idle";
   message = "在村庄开始。M2 使用你当前的装备。";
   route: RuntimeSettings["route"];
@@ -41,6 +45,33 @@ export class RunSession {
   plan: QuestPlan | null = null;
   private token = 0;
   private lastPoll = -1;
+  private nextRunConfig: RogueConfig | null = null;
+
+  configForEditing(): RogueConfig { return this.nextRunConfig ?? this.core.config; }
+
+  validateConfigForSession(config: RogueConfig): void {
+    const old = this.core.config;
+    if (config.quest.id !== old.quest.id || config.quest.baseId !== old.quest.baseId || config.quest.mapNo !== old.quest.mapNo)
+      throw new Error("任务模板和地图需要重启脚本；控制台禁止热替换任务身份");
+    const names = Object.keys(this.catalog);
+    const known = names.concat(names.map((name) => this.catalog[name]!.cn ?? name));
+    for (const pool of config.pools) for (const name of pool.weak.concat(pool.strong ?? [], pool.ultimate ?? [])) {
+      if (!known.includes(name)) throw new Error(`怪物不在当前 Rise 目录中：${name}`);
+    }
+    for (const rule of config.unlockChain) {
+      if (!known.includes(rule.monster) || !known.includes(rule.requiresKilling)) throw new Error("解锁链包含未知怪物");
+    }
+  }
+
+  applyConfig(config: RogueConfig): void {
+    const old = this.core.config;
+    this.validateConfigForSession(config);
+    this.nextRunConfig = config;
+    const active = !["Idle", "Finished", "Fault"].includes(this.stage);
+    this.core.replaceConfig(active ? { ...config, maxCarts: old.maxCarts,
+      startPt: old.startPt, armorOptions: old.armorOptions, runtime: old.runtime,
+      cartRestorePrice: old.cartRestorePrice, cartRestoreLimit: old.cartRestoreLimit } : config);
+  }
   private requestedAt = 0;
   private progressAt = 0;
   private clearAt = 0;
@@ -51,6 +82,31 @@ export class RunSession {
 
   /** 当前任务实例号快照（状态发布用；null=未在任务中）。 */
   get questUniqueSnapshot(): number | null { return this.questUnique; }
+
+  preparation() {
+    const reading = this.readingSnapshot;
+    const players = (reading?.players ?? []).map((player) => ({ ...player,
+      campDistance: this.camp ? Math.sqrt((player.position.x - this.camp.x) ** 2 +
+        (player.position.y - this.camp.y) ** 2 + (player.position.z - this.camp.z) ** 2) : null }));
+    const gathered = this.roster.length > 0 && this.roster.every((id) =>
+      players.some((p) => p.id === id && p.campDistance !== null && p.campDistance <= this.settings.campRadius));
+    const remaining = this.stage === "Carve" ? Math.max(0, this.settings.carveSeconds - ((reading?.time ?? 0) - this.clearAt)) : 0;
+    return { camp: this.camp, radius: this.settings.campRadius, players, gathered,
+      carveRemaining: remaining,
+      dwellRemaining: this.campSince === null ? this.settings.campDwellSeconds :
+        Math.max(0, this.settings.campDwellSeconds - ((reading?.time ?? 0) - this.campSince)),
+      seen: this.seen.length, resolved: this.resolved.length,
+      expected: this.plan?.monsterIds.length ?? 0, waveToken: this.plan?.token ?? null };
+  }
+
+  canShop(): boolean {
+    if (this.stage !== "Selecting") return false;
+    const r = this.readingSnapshot;
+    if (!r || r.online) return false;
+    if (!r.quest) return r.canPost;
+    return r.quest.playing && r.quest.unique === this.questUnique &&
+      r.quest.id === this.plan?.questId && this.preparation().gathered;
+  }
 
   private lastDeaths = 0;
   private seen: EnemyReading[] = [];
@@ -84,6 +140,11 @@ export class RunSession {
       if (reading.quest !== null || !reading.canPost) return fail("请在村庄且未接任务的状态开始");
       if (!["Idle", "Finished", "Fault"].includes(this.stage)) return fail("会话已在进行中");
       if (this.core.state.phase !== "Idle" && this.core.state.phase !== "GameOver") this.core.abortRun("Starting a new session");
+      if (this.nextRunConfig) {
+        this.core.replaceConfig(this.nextRunConfig);
+        Object.assign(this.settings, this.core.config.runtime ?? DEFAULT_RUNTIME);
+        this.nextRunConfig = null;
+      }
       const result = this.core.startRun(armor);
       if (!result.ok) return result;
       this.testOnly = spike;
@@ -193,11 +254,14 @@ export class RunSession {
   }
 
   tick(): void {
-    if (["Idle", "Finished", "Fault"].includes(this.stage)) return;
     try {
+      const now = this.port.now?.();
+      if (now !== undefined && now - this.lastPoll < this.settings.pollSeconds) return;
       const reading = this.port.read();
       if (reading.time - this.lastPoll < this.settings.pollSeconds) return;
       this.lastPoll = reading.time;
+      this.readingSnapshot = reading;
+      if (["Idle", "Finished", "Fault"].includes(this.stage)) return;
       if (reading.online) { this.fault("Online session detected; native hooks released"); return; }
       const postError = this.port.postingError();
       if (postError) { this.fault(postError); return; }
@@ -223,7 +287,13 @@ export class RunSession {
       if (this.stage === "Selecting") return;
       if (this.stage === "AwaitQuest") {
         if (reading.quest && this.plan && reading.quest.id === this.plan.questId && reading.quest.playing) {
-          if (reading.players.length === 0) return;
+          // During entry the engine can expose an uninitialised origin for one sample.
+          if (reading.players.length === 0 || reading.players.some((p) =>
+            p.position.x === 0 && p.position.y === 0 && p.position.z === 0)) {
+            if (reading.time - this.requestedAt > this.settings.postTimeoutSeconds)
+              this.fault("玩家位置尚未初始化，无法记录集结点；请检查玩家采样接口");
+            return;
+          }
           this.questUnique = reading.quest.unique;
           this.camp = { ...reading.players[0]!.position };
           this.roster = reading.players.map((player) => player.id);
@@ -298,7 +368,11 @@ export class RunSession {
         }
       }
       if (this.stage === "Carve") this.checkCamp(reading);
-    } catch (error) { this.fault(error); }
+    } catch (error) {
+      const now = this.port.now?.();
+      if (now !== undefined) this.lastPoll = now;
+      this.fault(error);
+    }
   }
 
   private observe(reading: RuntimeReading): void {
@@ -355,6 +429,7 @@ export class RunSession {
   }
 
   private fault(error: unknown): Result {
+    if (this.stage === "Fault" && this.message === String(error)) return fail(this.message);
     this.stage = "Fault";
     this.message = String(error);
     this.port.policy(null, false);

@@ -56,7 +56,11 @@ describe("native delivery confirmation", () => {
     host.active = true; expect(grantItem("potion", 1).granted).toBe(false);
     host.active = false; host.online = true; expect(grantItem("potion", 1).granted).toBe(false);
     host.online = false; host.capacity = false; expect(grantItem("potion", 1).granted).toBe(false);
-    host.capacity = true; expect(grantItem("potion", 10).granted).toBe(false);
+    host.capacity = true;
+    // count>=1 现在是合法批量请求（fill 模式依赖它），只有非正整数被拒绝
+    expect(grantItem("potion", 0).granted).toBe(false);
+    expect(grantItem("potion", -3).granted).toBe(false);
+    expect(grantItem("potion", 1.5).granted).toBe(false);
     expect(host.writes).toBe(0);
   });
   it("marks unreadable results uncertain so callers cannot refund and retry blindly", () => {

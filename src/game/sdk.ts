@@ -23,6 +23,8 @@ interface RefLog {
 
 /** @noSelf */
 interface RefJson {
+  load_string(text: string): unknown;
+  dump_string(data: unknown, indent?: number): string;
   load_file(path: string): unknown;
   dump_file(path: string, data: unknown, indent?: number): boolean;
 }
@@ -81,6 +83,9 @@ declare const re: RefRe;
 declare const imgui: RefImgui;
 declare const thread: RefThread;
 declare const sdk: RefSdk;
+/** @noSelf */
+interface RefFs { read(path: string): string; write(path: string, text: string): void; }
+declare const fs: RefFs;
 
 /* ---------- RE Engine 类型（最小面，冒号语义） ---------- */
 
@@ -160,6 +165,7 @@ export const reframework = {
 
 export const relog = log;
 export const rejson = json;
+export const refFs = fs;
 export const imguiApi = imgui;
 
 /** Wall clock, rather than process CPU time, for spawn/post deadlines. */

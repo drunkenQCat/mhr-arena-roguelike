@@ -6,7 +6,7 @@ const mock = vi.hoisted(() => ({ click: false, selecting: true, village: true, c
   grant: vi.fn(), dumps: vi.fn(), begin: vi.fn(), end: vi.fn(), text: vi.fn() }));
 vi.mock("./item_grant", () => ({ canTrade: () => mock.village,
   pouchCount: () => mock.count, grantItem: mock.grant }));
-vi.mock("./sdk", () => ({ rejson: { dump_file: mock.dumps }, imguiApi: {
+vi.mock("./sdk", () => ({ clockSeconds: () => 0, rejson: { dump_file: mock.dumps }, imguiApi: {
   begin_window: mock.begin, end_window: mock.end,
   set_next_window_pos: () => {}, set_next_window_size: () => {},
   separator: () => {}, same_line: () => {}, text: mock.text,
@@ -69,10 +69,16 @@ describe("shop transaction", () => {
     const { shop, click } = fixture(); click(); mock.selecting = false; shop.tick();
     expect(mock.grant).not.toHaveBeenCalled();
   });
-  it("locks an unexpectedly throwing delivery instead of permitting a duplicate retry", () => {
+  it("locks an unexpected delivery exception after debit because the native result is unknown", () => {
     const { shop, click } = fixture(); mock.grant.mockImplementation(() => { throw new Error("unknown native state"); });
     click(); shop.tick(); click(); shop.tick();
     expect(shop.busy).toBe(true); expect(mock.grant).toHaveBeenCalledTimes(1);
+    expect(shop.lastTransaction?.status).toBe("uncertain");
+  });
+  it("locks unresolved when grant reports uncertain delivery", () => {
+    const { shop, click } = fixture(); mock.grant.mockReturnValue({ granted: false, uncertain: true, before: 2 });
+    click(); shop.tick();
+    expect(shop.busy).toBe(true);
   });
 });
 
