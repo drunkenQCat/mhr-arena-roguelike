@@ -6,3 +6,16 @@ reframework/logs/
 src/game/default_config.ts
 # 生成的 SDK（npm run build / npm run gen 随时可再生成）
 src/game/gen/
+
+# Frontend build output
+/console/dist/
+
+# Native compiler/linker output (source and build scripts remain tracked)
+*.dll
+*.obj
+*.exe
+*.map
+*.exp
+*.lib
+*.pdb
+*.ilk
