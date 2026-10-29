@@ -23,7 +23,7 @@
 
 namespace webconsole {
 
-inline constexpr const char* PLUGIN_VERSION = "0.3.2";
+inline constexpr const char* PLUGIN_VERSION = "0.3.4";
 inline unsigned short g_listen_port = 11777;
 
 // Process-wide DLL session id (pid + boot counter tail). Created at

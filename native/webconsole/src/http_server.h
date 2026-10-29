@@ -5,8 +5,6 @@
 
 #include "common.h"
 
-#include "httplib.h"
-
 namespace webconsole {
 
 void start_http_server();

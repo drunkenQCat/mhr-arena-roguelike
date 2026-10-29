@@ -1,4 +1,4 @@
-"""端到端验证：真实 webconsole.dll 里的 luaopen_webconsole 在真实 Lua 5.4 VM 中加载。
+"""导出/装载检查：不操作宿主 Lua state，不构成游戏内 ABI 或 GC 验收。
 
 做法：lupa 的 LuaRuntime 自带一份 Lua 5.4 解释器，但它不是我们 DLL 静态链接的
 那份 lua54 库，所以不能直接把宿主 state 传给 luaopen_webconsole（这正是任务书

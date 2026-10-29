@@ -14,6 +14,8 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if (-not $OutputDirectory) { $OutputDirectory = $PSScriptRoot }
+if (-not [IO.Path]::IsPathRooted($OutputDirectory)) { $OutputDirectory = Join-Path (Get-Location).Path $OutputDirectory }
+$OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 
 # Use Microsoft's environment setup rather than reconstructing INCLUDE/LIB/SDK paths.
 if (-not $VisualStudioPath) {
@@ -35,8 +37,12 @@ if (-not $VisualStudioPath) {
     }
 }
 
-$work = Join-Path $PSScriptRoot ".build\$Target-$Configuration"
+if (-not $VisualStudioPath -or -not (Test-Path -LiteralPath (Join-Path $VisualStudioPath 'VC/Auxiliary/Build/vcvarsall.bat'))) {
+    throw 'A Visual Studio C++ installation is required; install Desktop development with C++ or pass -VisualStudioPath.'
+}
+$work = Join-Path $PSScriptRoot ".build\$Target-$Configuration-x64"
 New-Item -ItemType Directory -Force -Path $OutputDirectory, $work | Out-Null
+$cmakeTarget = if ($Target -eq 'Plugin') { 'webconsole' } else { 'webconsole_test' }
 $stem = if ($Target -eq 'Plugin') { 'webconsole' } elseif ($Configuration -eq 'Debug') { 'webconsole_dbg' } else { 'webconsole_test' }
 $extension = if ($Target -eq 'Plugin') { 'dll' } else { 'exe' }
 $output = Join-Path $OutputDirectory "$stem.$extension"
@@ -44,7 +50,7 @@ $output = Join-Path $OutputDirectory "$stem.$extension"
 Write-Host "Building $Target / $Configuration (x64) with $VisualStudioPath"
 $configureInfo = [Diagnostics.ProcessStartInfo]::new()
 $configureInfo.FileName = 'cmake.exe'
-$configureInfo.Arguments = "-S `"$PSScriptRoot`" -B `"$work`""
+$configureInfo.Arguments = "-S `"$PSScriptRoot`" -B `"$work`" -A x64 `"-DCMAKE_GENERATOR_INSTANCE=$VisualStudioPath`""
 $configureInfo.UseShellExecute = $false
 $configure = [Diagnostics.Process]::Start($configureInfo)
 $configure.WaitForExit()
@@ -52,7 +58,7 @@ if ($configure.ExitCode -ne 0) { throw "cmake configure failed with $($configure
 
 $buildInfo = [Diagnostics.ProcessStartInfo]::new()
 $buildInfo.FileName = 'cmake.exe'
-$buildInfo.Arguments = "--build `"$work`" --config $Configuration --target $stem"
+$buildInfo.Arguments = "--build `"$work`" --config $Configuration --target $cmakeTarget"
 $buildInfo.UseShellExecute = $false
 $buildProcess = [Diagnostics.Process]::Start($buildInfo)
 $buildProcess.WaitForExit()
@@ -61,8 +67,8 @@ if ($buildProcess.ExitCode -ne 0) { throw "cmake build failed with $($buildProce
 # 构建产物拷贝到 OutputDirectory（dist/ 构建产物、游戏目录部署由上层 deploy.js 负责）
 # Multi-config generators (Visual Studio) place the binary in a per-configuration
 # subdirectory; single-config layouts keep it at the build root.
-$built = Join-Path $work "Release\$stem.$extension"
-if (-not (Test-Path -LiteralPath $built)) { $built = Join-Path $work "$stem.$extension" }
+$built = Join-Path $work "$Configuration\$cmakeTarget.$extension"
+if (-not (Test-Path -LiteralPath $built)) { $built = Join-Path $work "$cmakeTarget.$extension" }
 if (-not (Test-Path -LiteralPath $built)) { throw "Build produced no $stem.$extension under $work" }
 Copy-Item -Path $built -Destination $output -Force
 Write-Host "Output: $output"

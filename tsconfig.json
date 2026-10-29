@@ -29,6 +29,7 @@
     "src/**/*.test.ts"
   ],
   "tstl": {
+    "noResolvePaths": ["webconsole"],
     "luaTarget": "5.4",
     "noImplicitGlobalVariables": true,
     "luaLibImport": "require-minimal",

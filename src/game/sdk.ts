@@ -54,6 +54,7 @@ interface RefImgui {
 
 /** @noSelf */
 interface RefThread {
+  get_id(): number;
   get_hook_storage(): Record<string, unknown>;
 }
 
@@ -161,6 +162,7 @@ export const reframework = {
   onDrawUi: re.on_draw_ui,
   onScriptReset: re.on_script_reset,
   getHookStorage: thread.get_hook_storage,
+  getThreadId: thread.get_id,
 };
 
 export const relog = log;
@@ -170,3 +172,16 @@ export const imguiApi = imgui;
 
 /** Wall clock, rather than process CPU time, for spawn/post deadlines. */
 export function clockSeconds(): number { return os.time(); }
+
+/** @noSelf */
+export interface NativeWebconsole {
+  ping(text: string): string;
+  epoch(): number;
+  take_commands(limit: number): string[];
+  publish_state(json: string): void;
+  publish_results(json: string): void;
+}
+declare function require(this: void, name: string): unknown;
+export function loadWebconsole(): NativeWebconsole {
+  return require("webconsole") as NativeWebconsole;
+}

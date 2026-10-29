@@ -11,6 +11,10 @@
 
 namespace webconsole {
 
+// Wire protocol version shared with src/game/webconsole_bridge.ts and the console UI.
+// 4: CLI identity fields, /api/probe/report and per-generation identity.
+inline constexpr int PLUGIN_PROTOCOL = 4;
+
 // Process-wide singleton shared by HTTP threads and the Lua module functions.
 MemoryBridge& bridge()
 {
@@ -53,7 +57,7 @@ std::string probe_json()
        << ",\"module\":\"webconsole\""
        << ",\"export\":\"luaopen_webconsole\""
        << ",\"moduleVersion\":\"" << json_escape(PLUGIN_VERSION) << "\""
-       << ",\"protocol\":3"
+       << ",\"protocol\":" << PLUGIN_PROTOCOL
        << ",\"pid\":" << GetCurrentProcessId()
        << ",\"session\":\"" << json_escape(g_session_id) << "\""
        << ",\"uptimeMs\":" << uptime

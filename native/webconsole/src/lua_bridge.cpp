@@ -2,12 +2,12 @@
 // Naming contract (all three must match, otherwise require() reports
 // "no field package.preload" or loadlib fails):
 //   DLL file name webconsole.dll == require("webconsole") == exported luaopen_webconsole
-// package.loadlib derives the symbol from the module name; REFramework's cpath
-// already covers <autorun>/?.dll and <plugins>/?.dll.
+// Plugin initialization registers package.preload on each host Lua creation;
+// the installed framework does not search plugins/ through package.cpath.
 //
 // The module is compiled against the Lua 5.4 sources vendored in lua54/ (same
 // version as REFramework's bundled Lua) and operates on the lua_State the host
-// passes in - same-source builds keep the ABI identical (standard Lua C module).
+// passes in. Source/config compatibility still requires host GC/reset validation.
 //
 // Registered bridge functions (backed by the process-wide MemoryBridge singleton;
 // HTTP threads and Lua sit on opposite sides of its lock):
@@ -24,6 +24,7 @@
 
 #include "common.h"
 #include "memory_bridge.h"
+#include "lua_bridge.h"
 
 #include <lua.hpp>
 
@@ -56,6 +57,7 @@ int lua_ping(lua_State* L)
 int lua_take_commands(lua_State* L)
 {
     const lua_Integer max = luaL_optinteger(L, 1, 8);
+    luaL_argcheck(L, max >= 0 && max <= 8, 1, "expected a limit from 0 to 8");
     lua_newtable(L);
     lua_Integer index = 1;
     std::string out;
@@ -131,4 +133,14 @@ extern "C" __declspec(dllexport) int luaopen_webconsole(lua_State* L)
 {
     luaL_newlib(L, MODULE_FUNCS);
     return 1;
+}
+
+void webconsole::attach_lua_bridge(lua_State* L) {
+    auto& memory = bridge();
+    memory.begin_session(memory.epoch() + 1);
+    lua_getglobal(L, "package");
+    lua_getfield(L, -1, "preload");
+    lua_pushcfunction(L, luaopen_webconsole);
+    lua_setfield(L, -2, "webconsole");
+    lua_pop(L, 2);
 }

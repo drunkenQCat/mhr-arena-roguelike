@@ -95,6 +95,15 @@ public:
         commands_.clear();
         total_bytes_ = 0;
         epoch_ = epoch;
+        state_.clear();
+        results_.clear();
+        probe_.clear();
+    }
+
+    void clear_snapshots() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        state_.clear(); results_.clear(); probe_.clear();
+        commands_.clear(); total_bytes_ = 0;
     }
 
     unsigned long long epoch()

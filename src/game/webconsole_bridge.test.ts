@@ -6,8 +6,13 @@ import { RunSession, type RuntimeReading, type SessionPort } from "../core/run_s
 import type { NativeRuntime } from "./native_runtime";
 import { ShopWindow } from "./shop_window";
 
-const host = vi.hoisted(() => ({ now: 10, files: {} as Record<string, any>, count: 0, failWrite: "" }));
-vi.mock("./sdk", () => ({ clockSeconds: () => host.now,
+const host = vi.hoisted(() => ({ now: 10, files: {} as Record<string, any>, count: 0, failWrite: "", commands: [] as string[] }));
+vi.mock("./sdk", () => ({ loadWebconsole: () => ({
+  epoch: () => 1,
+  take_commands: (limit: number) => host.commands.splice(0, limit),
+  publish_state: (text: string) => { host.files["webconsole_state.json"] = JSON.parse(text); },
+  publish_results: (text: string) => { if (host.failWrite === "webconsole_results.json") throw new Error("publish failed"); host.files["webconsole_results.json"] = JSON.parse(text); }
+}), clockSeconds: () => host.now, getSingleton: () => null,
   refFs: { read: (path: string) => host.files[path] === undefined ? "" : JSON.stringify(host.files[path]),
     write: (path: string, text: string) => { if (path !== host.failWrite) host.files[path] = JSON.parse(text); } },
   rejson: { dump_string: (body: unknown) => JSON.stringify(body), load_string: (s: string) => { try { return JSON.parse(s); } catch { return null; } },
@@ -33,14 +38,14 @@ function fixture() {
   const bridge = new WebConsoleBridge(session, runtime, shop);
   function tick() { host.now++; reading.time = host.now; session.tick(); for (let i = 0; i < 12; i++) bridge.tick(); }
   function command(cmd: string, extra: Record<string, unknown> = {}, id = `${cmd}-${host.now}`) {
-    host.files["webconsole_cmd.json"] = { id, bridgeId: bridge.bridgeId,
-      questUnique: reading.quest?.unique ?? null, waveToken: session.plan?.token ?? null, cmd, ...extra };
+    host.commands.push(JSON.stringify({ id, bridgeId: bridge.bridgeId,
+      questUnique: reading.quest?.unique ?? null, waveToken: session.plan?.token ?? null, cmd, ...extra }));
     tick(); return host.files["webconsole_results.json"]?.last;
   }
   const state = () => host.files["webconsole_state.json"];
   return { cfg, core, session, tools, shop, bridge, command, tick, state, reading };
 }
-beforeEach(() => { host.now = 10; host.files = {}; host.count = 0; host.failWrite = ""; });
+beforeEach(() => { host.now = 10; host.files = {}; host.count = 0; host.failWrite = ""; host.commands = []; });
 
 it("updates wave, position, gathering and shop eligibility with no PT change at preparation", () => {
   const f = fixture(); f.tick(); f.session.start(f.cfg.armorOptions[0]!); f.tick();
@@ -84,7 +89,7 @@ it("rejects stale or missing session identities, writes the matching receipt and
   const f = fixture(); f.tick();
   expect(f.command("setInvincible", { bridgeId: "old", value: true }).status).toBe("rejected");
   expect(f.tools.toggleGod).not.toHaveBeenCalled();
-  expect(host.files["webconsole_cmd.json"]).toEqual({});
+  expect(host.commands).toEqual([]);
   expect(f.command("killAll", { questUnique: 999 }).message).toContain("任务实例");
 });
 

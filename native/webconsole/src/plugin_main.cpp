@@ -3,11 +3,24 @@
 // layer; this DLL only serves the transport.
 #include "common.h"
 #include "http_server.h"
+#include "memory_bridge.h"
+#include "lua_bridge.h"
 #include "../reframework/API.h"
+#include <lua.hpp>
 
 #include <filesystem>
 
 #ifndef WEBCONSOLE_STANDALONE
+
+// Use the module already loaded as a REFramework plugin. Searching for another
+// copy under autorun can load a second DLL with a different in-memory queue.
+static void on_lua_created(lua_State* L) {
+    webconsole::attach_lua_bridge(L);
+}
+
+static void on_lua_destroyed(lua_State*) {
+    webconsole::bridge().clear_snapshots();
+}
 
 extern "C" __declspec(dllexport) void reframework_plugin_required_version(REFrameworkPluginVersion* version) {
     version->major = REFRAMEWORK_PLUGIN_VERSION_MAJOR;
@@ -25,6 +38,8 @@ extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFram
     static const REFrameworkPluginFunctions* functions = param->functions;
     static void (*const sink)(const char*) = [](const char* msg) { functions->log_info("%s", msg); };
     webconsole::log_sink = sink;
+    if (!param->functions->on_lua_state_created(on_lua_created) ||
+        !param->functions->on_lua_state_destroyed(on_lua_destroyed)) return false;
 
     // Data dir: <game>/reframework/data, the same target json.dump_file writes to.
     char exe_dir[MAX_PATH] = {};

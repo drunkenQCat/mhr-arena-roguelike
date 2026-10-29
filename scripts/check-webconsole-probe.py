@@ -86,7 +86,7 @@ function encode_literal(value)
 end
 
 json = {
-    dump_string = function(_, value) return encode_literal(value) end,
+    dump_string = function(value, indent) assert(indent == nil or type(indent) == "number"); return encode_literal(value) end,
     load_string = function(text) return assert(load("return " .. text))() end,
     dump_file = function(path, value) writes[path] = encode_literal(value) end,
 }
@@ -253,7 +253,7 @@ print("PASS truncated or altered echoes fail the roundtrip check")
 
 # 5. 同一 DLL 会话重复执行（手动重跑探针）：历史只保留一条（不重复展示旧记录）。
 sticky = "package.loaded.webconsole = { ping = function(s) return s end, " \
-    "session_id = function() return 'dll-1' end }"
+    "session_id = function() return 'dll-1' end, epoch = function() return 1 end }"
 first_host = Host()
 first_host.lua.execute(sticky)
 first_host.load_probe()
@@ -267,7 +267,7 @@ second_host.advance(0.05)
 second_host.run_frames()
 first = first_host.data()
 second = second_host.data()
-assert second["session"] == "dll-1" and second["result"]["sessionSource"] == "dll"
+assert second["session"] == "dll-1:lua-1" and second["result"]["sessionSource"] == "dll-lua-epoch"
 assert second["session"] == first["session"]
 assert len(second["history"]) == 1, second["history"]
 assert second["history"][0]["at"] == second["result"]["at"]
@@ -278,7 +278,8 @@ print("PASS same session keeps a single newest history entry")
 files = {}
 sessions = []
 for index in range(3):
-    host, data = probe_once(files=files, expect_ok=True, clock=200.0 + index * 10)
+    module = "return {ping=function(s) return s end, session_id=function() return 'same-dll' end, epoch=function() return " + str(index + 1) + " end}"
+    host, data = probe_once(files=files, module=module, expect_ok=True, clock=200.0 + index * 10)
     files = dict(host.writes().items())
     sessions.append(data["session"])
 assert len(set(sessions)) == 3, sessions

@@ -31,6 +31,7 @@ function copyIfChanged(fromRoot, relSrc, gameDir, relDst, hint) {
   } catch (e) {
     // DLL 被游戏进程锁定时写入失败属正常：提示重启游戏
     console.error(`FAIL 部署 ${relDst}: ${e.message}（游戏运行中可能锁定文件，重启游戏前请勿依赖该产物）`);
+    process.exitCode = 1;
     return false;
   }
 }

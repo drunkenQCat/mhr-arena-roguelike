@@ -6,6 +6,7 @@
 # 运行库：/MT（静态 CRT）——插件不依赖 VC Redist，与宿主 CRT 隔离
 cmake_minimum_required(VERSION 3.20)
 project(webconsole LANGUAGES C CXX)
+add_compile_options(/utf-8)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,7 +21,6 @@ list(FILTER LUA_SOURCES EXCLUDE REGEX "/lua\\.c$|/luac\\.c$")
 
 add_library(lua54 STATIC ${LUA_SOURCES})
 target_include_directories(lua54 PUBLIC ${LUA_DIR})
-target_compile_definitions(lua54 PRIVATE LUA_LIB)
 target_compile_options(lua54 PRIVATE /W3)
 
 # ---- webconsole 插件 DLL（REFramework 插件入口 + Lua C 模块）----
@@ -46,3 +46,11 @@ target_include_directories(webconsole_test PRIVATE
 )
 target_compile_definitions(webconsole_test PRIVATE WEBCONSOLE_STANDALONE)
 target_link_libraries(webconsole_test PRIVATE lua54 ws2_32.lib crypt32.lib)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(bridge_lifecycle_test tests/bridge_lifecycle.cpp src/lua_bridge.cpp src/http_server.cpp)
+    target_include_directories(bridge_lifecycle_test PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(bridge_lifecycle_test PRIVATE lua54 ws2_32.lib crypt32.lib)
+    add_test(NAME bridge_lifecycle COMMAND bridge_lifecycle_test)
+endif()

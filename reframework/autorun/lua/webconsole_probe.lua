@@ -9,7 +9,7 @@
 --   2. 字符串往返：二进制安全字节 + 中文 UTF-8，ping(s) 必须逐字节原样返回
 --   3. collectgarbage("collect") 后再往返一次：排除 GC 后悬垂指针/错误长度
 -- 记录本次运行时间、DLL 模块版本、进程号、会话号；覆盖写 reframework/data/webconsole_probe.json
--- （同时写 JSONP 版本 webconsole_probe.js 供页面备用），历史保留 8 条且会话号去重。
+-- （同时写 JSONP 版本 webconsole_probe.js 供页面备用），历史保留 8 条且按 DLL 会话 + Lua 代去重。
 -- Generated UI：re.on_draw_ui 窗口「WebConsole Probe」显示 PASS/FAIL、本次运行信息与历史。
 --
 -- 只用 REFramework 固定版本(5bae4701)与 master 都存在的 API：re.on_frame /
@@ -18,18 +18,8 @@
 local MODULE = "webconsole"
 local DATA_FILE = "webconsole_probe.json"
 local JS_FILE = "webconsole_probe.js"
-local STATUS_FILE = "webconsole_probe_status.json"
 local HISTORY_LIMIT = 8
 local STEP_SECONDS = 0.02
-
--- math.randomseed 在同一秒内重复调用会产生同一序列（= 连续 Reset 的会话号撞车），
--- 因此种子再混入 os.clock 微秒与脚本地址。
-local ok_seed, seed = pcall(function()
-    local script = debug and debug.getinfo and debug.getinfo(1, "S")
-    return os.time() * 1000000 + math.floor((os.clock() % 1) * 1000000) +
-        #tostring(script and script.source or "")
-end)
-math.randomseed(ok_seed and seed or 1)
 
 local state = {
     result = nil,
@@ -43,9 +33,9 @@ local function elapsed_seconds()
     return os.clock() - state.startedAt
 end
 
-local function dump_values(props, values)
+local function dump_values(values)
     if type(json) ~= "table" then return nil end
-    local ok, text = pcall(json.dump_string, props, values, 2)
+    local ok, text = pcall(json.dump_string, values, 2)
     if ok and type(text) == "string" then return text end
     if type(json.stringify) == "function" then
         local ok2, text2 = pcall(json.stringify, values, nil, 2)
@@ -115,7 +105,11 @@ local function derive_session(mod)
     if type(mod) == "table" and type(mod.session_id) == "function" then
         local ok, value = pcall(mod.session_id)
         if ok and type(value) == "string" and #value > 0 and value ~= "0" then
-            return value, "dll"
+            local ok_epoch, epoch = pcall(mod.epoch)
+            if ok_epoch and type(epoch) == "number" and epoch > 0 then
+                return value .. ":lua-" .. tostring(epoch), "dll-lua-epoch", value, epoch
+            end
+            return value .. ":load-" .. tostring(next_load_ordinal()), "dll-load", value
         end
     end
     return string.format("derived-%d-%d-%d", next_load_ordinal(), os.time(),
@@ -156,12 +150,6 @@ local function roundtrip(mod, label)
         elapsed, #payload
 end
 
-local function read_dll_status()
-    local status = parse_text(read_text(STATUS_FILE))
-    if type(status) ~= "table" then return nil end
-    return status
-end
-
 local function run_probe()
     local started = os.clock()
     local result = {
@@ -190,7 +178,7 @@ local function run_probe()
             "模块存在但缺少 ping 函数（加载了错误的 DLL 或版本过旧）"
     end
 
-    result.session, result.sessionSource = derive_session(mod)
+    result.session, result.sessionSource, result.dllSession, result.luaEpoch = derive_session(mod)
     if type(mod) == "table" then
         if type(mod.epoch) == "function" then
             local ok_epoch, epoch = pcall(mod.epoch)
@@ -198,13 +186,6 @@ local function run_probe()
         end
     end
 
-    local status = read_dll_status()
-    if status then
-        result.dll = status
-        result.moduleVersion = type(status.moduleVersion) == "string" and status.moduleVersion or nil
-        result.pid = type(status.pid) == "number" and status.pid or nil
-        result.versionSource = "dll_required_version"
-    end
     if type(result.moduleVersion) ~= "string" and type(mod) == "table" and type(mod.version) == "function" then
         local ok_version, version = pcall(mod.version)
         if ok_version and type(version) == "string" then
@@ -236,7 +217,7 @@ local function run_probe()
     return result
 end
 
--- 同一会话号只保留一条（覆盖），保证连续 Reset 的历史条目互不相同。
+-- 同一 Lua 代重复执行覆盖；跨 Reset 的 epoch 不同，保留为独立条目。
 local function merge_history(history, result)
     local merged = {}
     for _, item in ipairs(history) do
@@ -265,7 +246,7 @@ local function persist(result)
         result = result,
         history = merged,
     }
-    local text = dump_values(nil, document)
+    local text = dump_values(document)
     if text then
         document.persisted = write_text(DATA_FILE, text)
         write_text(JS_FILE, "window.MHR_PROBE=" .. text .. ";")
@@ -337,7 +318,13 @@ local function tick()
     if state.finished then return end
     if elapsed_seconds() < STEP_SECONDS then return end
     state.finished = true
-    local result = run_probe()
+    local ok_run, result = pcall(run_probe)
+    if not ok_run then
+        local session, source, dll_session, epoch = derive_session(package.loaded[MODULE])
+        result = { ok = false, at = os.time(), atIso = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+            session = session, sessionSource = source, dllSession = dll_session, luaEpoch = epoch,
+            durationMs = 0, checks = {}, errors = { "probe runtime error: " .. tostring(result) } }
+    end
     state.result = result
     persist(result)
     if type(log) == "table" and type(log.info) == "function" then

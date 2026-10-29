@@ -1,4 +1,5 @@
 /** HTTP plugin transport; all mutations execute on the Lua update thread. */
+import { NativeUi } from "./native_ui";
 import { validateConfig } from "../core/config";
 import type { RunSession } from "../core/run_session";
 import type { NativeRuntime } from "./native_runtime";
@@ -8,6 +9,7 @@ import { clockSeconds, getSingleton, refFs, rejson, loadWebconsole, type NativeW
 interface Command {
   id?: string; bridgeId?: string; cmd?: string; armor?: string; index?: number;
   value?: boolean; itemId?: string; route?: string; config?: unknown;
+  sceneToken?: string; dialogToken?: string; slot?: number;
   configVersion?: number; questUnique?: number | null; waveToken?: number | null;
 }
 type Outcome = Record<string, unknown>;
@@ -15,6 +17,7 @@ type Outcome = Record<string, unknown>;
 export class WebConsoleBridge {
   readonly bridgeId: string;
   private readonly transport: NativeWebconsole;
+  private readonly nativeUi: NativeUi;
   private pendingReceipt: Outcome | null = null;
   configVersion = 0;
   private frames = 0;
@@ -28,6 +31,7 @@ export class WebConsoleBridge {
     private readonly shop: ShopWindow) {
     this.transport = loadWebconsole();
     this.bridgeId = `${this.transport.epoch()}-${clockSeconds()}-${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
+    this.nativeUi = new NativeUi(this.bridgeId);
     this.writeResults({ id: "", status: "ready" });
   }
 
@@ -40,6 +44,12 @@ export class WebConsoleBridge {
     if (this.closed) return;
     try {
       if (this.pendingReceipt && !this.writeResults(this.pendingReceipt)) return;
+      const uiResult = this.nativeUi.poll();
+      if (uiResult) {
+        const old = this.results.find(entry => entry.id === uiResult.id);
+        if (old) Object.assign(old, uiResult);
+        this.writeResults(old ?? uiResult);
+      }
       if (this.purchase && this.shop.transactionVersion > this.purchase.version && this.shop.lastTransaction) {
         const result = this.results.find((entry) => entry.id === this.purchase!.id);
         if (result) {
@@ -101,6 +111,8 @@ export class WebConsoleBridge {
   private execute(cmd: Command): Outcome {
     const s = this.session;
     switch (cmd.cmd) {
+      case "startup.acknowledge": case "title.advance": case "title.continue":
+      case "save.load": case "dialog.close": return this.nativeUi.request(cmd);
       case "getConfig": return { status: "applied", message: "已读取游戏配置（含下一局规则）", config: s.configForEditing(),
         activeRules: { startPt: s.core.config.startPt, maxCarts: s.core.config.maxCarts,
           runtime: s.settings }, configVersion: this.configVersion };
@@ -176,22 +188,23 @@ export class WebConsoleBridge {
     const players = r?.players ?? [];
     const position = players[0]?.position ?? null;
     const inQuest = r?.quest !== null && r?.quest !== undefined;
-    const scene = inQuest ? (r?.quest?.playing ? "quest"
-      : staleQuest ? "village" : "quest_ready")
-      : (r?.canPost ? "village" : "unknown");
+    const native = this.nativeUi.observe();
+    const scene = native.scene !== "unknown" ? native.scene : inQuest
+      ? (r?.quest?.playing ? "quest" : "quest_ready")
+      : (r?.canPost && players.length > 0 ? "village" : "unknown");
     return {
+      ...native,
       scene,
-      // Scene instance token: quest unique when inside one; the wave token and
-      // bridgeId keep the two apart after a reload.
-      sceneToken: inQuest ? `quest:${r?.quest?.unique ?? 0}` : `bridge:${this.bridgeId}:${mapNo ?? "?"}`,
+      // Native UI revision is bound to this Lua bridge generation.
+      sceneToken: native.sceneToken,
       mapNo,
-      loading: position === null,
-      busy: this.shop.busy,
+      loading: native.loading ?? (native.scene === "unknown" && position === null ? null : false),
+      busy: this.shop.busy || native.busy,
       questStatus: r?.quest?.status ?? null,
       online: r?.online ?? false,
       canPost: r?.canPost ?? false,
-      dialogs: [],
-      allowedActions: [
+      allowedActions: native.dialogs.length > 0 ? native.allowedActions : [
+        ...native.allowedActions,
         ...(["Idle", "Finished", "Fault"].includes(this.session.stage) && r?.canPost &&
           (!inQuest || staleQuest) ? ["run.start"] : []),
         ...(this.session.canShop() && !this.shop.busy ? ["run.choose", "shop.buy"] : []),
@@ -199,13 +212,14 @@ export class WebConsoleBridge {
         ...(inQuest && r?.quest?.playing ? ["test.killAll"] : []),
       ],
       evidence: [
+        ...native.evidence,
         { source: "snow.QuestManager.isActiveQuest", value: inQuest },
         { source: "snow.stage.StageManager", value: "no verified map accessor in the installed SDK" },
         { source: "snow.gui.GuiManager.IsCanInvokeQuestBoard", value: r?.canPost ?? null },
         { source: "snow.player.PlayerManager.PlayerList", value: players.length },
       ],
       dialogsKnown: false,
-      note: "Viewpoint sensor only: title, save select and dialogs are not observed.",
+      note: "Native title/save/menu observation; unclassified dialogs remain unsupported.",
     };
   }
 

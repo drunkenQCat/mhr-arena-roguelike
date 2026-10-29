@@ -1,6 +1,6 @@
 # Native webconsole 构建
 
-当前插件面向 Windows x64。安装 Visual Studio 或独立 Build Tools 的 **Desktop development with C++**（C++20 编译器和 Windows SDK）。不依赖特定安装盘、VS 年份/版本或 SDK 版本。
+当前插件面向 Windows x64。安装 Visual Studio 或独立 Build Tools 的 **Desktop development with C++**（C++20 编译器和 Windows SDK），并安装 CMake 3.20 或更新版本。不依赖特定安装盘、VS 年份/版本或 SDK 版本。
 
 从仓库根目录运行（也可从其他目录通过完整路径运行）：
 
@@ -15,9 +15,9 @@
 .\native\webconsole\build.ps1 -Target Standalone -Configuration Debug
 ```
 
-构建统一使用 `webconsole/build.ps1` 的 `Target` 和 `Configuration` 参数：通过 PATH 或 Visual Studio Installer 中的 `vswhere.exe` 发现包含 x64 C++ 工具的最新安装（包含 Build Tools），由 VS 自带的 `vcvarsall.bat x64` 配置编译器、链接器及 SDK。找不到 vswhere 时可使用已有 `VSINSTALLDIR`。缺失工具链或编译失败会返回失败，不继续部署。
+构建统一使用 `webconsole/build.ps1` 的 `Target` 和 `Configuration` 参数：通过 PATH 或 Visual Studio Installer 中的 `vswhere.exe` 发现包含 x64 C++ 工具的最新安装（包含 Build Tools），由 CMake 配置编译器、链接器及 SDK。找不到 vswhere 时可使用已有 `VSINSTALLDIR`。缺失工具链或编译失败会返回失败，不继续部署。
 
-默认最终文件仍输出到 `native/webconsole/`，兼容现有部署和联调脚本；对象、导入库、符号和 map 写到 `.build/<Target>-<Configuration>/`。这些产物都由 `.gitignore` 排除。构建脚本本身不部署文件、不关闭游戏。
+默认最终文件仍输出到 `native/webconsole/`，兼容现有部署和联调脚本；对象、导入库、符号和 map 写到 `.build/<Target>-<Configuration>-x64/`。这些产物都由 `.gitignore` 排除。构建脚本本身不部署文件、不关闭游戏。
 
 可以直接传参数：
 
@@ -29,7 +29,7 @@
 
 自定义输出目录以调用者当前目录为基准；标准部署脚本仍从默认输出目录读取。输出 DLL 被游戏加载时需先退出游戏再重新构建。
 
-支持 Windows PowerShell 5.1 和 PowerShell 7。若执行策略阻止脚本，可对单次调用使用 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\native\webconsole\build.ps1`，无需修改机器执行策略。仓库不再维护 BAT 包装入口；构建内部调用 VS 的批处理初始化工具属于工具链实现。
+支持 Windows PowerShell 5.1 和 PowerShell 7。若执行策略阻止脚本，可对单次调用使用 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\native\webconsole\build.ps1`，无需修改机器执行策略。仓库不再维护 BAT 包装入口；CMake 管理 Lua 静态库、插件和独立测试目标。
 
 ## 独立测试
 
@@ -83,3 +83,23 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+
+## 内存桥与宿主探针（0.3.3）
+
+插件在 REFramework 的 Lua-created 回调中注册 `package.preload.webconsole`。`require("webconsole")` 使用已经加载的同一插件实例，不需要将 DLL 另拷到 autorun，不依赖 plugins 目录出现在 package.cpath 中。
+
+每个 Lua 环境创建时递增 epoch，并清空旧代命令/状态/结果/探针缓存。DLL session 标识进程中的插件，Lua epoch 区分连续 Reset；不能用进程 session 去重所有加载记录。HTTP 线程和 Lua 共享同一 MemoryBridge；常规命令、结果、状态不再经过文件信箱。配置保存和每次探针的一份证据文件仍会写盘。
+
+自动探针验证字符串（含 NUL/UTF-8）及 GC 后往返；网页直接读取 `/api/probe/report`，不以业务 stateSeq>0 作为探针展示条件。Reset 后旧报告不得继续展示为当前 PASS。
+
+原生生命周期测试（独立 Lua 环境，不能替代游戏内 Reset）：
+
+```powershell
+cmake --build native/webconsole/.build/Plugin-Release-x64 --config Release --target bridge_lifecycle_test
+ctest --test-dir native/webconsole/.build/Plugin-Release-x64 -C Release --output-on-failure
+```
+
+测试使用实际编译的 Lua C API/桥接函数，覆盖三个 Lua 环境的创建/销毁、preload、GC、错误参数、队列上限、同一存储实例及旧代清理。Lua 源码已逐文件核对：61 个文件与 REFramework `5bae4701396248a776c1de19f5be9552022295d5` 中的 `dependencies/lua/src` 一致（归一化 CRLF）。原始版权与完整许可文本保留在 `lua54/lua.h` 末尾；分发时需保留对应许可声明。
+
+原来的 `scripts/review-webconsole.py` 使用文件信箱的隔离联调机制，尚未适配新内存后端，不能据此验收此版本；当前使用原生 CTest、Lua 探针语义检查和真实游戏 HTTP 回执验证。

@@ -50,7 +50,7 @@ npm run check:runtime # 在真正的 Lua 5.4 中离线执行编译产物
           │ HTTP，同源 API
           ▼
 webconsole.dll：游戏进程内的 C++ HTTP 服务
-          │ JSON 文件信箱
+          │ 有界内存队列
           ▼
 REFramework Lua 桥：在游戏回调中校验并执行命令
           │
@@ -58,9 +58,9 @@ REFramework Lua 桥：在游戏回调中校验并执行命令
 RunSession／ShopWindow／原生游戏 API
 ```
 
-后端分为两层：原生插件使用 `cpp-httplib` 处理网络和网页分发，Lua 桥执行游戏操作。网络线程不直接访问游戏对象；命令经文件信箱进入游戏回调，校验脚本会话、任务实例、波次或配置版本后执行，再写回结果。浏览器按请求 ID 查询最终回执，购买显示“排队”不代表发货完成，结果不明时不要重复购买。
+后端分为两层：原生插件使用 `cpp-httplib` 处理网络和网页分发，Lua 桥执行游戏操作。网络线程不直接访问游戏对象；命令经内存队列进入游戏回调，校验脚本会话、任务实例、波次或配置版本后执行，再写回结果。浏览器按请求 ID 查询最终回执，购买显示“排队”不代表发货完成，结果不明时不要重复购买。
 
-目前使用 HTTP 轮询和文件信箱，不是 WebSocket。Lua 每 12 帧检查命令、约每秒发布一次小型状态快照；原生端共享短时读取缓存。心跳停止时，网页禁用操作，HTTP 服务存活本身不代表游戏状态仍在更新。
+目前使用 HTTP 轮询和内存快照，不是 WebSocket。Lua 每 12 帧检查命令、约每秒发布一次小型状态快照；原生端共享内存中的最新快照。心跳停止时，网页禁用操作，HTTP 服务存活本身不代表游戏状态仍在更新。
 
 ### 构建、部署与启动
 
@@ -98,7 +98,7 @@ node scripts/deploy.js
 
 ### 模块探针（DLL ↔ Lua 验收）
 
-`webconsole.dll` 同时是 REFramework 插件与 Lua C 模块：DLL 文件名 `webconsole.dll` == `require("webconsole")` == 导出 `luaopen_webconsole`。`autorun/webconsole_probe_auto.lua` 在每次脚本加载（含 Reset scripts）自动执行 `autorun/lua/webconsole_probe.lua`：require 模块 → 字符串往返（二进制安全 + UTF-8）→ `collectgarbage("collect")` 后再往返一次，结果（PASS/FAIL、本次耗时、模块版本、DLL 会话号、会话历史）写入 `reframework/data/webconsole_probe.json` 并经内存桥发布到 `GET /api/probe/report`；`GET /api/probe` 返回 DLL 本体标识（版本、进程、会话、计数）。网页控制台"模块探针"面板显示同一份数据，连续 Reset 的每次加载在历史中各占一条（同一 DLL 会话号只保留最新一条）。游戏内无需手输任何 Lua；本地语义验证跑 `python scripts/check-webconsole-probe.py`，DLL 导出契约验证跑 `python scripts/check-webconsole-dll-exports.py`。
+`webconsole.dll` 同时是 REFramework 插件与 Lua C 模块：DLL 文件名 `webconsole.dll` == `require("webconsole")` == 导出 `luaopen_webconsole`。`autorun/webconsole_probe_auto.lua` 在每次脚本加载（含 Reset scripts）自动执行 `autorun/lua/webconsole_probe.lua`：require 模块 → 字符串往返（二进制安全 + UTF-8）→ `collectgarbage("collect")` 后再往返一次，结果（PASS/FAIL、本次耗时、模块版本、DLL 会话号、会话历史）写入 `reframework/data/webconsole_probe.json` 并经内存桥发布到 `GET /api/probe/report`；`GET /api/probe` 返回 DLL 本体标识（版本、进程、会话、计数）。网页控制台"模块探针"面板显示同一份数据，连续 Reset 的每次加载在历史中各占一条（同一 DLL 会话内按 Lua 代号区分，同代重复执行覆盖）。游戏内无需手输任何 Lua；本地语义验证跑 `python scripts/check-webconsole-probe.py`，DLL 导出契约验证跑 `python scripts/check-webconsole-dll-exports.py`。
 
 - 网页更新：重新构建、部署后刷新浏览器。
 - Lua 更新：覆盖文件后，在安全状态使用 `REFramework → ScriptRunner → Reset scripts`，刷新网页并从新局开始；不保留进行中的肉鸽状态。
@@ -124,7 +124,7 @@ New-NetFirewallRule -DisplayName 'MHR Webconsole LAN 11777' -Direction Inbound -
 
 商店与游戏内窗口使用同一购买资格和交易路径：检查整备阶段、任务身份、集结位置、PT 与真实背包，执行后读取原生结果。补满、猫车恢复已接入，但原生效果仍需实机验收；不确定的交付会锁定交易，避免自动重复购买。
 
-主要端点为 `GET /console`、`GET /api/health`、`GET /api/state`、`GET /api/results`、`GET /api/config` 和 `POST /api/command`。其中 `/api/config` 是磁盘持久覆盖文件，未必等同当前 Lua 生效配置；网页通过命令桥读取权威配置。命令使用单槽排队，并发占用返回 409。
+主要端点为 `GET /console`、`GET /api/health`、`GET /api/state`、`GET /api/results`、`GET /api/config` 和 `POST /api/command`。其中 `/api/config` 是磁盘持久覆盖文件，未必等同当前 Lua 生效配置；网页通过命令桥读取权威配置。命令使用有界队列排队，队列达到 64 条或合计 1 MiB 时返回 429。
 
 协议、研究过程和验证边界见 [网页控制台研究记录](docs/research-web-console.md)；REFramework SDK 固定版本来源和许可证见 [第三方依赖说明](native/webconsole/reframework/README.md)。
 
@@ -153,7 +153,7 @@ M2a 显式测试 `EM1_HP=0`，其引擎时序必须实机核验。
 | `src/game/native_runtime.ts` | 观测、作用域隔离、计时/结算/倍率 hook |
 | `src/game/quest_transport.ts` | 原生柜台、单人选择、确认、出发、超时清理 |
 | `src/game/sdk.ts` | 唯一宿主 API 声明入口 |
-| `src/game/webconsole_bridge.ts` | Lua 命令信箱、状态发布、配置提交和交易回执 |
+| `src/game/webconsole_bridge.ts` | Lua 内存队列、状态发布、配置提交和交易回执 |
 | `reframework/autorun/lua/webconsole_probe.lua` | DLL↔Lua 验收探针（自动执行，PASS/FAIL 与会话历史） |
 | `src/game/shop_window.ts` | 网页与原生窗口共用的购买资格和交付流程 |
 | `console/src/` | Vue 控制台、策划编辑器与 HTTP 客户端 |
