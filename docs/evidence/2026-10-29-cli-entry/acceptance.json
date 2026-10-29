@@ -1,0 +1,494 @@
+{
+  "ok": true,
+  "scene": "village",
+  "requestedSlot": 1,
+  "steps": [
+    {
+      "cmd": "dialog.close",
+      "receipt": {
+        "id": "dialog.close-mvsk2ei9-5c23a2fae1b97ec1",
+        "message": "Native UI transitioned",
+        "status": "applied",
+        "ui": {
+          "adapterVersion": 1,
+          "allowedActions": null,
+          "beforeTitle": true,
+          "busy": false,
+          "diagnostics": {
+            "isNetworkErrorWindowButton": 1
+          },
+          "dialogCoverage": [
+            "network_error",
+            "confirmation",
+            "information"
+          ],
+          "dialogs": null,
+          "dialogsKnown": false,
+          "evidence": [
+            {
+              "source": "snow.gui.fsm.title.GuiTitleFsmManager.getCurrentNodeName(0)",
+              "value": "CheckDLC"
+            },
+            {
+              "source": "snow.gui.fsm.title.GuiTitleMenuFsmManager.get_TitleMenuState",
+              "value": 0
+            },
+            {
+              "source": "snow.gui.GuiSaveDataSelectMenu.isOpen",
+              "value": false
+            }
+          ],
+          "menuState": 0,
+          "scene": "unknown",
+          "sceneToken": "1-1793218584-e14fc2c3:ui:15",
+          "slots": null,
+          "titleNode": "CheckDLC"
+        }
+      }
+    },
+    {
+      "cmd": "startup.acknowledge",
+      "receipt": {
+        "id": "startup.acknowledge-mvsk2gn8-3c101c93a4962662",
+        "message": "Native UI transitioned",
+        "status": "applied",
+        "ui": {
+          "adapterVersion": 1,
+          "allowedActions": null,
+          "beforeTitle": true,
+          "busy": false,
+          "diagnostics": {
+            "getDecideButtonTrg": 1,
+            "isNetworkErrorWindowButton": 1
+          },
+          "dialogCoverage": [
+            "network_error",
+            "confirmation",
+            "information"
+          ],
+          "dialogs": null,
+          "dialogsKnown": false,
+          "evidence": [
+            {
+              "source": "snow.gui.fsm.title.GuiTitleFsmManager.getCurrentNodeName(0)",
+              "value": "EndGameStart"
+            },
+            {
+              "source": "snow.gui.fsm.title.GuiTitleMenuFsmManager.get_TitleMenuState",
+              "value": 0
+            },
+            {
+              "source": "snow.gui.GuiSaveDataSelectMenu.isOpen",
+              "value": false
+            }
+          ],
+          "menuState": 0,
+          "scene": "unknown",
+          "sceneToken": "1-1793218584-e14fc2c3:ui:17",
+          "slots": null,
+          "titleNode": "EndGameStart"
+        }
+      }
+    },
+    {
+      "cmd": "title.advance",
+      "receipt": {
+        "id": "title.advance-mvsk2jy3-ac865cc448d58d35",
+        "message": "Native UI transitioned",
+        "status": "applied",
+        "ui": {
+          "adapterVersion": 1,
+          "allowedActions": [
+            "title.continue"
+          ],
+          "beforeTitle": false,
+          "busy": false,
+          "diagnostics": {
+            "getDecideButtonTrg": 2,
+            "getDecideMouseEventTrg": 3,
+            "getTitlePressAnyButton": 1,
+            "isNetworkErrorWindowButton": 1
+          },
+          "dialogCoverage": [
+            "network_error",
+            "confirmation",
+            "information"
+          ],
+          "dialogs": null,
+          "dialogsKnown": false,
+          "evidence": [
+            {
+              "source": "snow.gui.fsm.title.GuiTitleFsmManager.getCurrentNodeName(0)",
+              "value": "Title_TopMenu_Demo"
+            },
+            {
+              "source": "snow.gui.fsm.title.GuiTitleMenuFsmManager.get_TitleMenuState",
+              "value": 2
+            },
+            {
+              "source": "snow.gui.GuiSaveDataSelectMenu.isOpen",
+              "value": false
+            }
+          ],
+          "menuState": 2,
+          "scene": "title",
+          "sceneToken": "1-1793218584-e14fc2c3:ui:20",
+          "slots": null,
+          "titleNode": "Title_TopMenu_Demo"
+        }
+      }
+    },
+    {
+      "cmd": "title.continue",
+      "receipt": {
+        "id": "title.continue-mvsk2m9z-3c0f2f4cee4f668f",
+        "message": "Native UI transitioned",
+        "status": "applied",
+        "ui": {
+          "adapterVersion": 1,
+          "allowedActions": [
+            "title.continue"
+          ],
+          "beforeTitle": false,
+          "busy": false,
+          "diagnostics": {
+            "getDecideButtonTrg": 3,
+            "getDecideMouseEventTrg": 5,
+            "getTitlePressAnyButton": 1,
+            "isNetworkErrorWindowButton": 1
+          },
+          "dialogCoverage": [
+            "network_error",
+            "confirmation",
+            "information"
+          ],
+          "dialogs": null,
+          "dialogsKnown": false,
+          "evidence": [
+            {
+              "source": "snow.gui.fsm.title.GuiTitleFsmManager.getCurrentNodeName(0)",
+              "value": "CheckDemoEnd"
+            },
+            {
+              "source": "snow.gui.fsm.title.GuiTitleMenuFsmManager.get_TitleMenuState",
+              "value": 2
+            },
+            {
+              "source": "snow.gui.GuiSaveDataSelectMenu.isOpen",
+              "value": false
+            }
+          ],
+          "menuState": 2,
+          "scene": "title",
+          "sceneToken": "1-1793218584-e14fc2c3:ui:21",
+          "slots": null,
+          "titleNode": "CheckDemoEnd"
+        }
+      }
+    },
+    {
+      "cmd": "save.load",
+      "receipt": {
+        "id": "save.load-mvsk2p6u-0ca48b9796780229",
+        "message": "Native UI transitioned",
+        "status": "applied",
+        "ui": {
+          "adapterVersion": 1,
+          "allowedActions": null,
+          "beforeTitle": false,
+          "busy": false,
+          "diagnostics": {
+            "getDecideButtonTrg": 4,
+            "getDecideMouseEventTrg": 5,
+            "getTitlePressAnyButton": 1,
+            "isNetworkErrorWindowButton": 1
+          },
+          "dialogCoverage": [
+            "network_error",
+            "confirmation",
+            "information"
+          ],
+          "dialogs": [
+            {
+              "buttons": null,
+              "identity": "2223350145792",
+              "kind": "information",
+              "passive": true,
+              "supported": false,
+              "text": "正在加载。\r\n请勿结束游戏。",
+              "token": "1-1793218584-e14fc2c3:ui:24:dialog:0",
+              "windowType": 2
+            }
+          ],
+          "dialogsKnown": false,
+          "evidence": [
+            {
+              "source": "snow.gui.fsm.title.GuiTitleFsmManager.getCurrentNodeName(0)",
+              "value": "ロード画面初期化"
+            },
+            {
+              "source": "snow.gui.fsm.title.GuiTitleMenuFsmManager.get_TitleMenuState",
+              "value": 2
+            },
+            {
+              "source": "snow.gui.GuiSaveDataSelectMenu.isOpen",
+              "value": true
+            }
+          ],
+          "loading": true,
+          "menuState": 2,
+          "scene": "loading",
+          "sceneToken": "1-1793218584-e14fc2c3:ui:24",
+          "selectedSlot": 1,
+          "slots": [
+            {
+              "hunterRank": 1,
+              "masterRank": 1,
+              "name": "量子猫",
+              "occupied": true,
+              "slot": 1
+            },
+            {
+              "hunterRank": -1,
+              "masterRank": -1,
+              "name": "(仮)名無し",
+              "occupied": false,
+              "slot": 2
+            },
+            {
+              "hunterRank": -1,
+              "masterRank": -1,
+              "name": "(仮)名無し",
+              "occupied": false,
+              "slot": 3
+            }
+          ],
+          "titleNode": "ロード画面初期化"
+        }
+      }
+    },
+    {
+      "cmd": "dialog.close",
+      "receipt": {
+        "id": "dialog.close-mvsk2u1b-42863c7fdad67851",
+        "message": "Native UI transitioned",
+        "status": "applied",
+        "ui": {
+          "adapterVersion": 1,
+          "allowedActions": null,
+          "beforeTitle": false,
+          "busy": false,
+          "diagnostics": {
+            "getDecideButtonTrg": 4,
+            "getDecideMouseEventTrg": 5,
+            "getTitlePressAnyButton": 1,
+            "isNetworkErrorWindowButton": 2
+          },
+          "dialogCoverage": [
+            "network_error",
+            "confirmation",
+            "information"
+          ],
+          "dialogs": null,
+          "dialogsKnown": false,
+          "evidence": [
+            {
+              "source": "snow.gui.fsm.title.GuiTitleFsmManager.getCurrentNodeName(0)",
+              "value": "ロード画面終了 村へ"
+            },
+            {
+              "source": "snow.gui.fsm.title.GuiTitleMenuFsmManager.get_TitleMenuState",
+              "value": 2
+            },
+            {
+              "source": "snow.gui.GuiSaveDataSelectMenu.isOpen",
+              "value": true
+            }
+          ],
+          "menuState": 2,
+          "scene": "save_menu_unknown",
+          "sceneToken": "1-1793218584-e14fc2c3:ui:26",
+          "selectedSlot": 1,
+          "slots": [
+            {
+              "hunterRank": 1,
+              "masterRank": 1,
+              "name": "量子猫",
+              "occupied": true,
+              "slot": 1
+            },
+            {
+              "hunterRank": -1,
+              "masterRank": -1,
+              "name": "(仮)名無し",
+              "occupied": false,
+              "slot": 2
+            },
+            {
+              "hunterRank": -1,
+              "masterRank": -1,
+              "name": "(仮)名無し",
+              "occupied": false,
+              "slot": 3
+            }
+          ],
+          "titleNode": "ロード画面終了 村へ"
+        }
+      }
+    }
+  ],
+  "final": {
+    "bridgeId": "1-1793218584-e14fc2c3",
+    "counter": 62,
+    "protocol": 4,
+    "sessionStage": "Idle",
+    "questUnique": null,
+    "online": false,
+    "ui": {
+      "adapterVersion": 1,
+      "allowedActions": [
+        "run.start"
+      ],
+      "busy": false,
+      "canPost": true,
+      "diagnostics": {
+        "getDecideButtonTrg": 4,
+        "getDecideMouseEventTrg": 5,
+        "getTitlePressAnyButton": 1,
+        "isNetworkErrorWindowButton": 2
+      },
+      "dialogCoverage": [
+        "network_error",
+        "confirmation",
+        "information"
+      ],
+      "dialogs": null,
+      "dialogsKnown": false,
+      "evidence": [
+        {
+          "source": "snow.gui.fsm.title.GuiTitleFsmManager.getCurrentNodeName(0)"
+        },
+        {
+          "source": "snow.gui.fsm.title.GuiTitleMenuFsmManager.get_TitleMenuState"
+        },
+        {
+          "source": "snow.gui.GuiSaveDataSelectMenu.isOpen",
+          "value": false
+        },
+        {
+          "source": "snow.QuestManager.isActiveQuest",
+          "value": false
+        },
+        {
+          "source": "snow.stage.StageManager",
+          "value": "no verified map accessor in the installed SDK"
+        },
+        {
+          "source": "snow.gui.GuiManager.IsCanInvokeQuestBoard",
+          "value": true
+        },
+        {
+          "source": "snow.player.PlayerManager.PlayerList",
+          "value": 1
+        }
+      ],
+      "loading": false,
+      "note": "Native title/save/menu observation; unclassified dialogs remain unsupported.",
+      "online": false,
+      "scene": "village",
+      "sceneToken": "1-1793218584-e14fc2c3:ui:29",
+      "slots": null
+    },
+    "preparation": {
+      "carveRemaining": 0,
+      "dwellRemaining": 2,
+      "expected": 0,
+      "gathered": false,
+      "players": [
+        {
+          "id": 0,
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        }
+      ],
+      "radius": 15,
+      "resolved": 0,
+      "seen": 0
+    }
+  },
+  "native": {
+    "ok": true,
+    "plugin": "webconsole",
+    "module": "webconsole",
+    "export": "luaopen_webconsole",
+    "moduleVersion": "0.3.4",
+    "protocol": 4,
+    "pid": 86432,
+    "session": "86432-5412135430",
+    "uptimeMs": 974267,
+    "sessions": 1,
+    "stateSeq": 965,
+    "queuedCommands": 0,
+    "commands": 6,
+    "pings": 2,
+    "transport": "memory"
+  },
+  "doctor": {
+    "ok": true,
+    "baseUrl": "http://127.0.0.1:11777",
+    "layers": {
+      "http": {
+        "state": "up",
+        "status": 200
+      },
+      "dll": {
+        "state": "up",
+        "plugin": "webconsole",
+        "version": "0.3.4",
+        "pid": 86432,
+        "session": "86432-5412135430",
+        "uptimeMs": 972417,
+        "transport": "memory",
+        "luaSessions": 1,
+        "pings": 2,
+        "commands": 6,
+        "queuedCommands": 0
+      },
+      "lua": {
+        "state": "pass",
+        "moduleVersion": "0.3.4",
+        "session": "86432-5412135430:lua-1",
+        "at": "2026-10-28T20:16:24Z",
+        "errors": []
+      },
+      "business": {
+        "state": "live",
+        "protocol": 4,
+        "sessionStage": "Idle",
+        "corePhase": "Idle",
+        "layer": 0,
+        "questUnique": null,
+        "sampledAt": 1793219550
+      }
+    },
+    "protocol": {
+      "expected": 4,
+      "actual": 4,
+      "compatible": true
+    },
+    "liveness": {
+      "state": "live",
+      "bridgeId": "1-1793218584-e14fc2c3",
+      "counter": {
+        "from": 963,
+        "to": 965
+      },
+      "sampleWindowMs": 1603
+    },
+    "blockers": []
+  },
+  "buildSha256": "8b94d3a591161c999527d3cfd447a114d2a701ba699e1b3bf86f2a719862e485"
+}

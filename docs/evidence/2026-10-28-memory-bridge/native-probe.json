@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "plugin": "webconsole",
+  "module": "webconsole",
+  "export": "luaopen_webconsole",
+  "moduleVersion": "0.3.3",
+  "protocol": 3,
+  "pid": 30880,
+  "session": "30880-403530972",
+  "uptimeMs": 63470,
+  "sessions": 1,
+  "stateSeq": 56,
+  "queuedCommands": 0,
+  "commands": 0,
+  "pings": 2,
+  "transport": "memory"
+}

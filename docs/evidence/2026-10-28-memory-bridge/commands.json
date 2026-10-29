@@ -1,0 +1,22 @@
+{
+  "pid": 30880,
+  "dllSession": "30880-403530972",
+  "bridgeId": "1-1793184083-28ee54ab",
+  "records": [
+    {
+      "id": "audit-current-1793184191611049400",
+      "status": "applied",
+      "message": "已读取游戏配置（含下一局规则）"
+    },
+    {
+      "id": "audit-stale-1793184191611049400",
+      "status": "rejected",
+      "message": "Error: 连接会话已更换，请等待同步后重试"
+    },
+    {
+      "id": "audit-current-1793184191611049400",
+      "status": "applied",
+      "message": "已读取游戏配置（含下一局规则）"
+    }
+  ]
+}

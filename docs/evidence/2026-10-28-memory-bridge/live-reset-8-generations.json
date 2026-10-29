@@ -1,0 +1,371 @@
+{
+  "probe": {
+    "ok": true,
+    "plugin": "webconsole",
+    "module": "webconsole",
+    "export": "luaopen_webconsole",
+    "moduleVersion": "0.3.3",
+    "protocol": 3,
+    "pid": 30880,
+    "session": "30880-403530972",
+    "uptimeMs": 3898149,
+    "sessions": 8,
+    "stateSeq": 3904,
+    "queuedCommands": 0,
+    "commands": 8,
+    "pings": 16,
+    "transport": "memory"
+  },
+  "report": {
+    "at": 1793187490,
+    "atIso": "2026-10-28T11:38:10Z",
+    "history": [
+      {
+        "at": 1793184083,
+        "atIso": "2026-10-28T10:41:23Z",
+        "checks": [
+          {
+            "bytes": 42,
+            "elapsedMs": 0.0,
+            "id": "roundtrip",
+            "message": "ping: 42 字节原样返回，0.00 ms",
+            "ok": true
+          },
+          {
+            "bytes": 51,
+            "elapsedMs": 0.0,
+            "gcMs": 2.000000000000668,
+            "id": "roundtrip-after-gc",
+            "message": "ping-after-gc: 51 字节原样返回，0.00 ms",
+            "ok": true
+          }
+        ],
+        "dllSession": "30880-403530972",
+        "durationMs": 2.000000000000668,
+        "epoch": 1,
+        "exportName": "luaopen_webconsole",
+        "loadedScript": "@C:\\Program Files (x86)\\Steam\\steamapps\\common\\MonsterHunterRise\\reframework\\autorun/lua/webconsole_probe.lua",
+        "localTime": "2026-10-28 18:41:23",
+        "luaEpoch": 1,
+        "moduleName": "webconsole",
+        "moduleVersion": "0.3.3",
+        "ok": true,
+        "previous": true,
+        "schema": 1,
+        "session": "30880-403530972:lua-1",
+        "sessionSeq": 1,
+        "sessionSource": "dll-lua-epoch",
+        "versionSource": "luaopen"
+      },
+      {
+        "at": 1793187482,
+        "atIso": "2026-10-28T11:38:02Z",
+        "checks": [
+          {
+            "bytes": 41,
+            "elapsedMs": 0.0,
+            "id": "roundtrip",
+            "message": "ping: 41 字节原样返回，0.00 ms",
+            "ok": true
+          },
+          {
+            "bytes": 52,
+            "elapsedMs": 0.0,
+            "gcMs": 0.9999999997489795,
+            "id": "roundtrip-after-gc",
+            "message": "ping-after-gc: 52 字节原样返回，0.00 ms",
+            "ok": true
+          }
+        ],
+        "dllSession": "30880-403530972",
+        "durationMs": 0.9999999997489795,
+        "epoch": 2,
+        "exportName": "luaopen_webconsole",
+        "loadedScript": "@C:\\Program Files (x86)\\Steam\\steamapps\\common\\MonsterHunterRise\\reframework\\autorun/lua/webconsole_probe.lua",
+        "localTime": "2026-10-28 19:38:02",
+        "luaEpoch": 2,
+        "moduleName": "webconsole",
+        "moduleVersion": "0.3.3",
+        "ok": true,
+        "previous": true,
+        "schema": 1,
+        "session": "30880-403530972:lua-2",
+        "sessionSeq": 2,
+        "sessionSource": "dll-lua-epoch",
+        "versionSource": "luaopen"
+      },
+      {
+        "at": 1793187484,
+        "atIso": "2026-10-28T11:38:04Z",
+        "checks": [
+          {
+            "bytes": 43,
+            "elapsedMs": 0.0,
+            "id": "roundtrip",
+            "message": "ping: 43 字节原样返回，0.00 ms",
+            "ok": true
+          },
+          {
+            "bytes": 52,
+            "elapsedMs": 0.0,
+            "gcMs": 1.0000000002037268,
+            "id": "roundtrip-after-gc",
+            "message": "ping-after-gc: 52 字节原样返回，0.00 ms",
+            "ok": true
+          }
+        ],
+        "dllSession": "30880-403530972",
+        "durationMs": 1.0000000002037268,
+        "epoch": 3,
+        "exportName": "luaopen_webconsole",
+        "loadedScript": "@C:\\Program Files (x86)\\Steam\\steamapps\\common\\MonsterHunterRise\\reframework\\autorun/lua/webconsole_probe.lua",
+        "localTime": "2026-10-28 19:38:04",
+        "luaEpoch": 3,
+        "moduleName": "webconsole",
+        "moduleVersion": "0.3.3",
+        "ok": true,
+        "previous": true,
+        "schema": 1,
+        "session": "30880-403530972:lua-3",
+        "sessionSeq": 3,
+        "sessionSource": "dll-lua-epoch",
+        "versionSource": "luaopen"
+      },
+      {
+        "at": 1793187485,
+        "atIso": "2026-10-28T11:38:05Z",
+        "checks": [
+          {
+            "bytes": 42,
+            "elapsedMs": 0.0,
+            "id": "roundtrip",
+            "message": "ping: 42 字节原样返回，0.00 ms",
+            "ok": true
+          },
+          {
+            "bytes": 51,
+            "elapsedMs": 0.0,
+            "gcMs": 0.9999999997489795,
+            "id": "roundtrip-after-gc",
+            "message": "ping-after-gc: 51 字节原样返回，0.00 ms",
+            "ok": true
+          }
+        ],
+        "dllSession": "30880-403530972",
+        "durationMs": 0.9999999997489795,
+        "epoch": 4,
+        "exportName": "luaopen_webconsole",
+        "loadedScript": "@C:\\Program Files (x86)\\Steam\\steamapps\\common\\MonsterHunterRise\\reframework\\autorun/lua/webconsole_probe.lua",
+        "localTime": "2026-10-28 19:38:05",
+        "luaEpoch": 4,
+        "moduleName": "webconsole",
+        "moduleVersion": "0.3.3",
+        "ok": true,
+        "previous": true,
+        "schema": 1,
+        "session": "30880-403530972:lua-4",
+        "sessionSeq": 4,
+        "sessionSource": "dll-lua-epoch",
+        "versionSource": "luaopen"
+      },
+      {
+        "at": 1793187487,
+        "atIso": "2026-10-28T11:38:07Z",
+        "checks": [
+          {
+            "bytes": 43,
+            "elapsedMs": 0.0,
+            "id": "roundtrip",
+            "message": "ping: 43 字节原样返回，0.00 ms",
+            "ok": true
+          },
+          {
+            "bytes": 51,
+            "elapsedMs": 0.0,
+            "gcMs": 0.9999999997489795,
+            "id": "roundtrip-after-gc",
+            "message": "ping-after-gc: 51 字节原样返回，0.00 ms",
+            "ok": true
+          }
+        ],
+        "dllSession": "30880-403530972",
+        "durationMs": 0.9999999997489795,
+        "epoch": 5,
+        "exportName": "luaopen_webconsole",
+        "loadedScript": "@C:\\Program Files (x86)\\Steam\\steamapps\\common\\MonsterHunterRise\\reframework\\autorun/lua/webconsole_probe.lua",
+        "localTime": "2026-10-28 19:38:07",
+        "luaEpoch": 5,
+        "moduleName": "webconsole",
+        "moduleVersion": "0.3.3",
+        "ok": true,
+        "previous": true,
+        "schema": 1,
+        "session": "30880-403530972:lua-5",
+        "sessionSeq": 5,
+        "sessionSource": "dll-lua-epoch",
+        "versionSource": "luaopen"
+      },
+      {
+        "at": 1793187488,
+        "atIso": "2026-10-28T11:38:08Z",
+        "checks": [
+          {
+            "bytes": 43,
+            "elapsedMs": 0.0,
+            "id": "roundtrip",
+            "message": "ping: 43 字节原样返回，0.00 ms",
+            "ok": true
+          },
+          {
+            "bytes": 52,
+            "elapsedMs": 0.0,
+            "gcMs": 0.9999999997489795,
+            "id": "roundtrip-after-gc",
+            "message": "ping-after-gc: 52 字节原样返回，0.00 ms",
+            "ok": true
+          }
+        ],
+        "dllSession": "30880-403530972",
+        "durationMs": 0.9999999997489795,
+        "epoch": 6,
+        "exportName": "luaopen_webconsole",
+        "loadedScript": "@C:\\Program Files (x86)\\Steam\\steamapps\\common\\MonsterHunterRise\\reframework\\autorun/lua/webconsole_probe.lua",
+        "localTime": "2026-10-28 19:38:08",
+        "luaEpoch": 6,
+        "moduleName": "webconsole",
+        "moduleVersion": "0.3.3",
+        "ok": true,
+        "previous": true,
+        "schema": 1,
+        "session": "30880-403530972:lua-6",
+        "sessionSeq": 6,
+        "sessionSource": "dll-lua-epoch",
+        "versionSource": "luaopen"
+      },
+      {
+        "at": 1793187489,
+        "atIso": "2026-10-28T11:38:09Z",
+        "checks": [
+          {
+            "bytes": 42,
+            "elapsedMs": 0.0,
+            "id": "roundtrip",
+            "message": "ping: 42 字节原样返回，0.00 ms",
+            "ok": true
+          },
+          {
+            "bytes": 50,
+            "elapsedMs": 0.0,
+            "gcMs": 1.0000000002037268,
+            "id": "roundtrip-after-gc",
+            "message": "ping-after-gc: 50 字节原样返回，0.00 ms",
+            "ok": true
+          }
+        ],
+        "dllSession": "30880-403530972",
+        "durationMs": 1.0000000002037268,
+        "epoch": 7,
+        "exportName": "luaopen_webconsole",
+        "loadedScript": "@C:\\Program Files (x86)\\Steam\\steamapps\\common\\MonsterHunterRise\\reframework\\autorun/lua/webconsole_probe.lua",
+        "localTime": "2026-10-28 19:38:09",
+        "luaEpoch": 7,
+        "moduleName": "webconsole",
+        "moduleVersion": "0.3.3",
+        "ok": true,
+        "previous": true,
+        "schema": 1,
+        "session": "30880-403530972:lua-7",
+        "sessionSeq": 7,
+        "sessionSource": "dll-lua-epoch",
+        "versionSource": "luaopen"
+      },
+      {
+        "at": 1793187490,
+        "atIso": "2026-10-28T11:38:10Z",
+        "checks": [
+          {
+            "bytes": 42,
+            "elapsedMs": 0.0,
+            "id": "roundtrip",
+            "message": "ping: 42 字节原样返回，0.00 ms",
+            "ok": true
+          },
+          {
+            "bytes": 51,
+            "elapsedMs": 0.0,
+            "gcMs": 0.9999999997489795,
+            "id": "roundtrip-after-gc",
+            "message": "ping-after-gc: 51 字节原样返回，0.00 ms",
+            "ok": true
+          }
+        ],
+        "dllSession": "30880-403530972",
+        "durationMs": 0.9999999997489795,
+        "epoch": 8,
+        "errors": null,
+        "exportName": "luaopen_webconsole",
+        "loadedScript": "@C:\\Program Files (x86)\\Steam\\steamapps\\common\\MonsterHunterRise\\reframework\\autorun/lua/webconsole_probe.lua",
+        "localTime": "2026-10-28 19:38:10",
+        "luaEpoch": 8,
+        "moduleName": "webconsole",
+        "moduleVersion": "0.3.3",
+        "ok": true,
+        "schema": 1,
+        "session": "30880-403530972:lua-8",
+        "sessionSeq": 8,
+        "sessionSource": "dll-lua-epoch",
+        "versionSource": "luaopen"
+      }
+    ],
+    "module": "webconsole",
+    "moduleVersion": "0.3.3",
+    "ok": true,
+    "result": {
+      "at": 1793187490,
+      "atIso": "2026-10-28T11:38:10Z",
+      "checks": [
+        {
+          "bytes": 42,
+          "elapsedMs": 0.0,
+          "id": "roundtrip",
+          "message": "ping: 42 字节原样返回，0.00 ms",
+          "ok": true
+        },
+        {
+          "bytes": 51,
+          "elapsedMs": 0.0,
+          "gcMs": 0.9999999997489795,
+          "id": "roundtrip-after-gc",
+          "message": "ping-after-gc: 51 字节原样返回，0.00 ms",
+          "ok": true
+        }
+      ],
+      "dllSession": "30880-403530972",
+      "durationMs": 0.9999999997489795,
+      "epoch": 8,
+      "errors": null,
+      "exportName": "luaopen_webconsole",
+      "loadedScript": "@C:\\Program Files (x86)\\Steam\\steamapps\\common\\MonsterHunterRise\\reframework\\autorun/lua/webconsole_probe.lua",
+      "localTime": "2026-10-28 19:38:10",
+      "luaEpoch": 8,
+      "moduleName": "webconsole",
+      "moduleVersion": "0.3.3",
+      "ok": true,
+      "schema": 1,
+      "session": "30880-403530972:lua-8",
+      "sessionSeq": 8,
+      "sessionSource": "dll-lua-epoch",
+      "versionSource": "luaopen"
+    },
+    "schema": 1,
+    "session": "30880-403530972:lua-8",
+    "sessionSeq": 8
+  },
+  "business": {
+    "bridgeId": "8-1793187490-4649aafc",
+    "stage": "Carve",
+    "questId": 900102,
+    "counterBefore": 484,
+    "counterAfter": 486
+  }
+}
