@@ -47,7 +47,33 @@ int main() try {
     for (size_t i = 0; i < webconsole::MemoryBridge::MAX_COMMANDS; ++i)
         check(bridge.push_command("bounded"), "Queue rejected before capacity");
     check(!bridge.push_command("overflow"), "Queue overwrote an accepted request");
-    std::cout << "PASS: 3 native Lua generations, preload, binary echo, GC, errors, singleton and queue bounds\n";
+
+    // Script endpoint input validation helpers (pure functions in common.h).
+    std::string value;
+    check(webconsole::json_find_string("{\"path\":\"a/b.lua\"}", "path", value) && value == "a/b.lua",
+        "json_find_string missed a plain value");
+    check(webconsole::json_find_string("{\"content\":\"line1\\nline2\\\"q\\\"\\u4e2d\"}", "content", value) &&
+        value == "line1\nline2\"q\"\xE4\xB8\xAD", "json_find_string mishandled escapes");
+    check(!webconsole::json_find_string("{\"path\":42}", "path", value), "json_find_string accepted a number");
+    check(!webconsole::json_find_string("{\"other\":1}", "path", value), "json_find_string invented a key");
+    check(webconsole::valid_run_script_name("probe_01", value) && value == "probe_01.lua",
+        "valid_run_script_name should append .lua");
+    check(!webconsole::valid_run_script_name("../evil", value) &&
+        !webconsole::valid_run_script_name("a/b", value) &&
+        !webconsole::valid_run_script_name("", value) &&
+        !webconsole::valid_run_script_name(std::string(200, 'x'), value),
+        "valid_run_script_name accepted an unsafe name");
+    check(webconsole::valid_run_script_path("reframework/autorun-probe/x.lua", value) &&
+        value == "reframework/autorun-probe/x.lua", "valid_run_script_path rejected a valid path");
+    check(!webconsole::valid_run_script_path("C:\\x.lua", value) &&
+        !webconsole::valid_run_script_path("/x.lua", value) &&
+        !webconsole::valid_run_script_path("a/../b.lua", value) &&
+        !webconsole::valid_run_script_path("a/b.txt", value) &&
+        !webconsole::valid_run_script_path("\xE4\xB8\xAD.lua", value),
+        "valid_run_script_path accepted an unsafe path");
+
+    std::cout << "PASS: 3 native Lua generations, preload, binary echo, GC, errors, singleton, "
+                 "queue bounds and script input validation\n";
     return 0;
 } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';

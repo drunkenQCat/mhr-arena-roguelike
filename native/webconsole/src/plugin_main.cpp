@@ -30,6 +30,9 @@ extern "C" __declspec(dllexport) void reframework_plugin_required_version(REFram
 
 extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFrameworkPluginInitializeParam* param) {
     if (!param || !param->functions) return false;
+    // Script-control surface of the forked framework (request_script_reset /
+    // run_script / last_script_error); members may still be null on older builds.
+    webconsole::g_plugin_functions = param->functions;
     // The installed build (5bae4701) declares log_info as varargs; log_sink is a
     // fixed-signature pointer, so forward through a wrapper. Only one argument
     // is ever passed, which is a legal varargs call.
@@ -47,7 +50,8 @@ extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFram
     std::string root = exe_dir;
     const auto slash = root.find_last_of('\\');
     if (slash != std::string::npos) root = root.substr(0, slash);
-    webconsole::g_data_dir = std::wstring(root.begin(), root.end()) + L"\\reframework\\data";
+    webconsole::g_game_root = std::wstring(root.begin(), root.end());
+    webconsole::g_data_dir = webconsole::g_game_root + L"\\reframework\\data";
     std::filesystem::create_directories(webconsole::g_data_dir);
 
     webconsole::start_http_server();
@@ -86,6 +90,7 @@ int main(int argc, char** argv)
     const auto slash = full.find_last_of(L"\\");
     webconsole::g_module_dir = slash == std::wstring::npos ? full : full.substr(0, slash);
     webconsole::g_data_dir = webconsole::g_module_dir + L"\\testdata";
+    webconsole::g_game_root = webconsole::g_module_dir;
     _wmkdir(webconsole::g_data_dir.c_str());
     webconsole::init_session_id();
     webconsole::log_info("standalone webconsole (test mode)");

@@ -7,6 +7,7 @@
 
 #include "httplib.h"
 
+#include <filesystem>
 #include <sstream>
 
 namespace webconsole {
@@ -44,6 +45,41 @@ std::string json_escape(const std::string& text)
         }
     }
     return out;
+}
+
+// Shared origin check for every POST endpoint: empty Origin (curl, CLI) passes;
+// browsers must name this interface or the dev server.
+bool origin_ok(const httplib::Request& req)
+{
+    const auto origin = req.get_header_value("Origin");
+    if (origin.empty()) return true;
+    const auto expected = std::string("http://127.0.0.1:") + std::to_string(g_listen_port);
+    const auto local = std::string("http://localhost:") + std::to_string(g_listen_port);
+    // Match the actual destination interface, not an arbitrary client-supplied Host.
+    const auto interface_origin = std::string("http://") + req.local_addr + ":" + std::to_string(g_listen_port);
+    return origin == expected || origin == local || origin == interface_origin ||
+        origin == "http://localhost:5173" || origin == "http://127.0.0.1:5173";
+}
+
+// g_game_root is ASCII on every relevant install (Steam library path); validated
+// script paths are ASCII by construction, so this narrowing is codepoint-exact.
+std::string narrow_path(const std::wstring& wide)
+{
+    std::string out;
+    out.reserve(wide.size());
+    for (const wchar_t ch : wide) out += static_cast<char>(ch);
+    return out;
+}
+
+// The three framework script endpoints answer uniformly when the plugin runs
+// outside REFramework (standalone test exe) or on an unforked framework build.
+bool script_api_available(std::string& error_body)
+{
+    const auto* fns = g_plugin_functions;
+    if (fns && fns->request_script_reset && fns->run_script && fns->last_script_error) return true;
+    error_body = "{\"ok\":false,\"error\":\"framework script API unavailable "
+                 "(standalone test build or unforked REFramework)\"}";
+    return false;
 }
 
 std::string probe_json()
@@ -139,16 +175,9 @@ void run_server()
     });
 
     // Bounded command queue: POST enqueues; Lua pops and publishes results.
-    // Origin is checked against the real destination interface, not an arbitrary Host.
     // 256 KB cap leaves room for config submissions.
     svr.Post("/api/command", [](const httplib::Request& req, httplib::Response& res) {
-        const auto expected = std::string("http://127.0.0.1:") + std::to_string(g_listen_port);
-        const auto local = std::string("http://localhost:") + std::to_string(g_listen_port);
-        // Match the actual destination interface, not an arbitrary client-supplied Host.
-        const auto interface_origin = std::string("http://") + req.local_addr + ":" + std::to_string(g_listen_port);
-        const auto origin = req.get_header_value("Origin");
-        if (!origin.empty() && origin != expected && origin != local && origin != interface_origin &&
-            origin != "http://localhost:5173" && origin != "http://127.0.0.1:5173") {
+        if (!origin_ok(req)) {
             res.status = 403;
             res.set_content("{\"ok\":false,\"error\":\"origin rejected\"}", "application/json");
             return;
@@ -172,6 +201,126 @@ void run_server()
         g_command_posts.fetch_add(1, std::memory_order_relaxed);
         std::ostringstream ss;
         ss << "{\"ok\":true,\"queued\":true,\"bytes\":" << req.body.size() << "}";
+        res.set_content(ss.str(), "application/json");
+    });
+
+    // Script control via the forked framework plugin API (fork commit 2e7ce5b:
+    // request_script_reset / run_script / last_script_error). Both POST endpoints
+    // queue the work; the game thread performs it inside the next frame.
+    svr.Post("/api/script/reset", [](const httplib::Request& req, httplib::Response& res) {
+        if (!origin_ok(req)) {
+            res.status = 403;
+            res.set_content("{\"ok\":false,\"error\":\"origin rejected\"}", "application/json");
+            return;
+        }
+        std::string unavailable;
+        if (!script_api_available(unavailable)) {
+            res.status = 503;
+            res.set_content(unavailable, "application/json");
+            return;
+        }
+        g_plugin_functions->request_script_reset();
+        std::ostringstream ss;
+        ss << "{\"ok\":true,\"queued\":true,\"action\":\"reset_scripts\""
+           << ",\"epoch\":" << bridge().epoch()
+           << ",\"session\":\"" << json_escape(g_session_id) << "\"}";
+        res.set_content(ss.str(), "application/json");
+    });
+
+    svr.Post("/api/script/run", [](const httplib::Request& req, httplib::Response& res) {
+        if (!origin_ok(req)) {
+            res.status = 403;
+            res.set_content("{\"ok\":false,\"error\":\"origin rejected\"}", "application/json");
+            return;
+        }
+        if (req.get_header_value("Content-Type").find("application/json") != 0) {
+            res.status = 415;
+            res.set_content("{\"ok\":false,\"error\":\"application/json required\"}", "application/json");
+            return;
+        }
+        if (req.body.size() > 262144) {
+            res.status = 413;
+            res.set_content("{\"ok\":false,\"error\":\"script body too large\"}", "application/json");
+            return;
+        }
+        std::string unavailable;
+        if (!script_api_available(unavailable)) {
+            res.status = 503;
+            res.set_content(unavailable, "application/json");
+            return;
+        }
+
+        std::string path_value, name_value, content_value;
+        const bool has_path = json_find_string(req.body, "path", path_value);
+        const bool has_content = json_find_string(req.body, "content", content_value);
+        json_find_string(req.body, "name", name_value);
+
+        std::string rel;        // game-root-relative narrow path handed to run_script
+        std::string script;     // name reported back to the client
+        if (has_path && has_content) {
+            res.status = 400;
+            res.set_content("{\"ok\":false,\"error\":\"path and content are mutually exclusive\"}", "application/json");
+            return;
+        } else if (has_path) {
+            if (!valid_run_script_path(path_value, rel)) {
+                res.status = 400;
+                res.set_content("{\"ok\":false,\"error\":\"path must be a relative ASCII "
+                    "game-tree path with a .lua suffix\"}", "application/json");
+                return;
+            }
+            script = rel;
+            const std::wstring wide = g_game_root + L"\\" + std::wstring(rel.begin(), rel.end());
+            std::error_code ec;
+            if (!std::filesystem::exists(wide, ec)) {
+                res.status = 404;
+                res.set_content("{\"ok\":false,\"error\":\"file not found in game tree\"}", "application/json");
+                return;
+            }
+        } else if (has_content) {
+            if (!valid_run_script_name(name_value, script)) {
+                res.status = 400;
+                res.set_content("{\"ok\":false,\"error\":\"content form requires name: one safe "
+                    "path component, ASCII, .lua suffix optional\"}", "application/json");
+                return;
+            }
+            const std::wstring runs_dir = g_data_dir + L"\\webconsole_runs";
+            std::filesystem::create_directories(runs_dir);
+            const std::wstring target = runs_dir + L"\\" + std::wstring(script.begin(), script.end());
+            if (!atomic_write_text(target, content_value)) {
+                res.status = 500;
+                res.set_content("{\"ok\":false,\"error\":\"failed to write script file\"}", "application/json");
+                return;
+            }
+            rel = "reframework/data/webconsole_runs/" + script;
+        } else {
+            res.status = 400;
+            res.set_content("{\"ok\":false,\"error\":\"provide path or content (+name)\"}", "application/json");
+            return;
+        }
+
+        const std::string absolute = narrow_path(g_game_root) + "\\" + rel;
+        if (!g_plugin_functions->run_script(absolute.c_str())) {
+            res.status = 500;
+            res.set_content("{\"ok\":false,\"error\":\"run_script rejected the path\"}", "application/json");
+            return;
+        }
+        std::ostringstream ss;
+        ss << "{\"ok\":true,\"queued\":true,\"script\":\"" << json_escape(script) << "\""
+           << ",\"epoch\":" << bridge().epoch()
+           << ",\"session\":\"" << json_escape(g_session_id) << "\"}";
+        res.set_content(ss.str(), "application/json");
+    });
+
+    svr.Get("/api/script/error", [](const httplib::Request&, httplib::Response& res) {
+        const auto* fns = g_plugin_functions;
+        const bool available = fns && fns->last_script_error;
+        char buf[4096] = {};
+        bool has = false;
+        if (available) has = fns->last_script_error(buf, sizeof(buf));
+        std::ostringstream ss;
+        ss << "{\"ok\":true,\"available\":" << (available ? "true" : "false")
+           << ",\"hasError\":" << (has ? "true" : "false")
+           << ",\"error\":\"" << json_escape(has ? buf : "") << "\"}";
         res.set_content(ss.str(), "application/json");
     });
 

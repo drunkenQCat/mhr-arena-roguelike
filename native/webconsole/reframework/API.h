@@ -88,6 +88,24 @@ typedef struct {
 
     REFOnImGuiFrameFn on_imgui_frame;
     REFOnImGuiDrawUIFn on_imgui_draw_ui;
+
+    /* Requests that all scripts get reloaded (same as pressing "Reset scripts" in the ScriptRunner UI).
+       The reset is performed on the next game frame. Safe to call from any thread.
+       Added after the initial release; check for nullptr before calling on older builds. */
+    void (*request_script_reset)();
+
+    /* Requests that the lua script at the given path be executed in the main script state on the
+       game thread (same as picking a file with the "Run script" button in the ScriptRunner UI,
+       without the file dialog). The script runs on the next game frame; script errors are reported
+       through the usual ScriptRunner error channel. Safe to call from any thread. Returns false if
+       path was null or empty. Check for nullptr before calling on older builds. */
+    bool (*run_script)(const char* path);
+
+    /* Copies the last ScriptRunner error text into out, NUL-terminated and truncated to
+       out_size - 1 bytes. Returns true when error text was copied; false when out is null,
+       out_size is 0, or there is no error (out is then set to an empty string). Safe to call
+       from any thread. Check for nullptr before calling on older builds. */
+    bool (*last_script_error)(char* out, unsigned int out_size);
 } REFrameworkPluginFunctions;
 
 typedef struct {
