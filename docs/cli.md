@@ -99,6 +99,18 @@ node cli/mhr.mjs wait --scene village --timeout 120
 
 `game launch` 只请求本机 Steam 启动 Rise，已运行时不重复启动；启动请求成功不等于已加载角色。远端 URL 不支持本机进程管理。
 
+## 脚本控制（需 fork 版 REFramework dinput8）
+
+```powershell
+node cli/mhr.mjs game reset --json
+node cli/mhr.mjs game run-script cli/tests/probe-sample.lua --timeout 20 --json
+node cli/mhr.mjs game last-error --json
+```
+
+`game reset` 触发与 ScriptRunner "Reset scripts" 相同的重置路径（下一帧生效，Lua epoch +1，旧 bridgeId 的请求被拒绝）。`game run-script` 优先把本地文件按内容上传（写入 `reframework/data/webconsole_runs/` 后执行），本地读不到则把参数当作游戏目录内的相对路径。两种形式都要求 ASCII 路径/名称，且不允许 `..` 与分隔符逃逸。提交后 CLI 轮询 `/api/probe/report`，直到出现 `script` 与提交时 `epoch` 都匹配的报告；超时则读取 `GET /api/script/error` 的框架错误文本一并输出。
+
+探针契约：脚本整体 `pcall`，把 `script`、`epoch`、`session`、`verdict`（PASS/FAIL/ERROR）、`steps`、`metrics`、`error` 组成报告，经 `require("webconsole").publish_probe(json.dump_string(report))` 发布。通道选择上 `publish_probe` 是探针专用槽，不要使用 `publish_results`（业务交易回执专用，会被覆盖）。
+
 `game enter` 必须指定已有槽位（1..3），会等待 DLL/Lua 初次就绪，观察菜单并依次处理已支持的启动连接错误、自动保存提示、标题和存档选择、被动加载提示及进村连接错误。最后必须观察到村庄就绪、玩家存在、没有已观察到的阻塞弹窗，才返回成功。首次获取会话后若 Lua Reset/连接失败则停止，不重放写操作。完整流程默认超时 120 秒。
 
 菜单稳定且心跳更新后才提交；每次写操作携带 sceneToken，弹窗操作额外携带 dialogToken。Lua 会再次核对。一次进入流程最多发起一次存档加载，防止加载时旧 UI 对象尚未销毁而重复操作。`saves load` 的回执证明原生加载流程已开始，不证明已经进村；完整完成判据由 `game enter` 检查。

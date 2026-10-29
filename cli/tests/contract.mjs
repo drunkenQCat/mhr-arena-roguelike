@@ -62,6 +62,9 @@ function createPlugin(behaviour = {}) {
         transport: "memory" });
       if (url.pathname === "/api/probe/report") {
         if (behaviour.noProbe) return json(503, { ok: false, error: "probe has not reported yet" });
+        if (state.scriptQueued) return json(200, { ok: true, kind: "run_script",
+          script: state.scriptQueued.script, epoch: state.scriptQueued.epoch,
+          verdict: behaviour.probeVerdict ?? "PASS", steps: [], metrics: {}, error: null });
         return json(200, { schema: 1, ok: true, session: "s-1:lua-1", moduleVersion: "test",
           atIso: "2026-01-01T00:00:00Z", result: { checks: [], errors: [] }, history: [] });
       }
@@ -73,6 +76,9 @@ function createPlugin(behaviour = {}) {
         if (behaviour.noLua) return json(503, { ok: false, error: "Lua bridge has not published results yet" });
         return json(200, { bridgeId: behaviour.bridgeForResults ?? "bridge-1",
           lastId: receipts.at(-1)?.id ?? "", last: receipts.at(-1) ?? null, history: receipts });
+      }
+      if (url.pathname === "/api/script/error") {
+        return json(200, behaviour.scriptError ?? { ok: true, available: true, hasError: false, error: "" });
       }
       return json(404, { ok: false, error: "not found" });
     }
@@ -92,6 +98,29 @@ function createPlugin(behaviour = {}) {
           receipts.push(receipt);
         }
         json(200, { ok: true, queued: true, bytes: body.length });
+      });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/script/reset") {
+      if (behaviour.scriptUnavailable) return json(503, { ok: false, error: "framework script API unavailable" });
+      received.push({ endpoint: "script/reset" });
+      return json(200, { ok: true, queued: true, action: "reset_scripts", epoch: 9, session: "s-1" });
+    }
+    if (req.method === "POST" && url.pathname === "/api/script/run") {
+      if (behaviour.scriptUnavailable) return json(503, { ok: false, error: "framework script API unavailable" });
+      let body = "";
+      req.on("data", (chunk) => { body += chunk; });
+      req.on("end", () => {
+        let payload = {};
+        try { payload = JSON.parse(body); } catch { /* malformed */ }
+        received.push({ endpoint: "script/run", payload });
+        if (behaviour.runReject) return json(behaviour.runReject, { ok: false, error: "file not found in game tree" });
+        // Model the probe contract: the queued script publishes a report carrying
+        // its name and the epoch that was current when the run was queued.
+        state.scriptQueued = { script: payload.name ?? payload.path?.split("/").pop(),
+          epoch: behaviour.runEpoch ?? 9 };
+        json(200, { ok: true, queued: true, script: state.scriptQueued.script,
+          epoch: state.scriptQueued.epoch, session: "s-1" });
       });
       return;
     }
@@ -242,6 +271,36 @@ await withPlugin({}, async (baseUrl) => {
   check("scenario passes", result.code === 0 && report.ok === true, report.steps);
   const bad = await runCli(["scenario", "run", join(ROOT, "cli", "tests", "scenario-fail.json"), "--json"], { baseUrl });
   check("failing scenario exits 4", bad.code === 4, bad.stdout.slice(0, 200));
+});
+
+// 9. Script control: reset, run-script content/path forms, timeout with error surfacing.
+await withPlugin({}, async (baseUrl, plugin) => {
+  const reset = await runCli(["game", "reset", "--json"], { baseUrl });
+  check("game reset exits 0", reset.code === 0, reset.stderr);
+  const sample = join(ROOT, "cli", "tests", "probe-sample.lua");
+  const run = await runCli(["game", "run-script", sample, "--json"], { baseUrl });
+  const runOut = JSON.parse(run.stdout);
+  check("run-script uploads local content and returns PASS", run.code === 0 &&
+    runOut.ok === true && runOut.report?.verdict === "PASS", run.stderr || run.stdout.slice(0, 200));
+  check("run-script posted the content form", plugin.received.some((r) => r.endpoint === "script/run" &&
+    r.payload?.name === "probe-sample.lua" && r.payload?.content?.includes("publish_probe")),
+    JSON.stringify(plugin.received));
+});
+await withPlugin({ runReject: 404 }, async (baseUrl) => {
+  const missing = await runCli(["game", "run-script", "reframework/autorun-probe/nope.lua", "--json"], { baseUrl });
+  check("run-script path form 404 exits 4", missing.code === 4, missing.stderr);
+});
+await withPlugin({ noProbe: true,
+  scriptError: { ok: true, available: true, hasError: true, error: "syntax error near 'end'" } },
+async (baseUrl) => {
+  const sample = join(ROOT, "cli", "tests", "probe-sample.lua");
+  const result = await runCli(["game", "run-script", sample, "--timeout", "2", "--json"], { baseUrl });
+  check("run-script without report exits 5 with framework error",
+    result.code === 5 && result.stderr.includes("syntax error near 'end'"), result.stderr);
+});
+await withPlugin({ scriptUnavailable: true }, async (baseUrl) => {
+  const reset = await runCli(["game", "reset", "--json"], { baseUrl });
+  check("script API unavailable exits 3", reset.code === 3, reset.stderr);
 });
 
 console.log(failures === 0 ? "\nALL CLI CONTRACT CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);

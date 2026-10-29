@@ -124,7 +124,7 @@ New-NetFirewallRule -DisplayName 'MHR Webconsole LAN 11777' -Direction Inbound -
 
 商店与游戏内窗口使用同一购买资格和交易路径：检查整备阶段、任务身份、集结位置、PT 与真实背包，执行后读取原生结果。补满、猫车恢复已接入，但原生效果仍需实机验收；不确定的交付会锁定交易，避免自动重复购买。
 
-主要端点为 `GET /console`、`GET /api/health`、`GET /api/state`、`GET /api/results`、`GET /api/config` 和 `POST /api/command`。其中 `/api/config` 是磁盘持久覆盖文件，未必等同当前 Lua 生效配置；网页通过命令桥读取权威配置。命令使用有界队列排队，队列达到 64 条或合计 1 MiB 时返回 429。
+主要端点为 `GET /console`、`GET /api/health`、`GET /api/state`、`GET /api/results`、`GET /api/config`、`POST /api/command`，以及脚本控制三端点 `POST /api/script/reset`、`POST /api/script/run`、`GET /api/script/error`（依赖 fork 版框架插件 API，见 `native/webconsole/reframework/README.md`；内容形式的脚本只接受 ASCII 安全文件名，落盘到 `reframework/data/webconsole_runs/`）。其中 `/api/config` 是磁盘持久覆盖文件，未必等同当前 Lua 生效配置；网页通过命令桥读取权威配置。命令使用有界队列排队，队列达到 64 条或合计 1 MiB 时返回 429。
 
 协议、研究过程和验证边界见 [网页控制台研究记录](docs/research-web-console.md)；REFramework SDK 固定版本来源和许可证见 [第三方依赖说明](native/webconsole/reframework/README.md)。
 

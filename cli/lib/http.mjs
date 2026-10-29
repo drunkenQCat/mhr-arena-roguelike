@@ -103,3 +103,16 @@ export async function postCommand(baseUrl, command, timeoutMs = 3000) {
 }
 
 export { newRequestId };
+/**
+ * POST an arbitrary JSON payload to a plugin endpoint (/api/script/*).
+ * Returns the raw {status, body, text}; the caller maps statuses to exit codes,
+ * because these endpoints are fire-and-forget queues rather than the command
+ * receipt protocol.
+ */
+export async function postJson(baseUrl, path, payload, timeoutMs = 3000) {
+  return request(baseUrl, path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }, timeoutMs);
+}

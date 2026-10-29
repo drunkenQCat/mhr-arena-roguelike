@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { EXIT, CliError, usage, unavailable, rejected } from "./lib/exit.mjs";
-import { normalizeBaseUrl, getRaw } from "./lib/http.mjs";
+import { normalizeBaseUrl, getRaw, postJson } from "./lib/http.mjs";
 import { captureIdentity, submit, requireReceipt, waitForReceipt, sleep } from "./lib/session.mjs";
 import { doctor, readState, readProbe, capabilitiesFrom, COMMAND_CATALOGUE, uiSection } from "./lib/observe.mjs";
 import { createOutput, runMain } from "./lib/output.mjs";
@@ -35,6 +35,7 @@ const HELP = `用法: node cli/mhr.mjs <命令> [选项]
   run retry                              重试原生接取
   run stop                               停止本局
   test invincible <on|off>               无敌开关
+  test tp --to <origin|monster>          TP in the active solo arena; verifies position
   test kill-all                          请求击杀已出场怪物
   shop buy --item <商品ID>               购买/补满/服务
   config validate --file <路径>          本地校验（复用 src/core/config.ts）
@@ -51,6 +52,12 @@ const HELP = `用法: node cli/mhr.mjs <命令> [选项]
   saves list | saves load --slot N       观察/加载已有存档
   dialog close --token TOKEN             关闭已识别的连接错误
   wait --scene village --timeout 120     等待原生场景
+
+脚本控制（需 fork 版框架 dinput8）:
+  game reset                             重置全部脚本（下一帧生效，epoch +1）
+  game run-script <文件> [--timeout S]   执行一个 Lua 文件并等待其 publish_probe 报告；
+                                         本地存在该文件则按内容上传，否则视为游戏目录相对路径
+  game last-error                        读取框架记录的最近脚本错误文本
 
 通用选项:
   --base-url URL     默认 http://127.0.0.1:11777（或 MHR_CLI_BASE_URL）
@@ -78,6 +85,7 @@ function parseArgs(argv) {
     "--item": (v) => { options.item = v; },
     "--file": (v) => { options.file = v; },
     "--version": (v) => { options.version = Number(v); },
+    "--to": (v) => { options.to = v; },
     "--scene": (v) => { options.scene = v; },
     "--slot": (v) => { options.slot = Number(v); },
     "--token": (v) => { options.dialogToken = v; },
@@ -160,7 +168,64 @@ async function main() {
         const { launchGame } = await import("./lib/game-process.mjs");
         output.result(await launchGame(baseUrl)); return EXIT.OK;
       }
-      if (sub !== "enter") throw usage("当前支持 game launch / game enter --slot N --timeout 120");
+      if (sub === "reset") {
+        const { status, body } = await postJson(baseUrl, "/api/script/reset", {}, timeoutMs * 1000);
+        if (status !== 200) {
+          throw new CliError(status === 503 ? EXIT.UNAVAILABLE : EXIT.REJECTED,
+            `重置请求失败：${body?.error ?? `HTTP ${status}`}`, { status, body });
+        }
+        output.result(body, (v) => `已请求重置脚本（下一帧生效，epoch ${v.epoch}）；旧 bridgeId 的请求将被拒绝`);
+        return EXIT.OK;
+      }
+      if (sub === "last-error") {
+        const { status, body } = await getRaw(baseUrl, "/api/script/error", timeoutMs * 1000);
+        if (status !== 200 || !body) throw unavailable(`HTTP ${status}`);
+        output.result(body, (v) => v.hasError ? `最近脚本错误：
+${v.error}` : "没有记录的脚本错误");
+        return EXIT.OK;
+      }
+      if (sub === "run-script") {
+        const file = words[2];
+        if (!file) throw usage("用法: game run-script <本地文件或游戏目录相对路径> [--timeout S]");
+        let content = null;
+        try { content = readFileSync(resolve(file), "utf8"); } catch { content = null; }
+        const script = file.split(/[\\/]/).pop();
+        // 本地读得到就按内容上传（不要求文件已在游戏目录里）；读不到视为游戏树内路径。
+        const payload = content !== null ? { name: script, content } : { path: file.replaceAll("\\", "/") };
+        const submitted = await postJson(baseUrl, "/api/script/run", payload, timeoutMs * 1000);
+        if (submitted.status !== 200) {
+          const { status, body } = submitted;
+          throw new CliError(status === 503 ? EXIT.UNAVAILABLE : EXIT.REJECTED,
+            `run-script 被拒绝：${body?.error ?? `HTTP ${status}`}`, { status, body });
+        }
+        const queuedEpoch = submitted.body.epoch;
+        const waitS = options.timeout ?? 15;
+        const deadline = Date.now() + waitS * 1000;
+        let report = null;
+        while (Date.now() < deadline) {
+          await sleep(500);
+          const probe = await getRaw(baseUrl, "/api/probe/report", timeoutMs * 1000);
+          // 探针契约：报告自带 script 与 epoch；两者都对上才认定是本轮触发的结果。
+          if (probe.status === 200 && probe.body &&
+              probe.body.script === script && probe.body.epoch === queuedEpoch) {
+            report = probe.body;
+            break;
+          }
+        }
+        if (!report) {
+          const err = await getRaw(baseUrl, "/api/script/error", timeoutMs * 1000);
+          const detail = err.body?.hasError
+            ? `框架记录了脚本错误：${err.body.error}`
+            : "脚本未发布报告（可能仍在排队，或加载阶段即失败）";
+          throw new CliError(EXIT.TIMEOUT, `等待 ${waitS}s 未收到 ${script} 的报告。${detail}`,
+            { script, queuedEpoch, lastError: err.body ?? null });
+        }
+        const ok = report.verdict === "PASS";
+        output.result({ ok, report },
+          (v) => `${script}: ${v.report.verdict}${v.report.error ? ` — ${v.report.error.split("\n")[0]}` : ""}`);
+        return ok ? EXIT.OK : EXIT.REJECTED;
+      }
+      if (sub !== "enter") throw usage("当前支持 game launch / enter / reset / run-script / last-error");
       const { enterGame } = await import("./lib/game-entry.mjs");
       const result = await enterGame(baseUrl, options, output.progress);
       output.result(result); return EXIT.OK;
@@ -303,6 +368,27 @@ async function main() {
         output.result({ ok: true, invincible: value === "on", receipt },
           () => `无敌 ${value === "on" ? "已开" : "已关"}：${receipt.message ?? ""}`);
         return EXIT.OK;
+      }
+      if (sub === "tp") {
+        if (!["origin", "monster"].includes(options.to)) throw usage("test tp requires --to origin or monster");
+        const { receipt } = await submit(baseUrl, { cmd: "teleport", to: options.to },
+          { identity, timeoutMs, receiptTimeoutMs });
+        requireReceipt(receipt);
+        const target = receipt.target;
+        if (!target || ![target.x, target.y, target.z].every(Number.isFinite)) throw unavailable("Lua did not return a finite TP target");
+        const deadline = Date.now() + 6000;
+        let position = null;
+        while (Date.now() < deadline) {
+          await sleep(250);
+          const state = await snapshot();
+          if (state.bridgeId !== identity.bridgeId || state.questUnique !== receipt.questUnique) throw rejected("TP session changed; no retry");
+          position = state.preparation?.players?.[0]?.position;
+          if (position && [position.x, position.y, position.z].every(Number.isFinite) &&
+            Math.hypot(position.x-target.x, position.y-target.y, position.z-target.z) <= 5) {
+            output.result({ ok: true, receipt, target, position, verified: true }); return EXIT.OK;
+          }
+        }
+        output.result({ ok: false, receipt, target, position, verified: false }); return EXIT.TIMEOUT;
       }
       if (sub === "kill-all") {
         // killAll is acknowledged as queued; the native kill happens on a later frame.

@@ -147,6 +147,7 @@ export const COMMAND_CATALOGUE = [
   { cmd: "choose", writes: true, summary: "选择下一波（需完成集结且无未决交易）" },
   { cmd: "buy", writes: true, summary: "购买/补满/服务（共用游戏内资格）" },
   { cmd: "setInvincible", writes: true, summary: "测试用无敌开关（单人测试任务）" },
+  { cmd: "teleport", writes: true, summary: "Task origin or live monster; solo active arena only" },
   { cmd: "killAll", writes: true, summary: "请求击杀当前已出场怪物" },
   { cmd: "retryPost", writes: true, summary: "重试原生接取" },
   { cmd: "stop", writes: true, summary: "停止本局并恢复原生结算" },
@@ -164,6 +165,7 @@ export function capabilitiesFrom(state, dllProtocol) {
     state?.capabilities?.start ? null : `当前阶段 ${stage ?? "unknown"} 不允许开局`);
   add("run.choose", true, state?.capabilities?.choose === true && !busy,
     state?.capabilities?.choose ? (busy ? "商店交易进行中" : null) : "需完成清波与集结");
+  add("test.tp", state?.capabilities?.teleport !== undefined, state?.capabilities?.teleport === true, "Requires an active solo arena and recorded task origin");
   add("run.stop", true, state?.capabilities?.stop === true, state?.capabilities?.stop ? null : "未开局");
   add("run.retry", true, ["AwaitQuest", "Fault"].includes(stage), "仅等待接取或故障阶段");
   add("run.route", true, ["Idle", "Finished", "Fault"].includes(stage), "路线只能在开局前切换");
