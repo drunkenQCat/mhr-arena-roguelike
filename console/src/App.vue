@@ -14,15 +14,16 @@ const probe = ref<ProbeInfo | null>(null);
 const probeState = ref<ProbeReport | null>(null);
 const probeError = ref("");
 let probeDllVersion = "";
+let probeReading = false;
 interface ProbeCheck { id: string; ok: boolean; message: string; elapsedMs?: number; bytes?: number; gcMs?: number; }
 interface ProbeSession {
-  ok: boolean; session: string; sessionSource?: string; sessionSeq?: number;
+  ok: boolean; session: string; sessionSource?: string; sessionSeq?: number; dllSession?: string; luaEpoch?: number;
   at?: number; atIso?: string; localTime?: string; moduleVersion?: string; versionSource?: string;
   durationMs?: number; checks?: ProbeCheck[]; errors?: string[];
   dll?: { pid?: number; moduleVersion?: string; uptimeMs?: number; sessions?: number; commands?: number; pings?: number };
 }
 interface ProbeReport { schema?: number; ok: boolean; session: string; moduleVersion?: string; history: ProbeSession[]; result?: ProbeSession }
-// 连续 Reset 时每个会话只显示一次；会话号与 DLL 完全相同即“未重置”。
+// A Lua generation has its own identity even while the native DLL stays loaded.
 const probeSessions = computed(() => {
   const seen = new Set<string>();
   return (probeState.value?.history ?? []).filter((entry) => {
@@ -32,13 +33,13 @@ const probeSessions = computed(() => {
 });
 const probeLocal = computed(() => {
   if (!probe.value) return "";
-  const readings = probeSessions.value.filter((entry) => entry.versionSource === "dll_required_version").length;
+  const readings = probeSessions.value.filter((entry) => entry.dllSession === probe.value?.session && entry.versionSource === "luaopen").length;
   if (!readings) return "尚无 Lua 读取记录：模块初始化回调未执行，或探针脚本未部署到 reframework/autorun。";
   if (readings === 1) return `Lua 已读取模块版本（${probe.value.moduleVersion}）。再按 Reset scripts 可验证连续重置的会话区分。`;
   return `已记录 ${readings} 次加载（${readings - 1} 次 Reset）。`;
 });
 let alive = true, timer: ReturnType<typeof setTimeout> | undefined, loadedBridge = "";
-const connected = computed(() => !stale.value && state.value?.protocol === 3);
+const connected = computed(() => !stale.value && state.value?.protocol === 4);
 const categoryOrder = ["基础补给", "弹药", "战术道具", "调和素材", "高阶药品", "翻盘服务"];
 const categories = computed(() => Object.keys(state.value?.shop ?? {}).sort((a, b) =>
   (categoryOrder.indexOf(a) < 0 ? 99 : categoryOrder.indexOf(a)) - (categoryOrder.indexOf(b) < 0 ? 99 : categoryOrder.indexOf(b))));
@@ -85,20 +86,25 @@ async function submitConfig(value: unknown, version: number) {
   }
 }
 async function readProbe() {
+  if (probeReading) return;
+  probeReading = true;
   try {
     const info = await getJson<ProbeInfo>("/api/probe", AbortSignal.timeout(3000));
     probe.value = info; probeError.value = "";
-    if (info.moduleVersion && info.moduleVersion !== probeDllVersion) {
-      probeDllVersion = info.moduleVersion;
+    const identity = `${info.session}:${info.sessions}`;
+    if (identity !== probeDllVersion) {
+      probeDllVersion = identity;
       probeState.value = null; // 换了 DLL：旧记录不再代表当前模块
     }
-    if (info.stateSeq > 0) {
+    {
       const report = await getJson<ProbeReport>("/api/probe/report", AbortSignal.timeout(3000));
+      if (report?.result?.dllSession !== info.session || report?.result?.luaEpoch !== info.sessions)
+        throw new Error("探针报告不属于当前 Lua 代，请等待新报告");
       probeState.value = report;
     }
   } catch (error) {
     probeError.value = String(error).replace("Error: ", "");
-  }
+  } finally { probeReading = false; }
 }
 
 async function poll() {
@@ -117,7 +123,7 @@ async function poll() {
       (!!s.publishedAt && Date.now() / 1000 - s.publishedAt > 5) ||
       (!!s.sampledAt && Date.now() / 1000 - s.sampledAt > 5);
     if (!stale.value) lastSync.value = new Date().toLocaleTimeString();
-    if (s.protocol === 3 && loadedBridge !== s.bridgeId && !busy.value) {
+    if (s.protocol === 4 && loadedBridge !== s.bridgeId && !busy.value) {
       loadedBridge = s.bridgeId;
       if (!config.value) void loadConfig();
       else configMessage.value = "脚本已重载。草稿仍保留，请重新载入游戏配置核对版本。";
@@ -135,11 +141,11 @@ const f = (value: number | null | undefined) => value == null ? "—" : value.to
 <template>
   <main>
     <header class="app-header"><div><p class="eyebrow">MHR ARENA ROGUELIKE</p><h1>斗技场控制台</h1></div>
-      <div class="connection"><span :class="['badge', connected ? 'live' : 'warning']">{{ stale ? '游戏状态已过期 / 连接断开' : state?.protocol !== 3 ? '旧版脚本，等待重载' : '游戏状态同步中' }}</span>
+      <div class="connection"><span :class="['badge', connected ? 'live' : 'warning']">{{ stale ? '游戏状态已过期 / 连接断开' : state?.protocol !== 4 ? '旧版脚本，等待重载' : '游戏状态同步中' }}</span>
         <small>同步 {{ lastSync }} · 状态 #{{ state?.counter ?? '—' }} · 配置 v{{ state?.configVersion ?? '—' }}</small></div>
     </header>
     <p v-if="state?.testMode" class="alert">隔离验证环境：Lua 与 HTTP 为真实构建，玩家、怪物和背包是测试数据，不会操作实际游戏。</p>
-    <p v-if="state && state.protocol !== 3" class="alert">当前 Lua 仍使用旧版协议，无法提供位置与商店资格。请在 REFramework → ScriptRunner 执行 Reset scripts；网页已禁止向旧脚本发送操作。</p>
+    <p v-if="state && state.protocol !== 4" class="alert">当前 Lua 仍使用旧版协议，无法提供位置与商店资格。请在 REFramework → ScriptRunner 执行 Reset scripts；网页已禁止向旧脚本发送操作。</p>
     <div class="toolbar topnav"><button :class="{ selected: page === 'play' }" @click="page = 'play'">游戏与商店</button><button :class="{ selected: page === 'design' }" @click="page = 'design'">策划工作台</button><button :class="{ selected: page === 'events' }" @click="page = 'events'">命令记录</button></div>
     <p class="notice" role="status">{{ notice }}</p>
     <template v-if="page === 'play'">
@@ -181,7 +187,7 @@ const f = (value: number | null | undefined) => value == null ? "—" : value.to
     <section class="panel full" id="module-probe">
       <div class="section-heading"><h2>模块探针（DLL ↔ Lua）</h2>
         <span :class="['badge', probeState?.ok ? 'live' : 'warning']">{{ probeState ? (probeState.ok ? 'PASS' : 'FAIL') : '等待 Lua' }}</span></div>
-      <p v-if="probeError" class="notice">原生服务未响应：{{ probeError }}（/api/probe 无应答）</p>
+      <p v-if="probeError" class="notice">探针同步尚未完成：{{ probeError }}</p>
       <template v-else-if="probe">
         <div class="meta">DLL {{ probe.moduleVersion }} · 会话 {{ probe.session }} · 进程 {{ probe.pid }} · 运行 {{ Math.floor(probe.uptimeMs / 1000) }} 秒 ·
           已服务 Lua 会话 {{ probe.sessions }} · ping {{ probe.pings }} · 命令 {{ probe.commands }} · 导出 {{ probe.export }}</div>

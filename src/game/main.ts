@@ -21,7 +21,9 @@ try {
   const runtime = new NativeRuntime(config, installer);
   const session = new RunSession(core, monsterCatalog, runtime);
   const shopWindow = new ShopWindow(session.core, () => session.canShop(), () => session.shopQuest());
-  const webConsole = new WebConsoleBridge(session, runtime, shopWindow);
+  let webConsole: WebConsoleBridge | null = null;
+  try { webConsole = new WebConsoleBridge(session, runtime, shopWindow); }
+  catch (error) { relog.warn(`[MhwRogue] webconsole unavailable: ${String(error)}`); }
   reframework.onFrame(() => {
     try { runtime.tick(); shopWindow.tick(); session.tick(); }
     catch (error) {
@@ -32,14 +34,14 @@ try {
     }
   });
   reframework.onDrawUi(() => drawHud(session, runtime, shopWindow));
-  reframework.onFrame(() => webConsole.tick());
+  reframework.onFrame(() => webConsole?.tick());
   reframework.onFrame(() => {
     try { shopWindow.draw(); }
     catch (error) { relog.error(`[MhwRogue] shop window: ${String(error)}`); }
   });
   reframework.onScriptReset(() => {
     runtime.shutdown();
-    webConsole.newScriptSession(); // Reset 后新桥会话：旧页面命令按 bridgeId 拒绝
+    webConsole?.newScriptSession(); // Reset 后新桥会话：旧页面命令按 bridgeId 拒绝
   });
   rejson.dump_file("mhw_rogue_boot.json", { ok: true, version: 2,
     quest: config.quest, route: session.route, startedAt: clockSeconds(), runtimeVerified: false }, 2);

@@ -2,7 +2,7 @@ export interface ShopEntry { id: string; name: string; category: string; price: 
 export interface Choice { index: number; label: string; monsters: string[]; mode?: string; hpMul: number; dmgMul: number; rewardPt: number; }
 export interface ConsoleState {
   testMode?: boolean;
-  ok: boolean; protocol: number; bridgeId: string; counter: number; publishedAt?: number;
+  ok: boolean; protocol: 4; bridgeId: string; counter: number; publishedAt?: number;
   sampledAt?: number; configVersion: number; sessionStage: string; corePhase: string; questId: number | null;
   questUnique: number | null; layer: number; pt: number; cartsLeft: number; maxCarts: number;
   armor: string | null; armorOptions?: string[]; invincible: boolean; route?: string;

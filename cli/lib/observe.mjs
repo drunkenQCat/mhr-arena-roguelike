@@ -171,6 +171,11 @@ export function capabilitiesFrom(state, dllProtocol) {
   add("test.killAll", true, stage === "Combat", "仅战斗阶段");
   add("shop.buy", true, state?.shopAvailable === true && !busy && dllProtocol === 4,
     state?.shopAvailable ? (busy ? "商店交易进行中" : null) : (state?.shopReason ?? "当前不可购买"));
+  for (const name of ["startup.acknowledge", "title.advance", "title.continue", "save.load", "dialog.close"]) {
+    const implemented = state?.ui?.adapterVersion === 1;
+    const allowed = implemented && state.ui.allowedActions?.includes(name) === true && !state.ui.busy;
+    add(name, implemented, allowed, allowed ? null : "需要支持的原生菜单、当前 sceneToken/dialogToken 和空闲 UI");
+  }
   const catalog = COMMAND_CATALOGUE.map((entry) => ({ ...entry, implemented: true }));
   const orders = [];
   if (dllProtocol !== 4) orders.push(`DLL 协议 ${dllProtocol} ≠ 4：CLI 写入命令可能被旧版 Lua 拒绝`);
