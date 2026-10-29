@@ -83,19 +83,36 @@ npm run test:cli
 
 契约测试不依赖游戏进程；真实游戏结果需另跑并通过报告区分。
 
-## ui 观察的边界
+## 原生菜单与自动进村
 
-`state.ui` 由 Lua 侧 `WebConsoleBridge.uiSection()` 发布：`scene`（quest / quest_ready /
-village / unknown）、`mapNo`、`loading`、`busy`、`questStatus`、`allowedActions` 与逐项
-`evidence`（`QuestManager.isActiveQuest`、`StageManager.get_MapNo`、
-`GuiManager.IsCanInvokeQuestBoard`、`PlayerManager.PlayerList`）。
+```powershell
+node cli/mhr.mjs game launch --json
+node cli/mhr.mjs game enter --slot 1 --timeout 120 --json
+node cli/mhr.mjs ui --json
+node cli/mhr.mjs saves list --json
+node cli/mhr.mjs title advance --json
+node cli/mhr.mjs title continue --json
+node cli/mhr.mjs saves load --slot 1 --json
+node cli/mhr.mjs dialog close --token <从ui读取的token> --json
+node cli/mhr.mjs wait --scene village --timeout 120
+```
 
-它是"视角传感器"，不是窗口分类器：标题、存档选择、原生弹窗都看不到，
-因此 `dialogsKnown=false`、`dialogs=[]`，`scene=unknown` 时不推断。
-旧版 bundle 没有该分区时，CLI 明确报告"未发布 ui 分区"而不是给默认值。
+`game launch` 只请求本机 Steam 启动 Rise，已运行时不重复启动；启动请求成功不等于已加载角色。远端 URL 不支持本机进程管理。
 
-## 当前未支持
+`game enter` 必须指定已有槽位（1..3），会等待 DLL/Lua 初次就绪，观察菜单并依次处理已支持的启动连接错误、自动保存提示、标题和存档选择、被动加载提示及进村连接错误。最后必须观察到村庄就绪、玩家存在、没有已观察到的阻塞弹窗，才返回成功。首次获取会话后若 Lua Reset/连接失败则停止，不重放写操作。完整流程默认超时 120 秒。
 
-- 进程启动/退出、存档槽、原生弹窗观察（任务书第二/三阶段）。
-- 远端 `--base-url` 下不支持本机进程管理。
-- `killAll` 没有专门的完成回执，需要补 `enemy.kill(uid)` 或事件后再声称精确击杀。
+菜单稳定且心跳更新后才提交；每次写操作携带 sceneToken，弹窗操作额外携带 dialogToken。Lua 会再次核对。一次进入流程最多发起一次存档加载，防止加载时旧 UI 对象尚未销毁而重复操作。`saves load` 的回执证明原生加载流程已开始，不证明已经进村；完整完成判据由 `game enter` 检查。
+
+`state.ui.scene` 可包含 autosave_notice / title_press / title / save_select / save_menu_unknown / loading / village / quest / quest_ready / unknown。`loading` 在没有依据时为 null；玩家对象缺失不直接视为加载，玩家对象存在也不能直接视为进村（存档预览已有玩家）。空槽会带默认名字，occupied 还检查原生猎人等级。
+
+当前菜单适配器固定于安装版 REFramework/游戏 RTTI，加载入口只接受实机观察过的原生 LoadDataSelect 节点。新游戏/保存/覆盖共用界面不会获得加载权限。网络错误自动关闭目前仅支持实测的 MR-111-83、BUTTON_CURSOR_ON 类型；未知错误/有按钮的未知提示会停止并报告。无按钮的连接/加载信息只等待，不发确认。
+
+`dialogsKnown=false` 表示覆盖范围有限；dialogCoverage 列出网络错误、通用确认和信息窗口，并不代表已经识别全部原生窗口。地图编号仍无已验证访问器，不伪造 mapNo。原生观察分区不存在时，CLI 保持 unknown。
+
+## 验证与当前边界
+
+- 原生适配器与桥回归：`npm test -- --run src/game/native_ui.test.ts src/game/webconsole_bridge.test.ts`。
+- CLI 传输合同：`npm run test:cli`；自动进村合同：`node --test cli/tests/game-entry.mjs`。
+- 实机结果与已知限制以最新 evidence 记录为准。单元测试、假 HTTP 服务和真实游戏验证分开报告。
+- 尚未实现通用游戏退出/返回标题、所有类型弹窗应答、远程 Reset、指定 UID 击杀与自动回营。
+- `killAll` 仍需用实际死亡/清波后置条件验收；不能把入队视为讨伐完成。

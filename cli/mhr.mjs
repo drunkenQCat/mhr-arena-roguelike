@@ -45,6 +45,13 @@ const HELP = `用法: node cli/mhr.mjs <命令> [选项]
        [--uid-alive N] [--uid-dead N] [--shop] [--timeout S]
   scenario run <文件.json> [--report <输出>]
 
+原生菜单（需新版 Lua）:
+  game enter --slot N --timeout 120       从支持的标题/弹窗加载现有存档进村
+  title advance | title continue         原生标题操作
+  saves list | saves load --slot N       观察/加载已有存档
+  dialog close --token TOKEN             关闭已识别的连接错误
+  wait --scene village --timeout 120     等待原生场景
+
 通用选项:
   --base-url URL     默认 http://127.0.0.1:11777（或 MHR_CLI_BASE_URL）
   --json             机器可读输出（stdout 单文档）
@@ -63,7 +70,7 @@ function parseArgs(argv) {
     report: undefined, category: undefined, probeTimeoutS: undefined };
   const valueFlags = {
     "--base-url": (v) => { options.baseUrl = v; },
-    "--timeout": (v) => { options.timeoutS = Number(v); },
+    "--timeout": (v) => { options.timeoutS = Number(v); options.timeout = Number(v); },
     "--receipt-timeout": (v) => { options.receiptTimeoutS = Number(v); },
     "--sample-ms": (v) => { options.sampleMs = Number(v); },
     "--armor": (v) => { options.armor = v; },
@@ -71,6 +78,9 @@ function parseArgs(argv) {
     "--item": (v) => { options.item = v; },
     "--file": (v) => { options.file = v; },
     "--version": (v) => { options.version = Number(v); },
+    "--scene": (v) => { options.scene = v; },
+    "--slot": (v) => { options.slot = Number(v); },
+    "--token": (v) => { options.dialogToken = v; },
     "--stage": (v) => { options.stage = v; },
     "--layer": (v) => { options.layer = Number(v); },
     "--quest-unique": (v) => { options.questUnique = Number(v); },
@@ -145,6 +155,29 @@ async function main() {
   };
 
   switch (group) {
+    case "game": {
+      if (sub === "launch") {
+        const { launchGame } = await import("./lib/game-process.mjs");
+        output.result(await launchGame(baseUrl)); return EXIT.OK;
+      }
+      if (sub !== "enter") throw usage("当前支持 game launch / game enter --slot N --timeout 120");
+      const { enterGame } = await import("./lib/game-entry.mjs");
+      const result = await enterGame(baseUrl, options, output.progress);
+      output.result(result); return EXIT.OK;
+    }
+    case "title": case "startup": case "saves": case "dialog": {
+      if (group === "saves" && sub === "list") {
+        const state = await snapshot(); output.result({ ui: state.ui, slots: state.ui?.slots ?? [] }); return EXIT.OK;
+      }
+      const cmd = group === "title" && ["advance", "continue"].includes(sub) ? `title.${sub}`
+        : group === "startup" && sub === "acknowledge" ? "startup.acknowledge"
+        : group === "saves" && sub === "load" ? "save.load"
+        : group === "dialog" && sub === "close" ? "dialog.close" : null;
+      if (!cmd) throw usage("未知 UI 操作");
+      const { uiCommand } = await import("./lib/game-entry.mjs");
+      const receipt = await uiCommand(baseUrl, cmd, options, { slot: options.slot, dialogToken: options.dialogToken });
+      output.result({ ok: true, receipt }); return EXIT.OK;
+    }
     case "doctor": {
       const report = await doctor(baseUrl, { timeoutMs, sampleMs: options.sampleMs, expectProtocol: PROTOCOL });
       output.result(report, printDoctor);
@@ -384,6 +417,7 @@ function summarise(state) {
 /** --stage/--layer/... map to explicit predicates; unknown options are rejected above. */
 function buildWaitConditions(options, trailing) {
   const conditions = [];
+  if (options.scene) conditions.push({ label: `scene=${options.scene}`, test: s => s?.ui?.scene === options.scene });
   if (options.stage) conditions.push({ label: `stage=${options.stage}`,
     test: (s) => s.sessionStage === options.stage });
   if (Number.isFinite(options.layer)) conditions.push({ label: `layer=${options.layer}`,
