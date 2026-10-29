@@ -376,7 +376,8 @@ ${v.error}` : "没有记录的脚本错误");
         requireReceipt(receipt);
         const target = receipt.target;
         if (!target || ![target.x, target.y, target.z].every(Number.isFinite)) throw unavailable("Lua did not return a finite TP target");
-        const deadline = Date.now() + 6000;
+        // The warp flow fades out, moves and fades in; arrival lands ~4s after the kick.
+        const deadline = Date.now() + 10000;
         let position = null;
         while (Date.now() < deadline) {
           await sleep(250);

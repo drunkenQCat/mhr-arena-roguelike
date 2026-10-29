@@ -33,7 +33,8 @@ function fixture() {
   const session = new RunSession(core, { Izuchi: { id: 98, cn: "镰鼬龙王" },
     ...JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8")) }, port);
   const tools = { invincible: false, message: "ok", toggleGod: vi.fn(() => { tools.invincible = !tools.invincible; }), requestKill: vi.fn() };
-  const runtime = { status: () => "ready", testTools: tools } as unknown as NativeRuntime;
+  const runtime = { status: () => "ready", testTools: tools, teleportPlayer: vi.fn(),
+    nearestAliveMonsterPosition: vi.fn(() => ({ x: 100, y: 5, z: 80 })) } as unknown as NativeRuntime;
   const shop = new ShopWindow(core, () => session.canShop(), () => session.shopQuest());
   const bridge = new WebConsoleBridge(session, runtime, shop);
   function tick() { host.now++; reading.time = host.now; session.tick(); for (let i = 0; i < 12; i++) bridge.tick(); }
@@ -43,7 +44,7 @@ function fixture() {
     tick(); return host.files["webconsole_results.json"]?.last;
   }
   const state = () => host.files["webconsole_state.json"];
-  return { cfg, core, session, tools, shop, bridge, command, tick, state, reading };
+  return { cfg, core, session, runtime, tools, shop, bridge, command, tick, state, reading };
 }
 beforeEach(() => { host.now = 10; host.files = {}; host.count = 0; host.failWrite = ""; host.commands = []; });
 
@@ -124,4 +125,22 @@ it("freezes run rules and the current wave, but stages new rules for the next ru
   expect(f.core.config.scaling.hpBase).toBe(0.9);
   f.session.stop(); f.tick(); expect(f.session.start(f.cfg.armorOptions[0]!).ok).toBe(true);
   expect(f.core.state.wallet.pt).toBe(999); expect(f.core.state.cartsLeft).toBe(8);
+});
+
+it("rejects village and stale TP; deduplicates a native task origin request", () => {
+  const f = fixture(); f.tick();
+  expect(f.command("teleport", { to: "origin" }).status).toBe("rejected");
+  f.session.start(f.cfg.armorOptions[0]!); f.tick();
+  const choice = f.core.state.currentChoices.find(c => c.monsters.length === 1)!;
+  f.command("choose", { index: choice.index });
+  f.reading.quest = { id: f.cfg.quest.id, unique: 42, playing: true, status: "play" };
+  f.reading.canPost = false;
+  f.reading.enemies = [{ uid: 9, typeId: f.session.plan!.monsterIds[0]!, hp: 100, maxHp: 100 }]; f.tick();
+  expect(f.command("teleport", { to: "origin", questUnique: 999 }).status).toBe("rejected");
+  expect(f.runtime.teleportPlayer).not.toHaveBeenCalled();
+  const r = f.command("teleport", { to: "origin" }, "tp-once");
+  expect(r.status).toBe("queued"); expect(r.target).toEqual({ x: 10, y: 20, z: 30 });
+  f.command("teleport", { to: "origin" }, "tp-once");
+  expect(f.runtime.teleportPlayer).toHaveBeenCalledTimes(1);
+  expect(f.command("teleport", { to: "monster" }).target).toEqual({ x: 104, y: 5, z: 80 });
 });

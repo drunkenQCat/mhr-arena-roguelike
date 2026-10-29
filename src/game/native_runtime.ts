@@ -11,7 +11,7 @@ import { snow_quest_FailReason } from "./gen/enums/snow_quest_FailReason";
 import { snow_enemy_EnemyDef_VitalCategory } from "./gen/enums/snow_enemy_EnemyDef_VitalCategory";
 import { snow_enemy_EnemyDef_NandoGetType } from "./gen/enums/snow_enemy_EnemyDef_NandoGetType";
 import {
-  clockSeconds, createInstance, findTypeDefinition, floatToPtr, getSingleton, hookMethod, PRE_HOOK,
+  clockSeconds, findTypeDefinition, floatToPtr, getSingleton, hookMethod, PRE_HOOK,
   questManager, reframework, rejson, relog, toFloat, toInt64, toManagedObject, toPtr,
   type REManagedArray, type REManagedObject,
 } from "./sdk";
@@ -74,52 +74,62 @@ export class NativeRuntime implements SessionPort {
   postingError(): string | null { return this.transport.getError(); }
   takeDeaths(): DeathReading[] { const events = this.deaths; this.deaths = []; return events; }
   /**
-   * 传送玩家到指定位置（debug 命令用）。通过 via.vec3 临时对象写 _PosAfterMotionUpdate；
-   * 位置 struct 由引擎在下次运动帧吸收，无需额外调用。
+   * Test-only teleport request: drives the game's own warp flow (fade out, move,
+   * fade in over a few seconds); the caller verifies the position on later frames.
+   * Two approaches verified dead in the arena and therefore not used here: writing
+   * the player's position struct (component writes are copies; a set_field with a
+   * managed instance hard-freezes the game loop) and player.setPosWarpConsiderDogRide
+   * with a create_instance vec3 (the vec3 invokes as garbage). setPlWarpInfo with a
+   * Vector3f.new value plus kicking WarpFlow to WaitFadeOut is the engine's own
+   * fast-travel path and the only one that actually moves the player.
    */
-  teleportPlayer(target: { x: number; y: number; z: number }): void
-  {
-    const player = (this.read().players[0] !== undefined) ? this.playerRef() : null;
-    if (!player) throw new Error("teleport: player not available");
-    const vec = this.vec3(target.x, target.y, target.z);
-    player.set_field("_PosAfterMotionUpdate", vec);
+  teleportPlayer(target: { x: number; y: number; z: number }): void {
+    this.requireTeleportScope();
+    if (![target.x, target.y, target.z].every((v) => Number.isFinite(v))) throw new Error("teleport: invalid position");
+    const stage = getSingleton("snow.stage.StageManager");
+    if (!stage) throw new Error("teleport: stage manager missing");
+    if (stage.call("get_IsWarpFlowMoving") !== false) throw new Error("teleport: warp flow already moving");
+    stage.call("setPlWarpInfo(via.vec3, System.Single, snow.stage.StageManager.AreaMoveQuest)",
+      Vector3f.new(target.x, target.y, target.z), 0.0, 1 /* AreaMoveQuest.Normal */);
+    stage.call("set_CurrentWarpFlow", 0 /* WarpFlow.WaitFadeOut */);
   }
 
-  /** 最近存活大型怪的位置（tp-to-monster 用）；无怪返回 null。 */
-  nearestAliveMonsterPosition(): { x: number; y: number; z: number } | null
-  {
+  private requireTeleportScope(): void {
+    const q = questManager();
+    const stage = getSingleton("snow.stage.StageManager");
+    if (!q || !stage || stage.call("get_IsQuestOnline") !== false ||
+      q.call("isPlayQuest") !== true || q.call("get_ActiveQuestNo") !== this.cfg.quest.id) {
+      throw new Error("teleport: requires the active solo custom arena quest");
+    }
+  }
+
+  nearestAliveMonsterPosition(): { x: number; y: number; z: number } | null {
+    this.requireTeleportScope();
+    const origin = this.playerRef()?.get_field("_PosAfterMotionUpdate") as { x: number; y: number; z: number } | null;
+    if (!origin || ![origin.x, origin.y, origin.z].every((v) => Number.isFinite(v))) throw new Error("teleport: local position unavailable");
     const manager = getSingleton("snow.enemy.EnemyManager");
     if (!manager) return null;
     const count = callNative(manager, "getBossEnemyCount") as number;
+    if (!Number.isInteger(count) || count < 0 || count > 64) throw new Error("teleport: invalid enemy count");
+    let nearest: { x: number; y: number; z: number } | null = null;
+    let distance = Infinity;
     for (let i = 0; i < count; i++) {
       const enemy = callNative(manager, "getBossEnemy", i) as REManagedObject | null;
-      if (!enemy) continue;
-      if (callNative(enemy, "isCapture") === true) continue;
-      const pos = enemy.get_field("_PosAfterMotionUpdate") as { x: number; y: number; z: number } | null;
-      if (pos && [pos.x, pos.y, pos.z].every((v) => typeof v === "number")) return { x: pos.x, y: pos.y, z: pos.z };
+      if (!enemy || callNative(enemy, "isCapture") === true || callNative(enemy, "isDieBehaviorActive") === true) continue;
+      // Live actors expose their position to reflection only through get_Pos();
+      // the _Pos* fields read nil on enemies (verified in the arena, em092).
+      const pos = callNative(enemy, "get_Pos") as { x: number; y: number; z: number } | null;
+      if (!pos || ![pos.x, pos.y, pos.z].every((v) => Number.isFinite(v))) continue;
+      const d = (pos.x - origin.x) ** 2 + (pos.y - origin.y) ** 2 + (pos.z - origin.z) ** 2;
+      if (d < distance) { distance = d; nearest = { x: pos.x, y: pos.y, z: pos.z }; }
     }
-    return null;
+    return nearest;
   }
 
-  private playerRef(): REManagedObject | null
-  {
-    const playerManager = getSingleton("snow.player.PlayerManager");
-    const array = playerManager?.get_field("PlayerList") as REManagedArray | null;
-    if (!playerManager || !array) return null;
-    for (let i = 0; i < array.get_size(); i++) {
-      const player = array.get_element(i) as REManagedObject | null;
-      if (player && playerManager.call("isReadyPlayer", i) === true) return player;
-    }
-    return null;
+  private playerRef(): REManagedObject | null {
+    return (getSingleton("snow.player.PlayerManager")?.call("findMasterPlayer") as REManagedObject | null) ?? null;
   }
 
-  private vec3(x: number, y: number, z: number): REManagedObject
-  {
-    const v = createInstance("via.vec3", true);
-    if (!v) throw new Error("via.vec3 allocation failed");
-    v.set_field("x", x); v.set_field("y", y); v.set_field("z", z);
-    return v;
-  }
 
   shutdown(): void { this.testTools.shutdown(); this.policy(null, false); this.transport.cancel(); }
 
@@ -183,7 +193,9 @@ export class NativeRuntime implements SessionPort {
         // Native death callbacks are not guaranteed on every dynamically registered actor.
         // Feed the same conservative evidence used by RunSession into the sequential queue.
         if (captured || dead) this.inplace.death(uid);
-        const position = enemy.get_field("_PosAfterMotionUpdate") as { x: number; y: number; z: number } | null;
+        // Live actors expose their position to reflection only through get_Pos();
+        // the _Pos* fields read nil on enemies (verified in the arena, em092).
+        const position = callNative(enemy, "get_Pos") as { x: number; y: number; z: number } | null;
         const pos = position && [position.x, position.y, position.z].every((v) => Number.isFinite(v))
           ? { x: position.x, y: position.y, z: position.z } : undefined;
         enemies.push({ uid, typeId, captured, dead, position: pos });

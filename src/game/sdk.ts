@@ -88,6 +88,15 @@ declare const sdk: RefSdk;
 interface RefFs { read(path: string): string; write(path: string, text: string): void; }
 declare const fs: RefFs;
 
+declare global {
+  /** sol2 usertype wrapping glm::vec3. Its .new constructor is the only supported way
+   * to pass a by-value via.vec3 through reflection calls in this build: instances from
+   * sdk.create_instance read back fine but invoke as garbage (verified live on em092). */
+  // Invoked as Vector3f.new(x, y, z) (a plain property call): TSTL compiles the
+  // `new` operator into its own class protocol, which this Lua usertype lacks.
+  const Vector3f: { new: (x: number, y: number, z: number) => object };
+}
+
 /* ---------- RE Engine 类型（最小面，冒号语义） ---------- */
 
 export interface REManagedObject {

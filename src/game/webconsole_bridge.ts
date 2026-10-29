@@ -9,7 +9,7 @@ import { clockSeconds, getSingleton, refFs, rejson, loadWebconsole, type NativeW
 interface Command {
   id?: string; bridgeId?: string; cmd?: string; armor?: string; index?: number;
   value?: boolean; itemId?: string; route?: string; config?: unknown;
-  sceneToken?: string; dialogToken?: string; slot?: number;
+  sceneToken?: string; dialogToken?: string; slot?: number; to?: string;
   configVersion?: number; questUnique?: number | null; waveToken?: number | null;
 }
 type Outcome = Record<string, unknown>;
@@ -82,7 +82,7 @@ export class WebConsoleBridge {
     else {
       try {
         if (cmd.bridgeId !== this.bridgeId) throw new Error("连接会话已更换，请等待同步后重试");
-        if (["choose", "buy", "killAll", "stop"].includes(cmd.cmd ?? "")) {
+        if (["choose", "buy", "killAll", "stop", "teleport"].includes(cmd.cmd ?? "")) {
           if (cmd.questUnique !== this.session.readingSnapshot?.quest?.unique &&
             !(cmd.questUnique === null && !this.session.readingSnapshot?.quest))
             throw new Error("任务实例已变化，此操作已拒绝");
@@ -157,6 +157,17 @@ export class WebConsoleBridge {
           message: this.runtime.testTools.message };
       }
       case "killAll": this.runtime.testTools.requestKill(); return { status: "queued", message: "等待原生怪物更新执行击杀" };
+      case "teleport": {
+        if (!s.plan || !s.readingSnapshot?.quest?.playing || s.readingSnapshot.online ||
+          !["Combat", "Carve", "Returning", "Selecting"].includes(s.stage)) throw new Error("TP requires an active solo arena run");
+        const target = cmd.to === "origin" ? s.campSnapshot
+          : cmd.to === "monster" ? this.runtime.nearestAliveMonsterPosition() : null;
+        if (!target) throw new Error("TP target unavailable; use origin or monster in the active quest");
+        const destination = { x: target.x + (cmd.to === "monster" ? 4 : 0), y: target.y, z: target.z };
+        this.runtime.teleportPlayer(destination);
+        return { status: "queued", target: destination, to: cmd.to,
+          questUnique: s.readingSnapshot.quest.unique, message: "Position request submitted; verify player position on a later frame" };
+      }
       case "retryPost": {
         const r = s.retryPost(); return { status: r.ok ? "applied" : "rejected", message: r.message };
       }
@@ -234,7 +245,7 @@ export class WebConsoleBridge {
       questId: r?.quest?.id ?? null, questUnique: r?.quest?.unique ?? null,
       quest: r?.quest ?? null, online: r?.online ?? false, route: s.route,
       layer: core.state.layer, pt: core.state.wallet.pt, cartsLeft: core.state.cartsLeft,
-      maxCarts: core.config.maxCarts, armor: core.state.armor, armorOptions: s.configForEditing().armorOptions,
+      nativeDeaths: r?.deaths ?? null, maxCarts: core.config.maxCarts, armor: core.state.armor, armorOptions: s.configForEditing().armorOptions,
       invincible: this.runtime.testTools.invincible,
       activeWave: core.state.activeWave?.label ?? null, preparation: s.preparation(),
       enemies: r?.enemies ?? [], choices: s.stage === "Selecting" ? core.state.currentChoices : [],
@@ -243,6 +254,7 @@ export class WebConsoleBridge {
       runtimeStatus: this.runtime.status(),
       ui: this.uiSection(),
       capabilities: { start: ["Idle", "Finished", "Fault"].includes(s.stage) && !!r?.canPost && !r?.quest,
+        teleport: !!r?.quest?.playing && !r?.online && !!s.plan && !!s.campSnapshot,
         choose: s.canShop() && !this.shop.busy, stop: !["Idle", "Finished"].includes(s.stage) },
     }, 0));
   }
