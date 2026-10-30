@@ -55,7 +55,7 @@ jobs:
         shell: pwsh
         run: |
           cmake -S reframework-src -B reframework-src/build -A x64 -DDEVELOPER_MODE=ON "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
-          cmake --build reframework-src/build --config Release --target MHRISE --parallel
+          cmake --build reframework-src/build --config Release --target MHRISE
 
       - name: Package game-folder release
         working-directory: mod
