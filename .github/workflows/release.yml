@@ -104,4 +104,5 @@ jobs:
         with:
           name: MHR Arena Roguelike ${{ github.ref_name }}
           generate_release_notes: true
+          overwrite_files: true
           files: MHR-Arena-Roguelike-*.zip
