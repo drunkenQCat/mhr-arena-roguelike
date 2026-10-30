@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "invincible": false,
+  "receipt": {
+    "id": "setInvincible-mvtuzjui-8f2f13291da14219",
+    "message": "Invincible OFF (solo custom arena only)",
+    "status": "applied"
+  }
+}

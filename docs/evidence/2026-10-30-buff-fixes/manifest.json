@@ -1,0 +1,10 @@
+{
+  "src/game/equip_wear.ts": "7d0ae621161d6ff0935e10c8c81760e9ab60db480c44b65a9b238ceba4c4fbc8",
+  "src/game/pouch_backup.ts": "d5dcb952edaf1b74a452b901f1c84144e9ed0e7e2266e468586f3731d3e59a6d",
+  "src/game/buff_service.ts": "4a77865230f4c393a99464ccd9bc08f605972df1d0564111f4514f55f2a8586c",
+  "src/game/main.ts": "cc04c0740a5dce5f0c6a7175648f80e459f96efa276455874860186843ee942e",
+  "src/game/gacha.ts": "48e3500dcf7e861f0ead57810770b6600e3cdec91462c99752d62f4761cde747",
+  "src/core/run_session.ts": "c2ceac51356c377de3a69a67b4d389f0f58b97e906abc3d971faa59581a1cba5",
+  "reframework/autorun/mhw_rogue.lua": "f78977e28cb4dfe5f31bac931704ef606708c7d5e6dcc8a122029ccd3317088b",
+  "deployedBundle": "f78977e28cb4dfe5f31bac931704ef606708c7d5e6dcc8a122029ccd3317088b"
+}

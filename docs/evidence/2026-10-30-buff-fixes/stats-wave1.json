@@ -1,0 +1,58 @@
+{
+  "ok": false,
+  "report": {
+    "epoch": 5,
+    "error": "...terRise\\reframework/data/webconsole_runs/buff_verify.lua:13: PlayerData unavailable",
+    "kind": "run_script",
+    "samples": [
+      {
+        "_AtkUpAlive": 0,
+        "_Attack": 340,
+        "_CriticalRate": -25,
+        "_DefUpAlive": 0,
+        "_Defence": 75,
+        "frame": 15,
+        "totalAttack": null
+      },
+      {
+        "_AtkUpAlive": 0,
+        "_Attack": 340,
+        "_CriticalRate": -25,
+        "_DefUpAlive": 0,
+        "_Defence": 75,
+        "frame": 30,
+        "totalAttack": null
+      },
+      {
+        "_AtkUpAlive": 0,
+        "_Attack": 340,
+        "_CriticalRate": -25,
+        "_DefUpAlive": 0,
+        "_Defence": 75,
+        "frame": 45,
+        "totalAttack": null
+      },
+      {
+        "_AtkUpAlive": 0,
+        "_Attack": 340,
+        "_CriticalRate": -25,
+        "_DefUpAlive": 0,
+        "_Defence": 75,
+        "frame": 60,
+        "totalAttack": null
+      },
+      {
+        "_AtkUpAlive": 0,
+        "_Attack": 340,
+        "_CriticalRate": -25,
+        "_DefUpAlive": 0,
+        "_Defence": 75,
+        "frame": 75,
+        "totalAttack": null
+      }
+    ],
+    "script": "buff_verify.lua",
+    "session": "67492-9138391530",
+    "verdict": "ERROR"
+  }
+}

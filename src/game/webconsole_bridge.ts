@@ -11,6 +11,7 @@ interface Command {
   value?: boolean; itemId?: string; route?: string; config?: unknown;
   sceneToken?: string; dialogToken?: string; slot?: number; to?: string;
   configVersion?: number; questUnique?: number | null; waveToken?: number | null;
+  testLayer?: number;
 }
 type Outcome = Record<string, unknown>;
 
@@ -135,7 +136,8 @@ export class WebConsoleBridge {
           message: "已保存：商店下次交易、曲线与怪池下次生成选择时生效；开局规则和节奏下一局生效。当前波次保持原计划。" };
       }
       case "startRun": {
-        const r = s.start(cmd.armor ?? s.configForEditing().armorOptions[0] ?? "");
+        const r = s.start(cmd.armor ?? s.configForEditing().armorOptions[0] ?? "",
+          false, cmd.testLayer);
         return { status: r.ok ? "applied" : "rejected", message: r.message };
       }
       case "choose": {
@@ -246,6 +248,7 @@ export class WebConsoleBridge {
       quest: r?.quest ?? null, online: r?.online ?? false, route: s.route,
       layer: core.state.layer, pt: core.state.wallet.pt, cartsLeft: core.state.cartsLeft,
       nativeDeaths: r?.deaths ?? null, maxCarts: core.config.maxCarts, armor: core.state.armor, armorOptions: s.configForEditing().armorOptions,
+      killedUltimates: core.state.killedUltimates,
       invincible: this.runtime.testTools.invincible,
       activeWave: core.state.activeWave?.label ?? null, preparation: s.preparation(),
       enemies: r?.enemies ?? [], choices: s.stage === "Selecting" ? core.state.currentChoices : [],

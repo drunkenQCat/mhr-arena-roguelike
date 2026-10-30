@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "command": {
+    "cmd": "startRun",
+    "armor": "骨套（均衡）"
+  },
+  "receipt": {
+    "id": "startRun-mvtuwl6c-7a9c735d8ba6c3ec",
+    "status": "applied"
+  }
+}

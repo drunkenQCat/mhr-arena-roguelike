@@ -1,0 +1,46 @@
+{
+  "ok": false,
+  "report": {
+    "before": "Reward",
+    "epoch": 2,
+    "error": "lua: error: Invoke threw an exception",
+    "frames": 558,
+    "kind": "run_script",
+    "methods": {
+      "getDecideButtonTrg": 2,
+      "getDecideMouseEventRep": 4
+    },
+    "pulses": 6,
+    "script": "result_accept.lua",
+    "session": "41084-6575803952",
+    "transitions": [
+      {
+        "cursor": 0,
+        "frame": 6,
+        "node": "Reward",
+        "select": 0
+      },
+      {
+        "cursor": 0,
+        "frame": 54,
+        "node": "PayoffAnimation",
+        "select": 1
+      },
+      {
+        "cursor": 0,
+        "frame": 294,
+        "node": "Save",
+        "select": 1
+      },
+      {
+        "cursor": 0,
+        "frame": 522,
+        "node": "End",
+        "select": 1
+      }
+    ],
+    "unique": -1511860811,
+    "verdict": "ERROR",
+    "waitingVillage": true
+  }
+}

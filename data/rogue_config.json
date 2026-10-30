@@ -40,6 +40,205 @@
     "骨套（均衡）",
     "铁套（攻高防低）"
   ],
+  "ArmorSets": {
+    "骨套（均衡）": {
+      "Series": 146,
+      "Desc": "均衡"
+    },
+    "铁套（攻高防低）": {
+      "Series": 9,
+      "Desc": "攻高防低"
+    }
+  },
+  "StartupRules": {
+    "StripTalismans": true,
+    "StripInsect": false,
+    "KeepPlayerWeapon": true,
+    "WeaponId": null
+  },
+  "BuffAmounts": {
+    "Atk": 10,
+    "Def": 15,
+    "Crit": 10
+  },
+  "GachaPools": {
+    "gacha_1": {
+      "Entries": [
+        {
+          "Kind": "armor",
+          "Id": 202375177,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 203423753,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 204472329,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 205520905,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 206569481,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 202375314,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 203423890,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 204472466,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 205521042,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 206569618,
+          "W": 1
+        }
+      ]
+    },
+    "gacha_2": {
+      "Entries": [
+        {
+          "Kind": "armor",
+          "Id": 202375178,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 203423754,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 204472330,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 205520906,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 206569482,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 202375315,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 203423891,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 204472467,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 205521043,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 206569619,
+          "W": 1
+        }
+      ]
+    },
+    "gacha_3": {
+      "Entries": [
+        {
+          "Kind": "weapon",
+          "Id": 139461048,
+          "W": 2
+        },
+        {
+          "Kind": "armor",
+          "Id": 202375178,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 203423754,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 204472330,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 205520906,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 206569482,
+          "W": 1
+        }
+      ]
+    },
+    "gacha_4": {
+      "Entries": [
+        {
+          "Kind": "weapon",
+          "Id": 139461048,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 202375315,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 203423891,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 204472467,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 205521043,
+          "W": 1
+        },
+        {
+          "Kind": "armor",
+          "Id": 206569619,
+          "W": 1
+        }
+      ]
+    }
+  },
   "UnlockChain": [
     {
       "Monster": "冥渊龙",
@@ -125,7 +324,10 @@
       ],
       "Ultimate": [
         "天彗龙",
-        "爵银龙"
+        "爵银龙",
+        "激昂金狮子",
+        "嗟怨怨虎龙",
+        "冥渊龙"
       ],
       "Types": [
         "A"
@@ -232,19 +434,27 @@
     },
     {
       "Id": "flash",
-      "Name": "闪光弹",
+      "Name": "闪光弹×3",
       "Category": "战术道具",
       "Price": 50,
       "Cap": 3,
-      "Mode": "perUnit",
+      "Mode": "fill",
       "Desc": "一次购买3个"
     },
     {
-      "Id": "seed_any",
-      "Name": "种子类（忍耐/硬化/鬼人）",
+      "Id": "seed_might",
+      "Name": "怪力种子",
       "Category": "战术道具",
       "Price": 30,
-      "Cap": 5,
+      "Cap": 10,
+      "Mode": "perUnit"
+    },
+    {
+      "Id": "seed_adamant",
+      "Name": "忍耐种子",
+      "Category": "战术道具",
+      "Price": 30,
+      "Cap": 10,
       "Mode": "perUnit"
     },
     {

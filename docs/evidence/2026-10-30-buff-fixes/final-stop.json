@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "command": {
+    "cmd": "stop"
+  },
+  "receipt": {
+    "id": "stop-mvtuxjq1-5a1e057022cf726c",
+    "message": "已停止本局",
+    "status": "applied"
+  }
+}

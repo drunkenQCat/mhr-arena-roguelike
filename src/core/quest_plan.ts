@@ -48,6 +48,28 @@ export function makeQuestPlan(config: RogueConfig, catalog: MonsterCatalog, wave
     layer, token, monsterIds, wave, sequential: wave.mode ? wave.mode === "sequential" : sequential };
 }
 
+/**
+ * V1.3 §2.2 极强单怪难度档重排：把模板 _VitalTbl 首槽换成最高档（模板最高档是
+ * 第三槽 80；单怪波只吃第一槽 68 → 实际血量少了最高档）。
+ * 仅 tier==="ultimate" 且单怪时重排（返回新数组）；其余返回 null（不改表）。
+ * 数组其余元素保持原序，非 boss 槽（0 值）不动。
+ */
+export function ultimateVitalTbl(template: number[], tier: string, monsterCount: number): number[] | null {
+  if (tier !== "ultimate" || monsterCount !== 1) return null;
+  if (!Array.isArray(template) || template.length === 0) return null;
+  let maxAt = -1;
+  let max = -1;
+  for (let i = 0; i < template.length; i++) {
+    const v = template[i]!;
+    if (typeof v === "number" && v > max) { max = v; maxAt = i; }
+  }
+  if (maxAt <= 0) return null; // 首槽已是最高档，无需重排
+  const out = template.slice();
+  out[maxAt] = template[0]!;
+  out[0] = max;
+  return out;
+}
+
 /** Native table patch, not a generator. Condition values are supplied from RTTI enums. */
 export function normalPatch(plan: QuestPlan, conditionDefault: number, conditionFirstHp: number,
   bossrush: number, allMainEnemy: number): Record<string, unknown> {

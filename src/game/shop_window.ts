@@ -3,12 +3,23 @@ import type { RunCore, ShopEntry } from "../core/run_core";
 import { replaceOrAdd } from "../core/run_state";
 import { canTrade, grantFill, grantItem, pouchCount, type TradeQuest } from "./item_grant";
 import { restoreNativeCart } from "./native_cart";
+import type { GachaRollResult } from "./gacha";
+import type { BuffKind } from "./buff_service";
 import { clockSeconds, imguiApi, rejson } from "./sdk";
 
 type Pending =
   | { kind: "item"; id: string }
   | { kind: "fill"; id: string }
-  | { kind: "cartRestore" };
+  | { kind: "cartRestore" }
+  | { kind: "buff"; id: string }
+  | { kind: "gacha"; id: string };
+
+/** 翻盘服务效果交付（main.ts 注入；缺省=仅猫车恢复可用）。 */
+export interface ServiceEffects {
+  buffBuy(kind: BuffKind): { ok: boolean; total: number };
+  gachaBuy(poolId: string): GachaRollResult;
+  hasGachaPool(poolId: string): boolean;
+}
 
 export class ShopWindow
 {
@@ -33,7 +44,8 @@ export class ShopWindow
   }
 
   constructor(private readonly core: RunCore, private readonly selecting: () => boolean,
-    private readonly questContext: () => TradeQuest | undefined = () => undefined) {}
+    private readonly questContext: () => TradeQuest | undefined = () => undefined,
+    private readonly services: ServiceEffects | null = null) {}
 
   get busy(): boolean { return this.pending !== null || this.unresolved; }
 
@@ -55,8 +67,9 @@ export class ShopWindow
     }
     const categories = this.core.getShop();
     for (const category of Object.keys(categories)) for (const item of categories[category]!) {
-      // service 现开放猫车恢复；抽取/单轮增益等仍需游戏效果接线（design doc §5.3/§4.2）
-      const serviceOpen = item.id === "cart_restore";
+      // service 开放范围：猫车恢复（已接线）、单轮增益（buff 服务）、抽取（有奖池配置才开）
+      const serviceOpen = item.id === "cart_restore" || item.id.startsWith("buff_") ||
+        (item.id.startsWith("gacha_") && this.services !== null && this.services.hasGachaPool(item.id));
       if (item.mode === "service" && !serviceOpen) { item.canBuy = false; item.reason = "游戏效果接线完成前暂不开放"; continue; }
       if (unreadable.includes(item.id)) { item.canBuy = false; item.reason = "道具映射或背包尚未就绪"; }
       if (!available) { item.canBuy = false; item.reason = reason; }
@@ -80,6 +93,8 @@ export class ShopWindow
     if (pt < item.price) return { ok: false, message: `PT不足（需要 ${item.price}，持有 ${pt}）` };
     if (item.mode === "fill") this.pending = { kind: "fill", id };
     else if (item.id === "cart_restore") this.pending = { kind: "cartRestore" };
+    else if (item.id.startsWith("buff_")) this.pending = { kind: "buff", id };
+    else if (item.id.startsWith("gacha_")) this.pending = { kind: "gacha", id };
     else this.pending = { kind: "item", id };
     return { ok: true, message: "queued" };
   }
@@ -108,9 +123,10 @@ export class ShopWindow
     try {
       const context = this.questContext();
       if (!this.selecting() || !canTrade(context)) throw new Error("需要在村庄整备或清波后的斗技场波次间购买");
-      const item = this.core.config.shop.find((entry) => entry.id === (req.kind === "cartRestore" ? "cart_restore" : req.id));
+      const item = this.core.config.shop.find((entry) => entry.id ===
+        (req.kind === "cartRestore" ? "cart_restore" : req.id));
       if (!item) throw new Error("无此商品");
-      if (req.kind !== "cartRestore") {
+      if (req.kind !== "cartRestore" && req.kind !== "buff" && req.kind !== "gacha") {
         const owned = pouchCount(req.id);
         this.core.state.wallet = { ...this.core.state.wallet,
           bag: replaceOrAdd(this.core.state.wallet.bag, req.id, owned) };
@@ -145,6 +161,29 @@ export class ShopWindow
           this.settle(false, "补满结果不明：PT 已预扣、商店已锁定，请先查交易日志再重试。");
         } else {
           this.settle(false, `补满未完成（${report.reason ?? "原因未知"}）；PT 与限购记录已恢复。`, snapshot);
+        }
+        return;
+      }
+
+      if (req.kind === "buff") {
+        const kind = req.id as BuffKind;
+        if (!this.services) { this.settle(false, "服务未装配；PT 与限购记录已恢复。", snapshot); return; }
+        const applied = this.services.buffBuy(kind);
+        if (applied.ok) this.settle(true, `增益已累计（当前总加值 ${applied.total}），下一场狩猎生效`);
+        else this.settle(false, "增益登记失败；PT 与限购记录已恢复。", snapshot);
+        return;
+      }
+
+      if (req.kind === "gacha") {
+        if (!this.services) { this.settle(false, "服务未装配；PT 与限购记录已恢复。", snapshot); return; }
+        const rolled = this.services.gachaBuy(req.id);
+        if (rolled.ok) {
+          this.settle(true, `抽取获得：${rolled.name ?? rolled.id}${rolled.name ? "" : "（名字读回失败，以装备箱为准）"}`);
+        } else if (rolled.uncertain) {
+          this.unresolved = true;
+          this.settle(false, `抽取结果不明（${rolled.reason ?? "未知"}）：PT 已预扣、商店已锁定，请查装备箱与交易日志。`);
+        } else {
+          this.settle(false, `抽取未完成（${rolled.reason ?? "未知"}）；PT 与限购记录已恢复。`, snapshot);
         }
         return;
       }

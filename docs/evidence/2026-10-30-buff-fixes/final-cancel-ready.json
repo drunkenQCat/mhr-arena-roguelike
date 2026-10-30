@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "waitedMs": 45,
+  "state": {
+    "bridgeId": "6-1793297252-e5a16150",
+    "sessionStage": "Selecting",
+    "corePhase": "Choosing",
+    "layer": 1,
+    "pt": 4000,
+    "waveToken": null,
+    "enemies": [],
+    "shopAvailable": true
+  }
+}

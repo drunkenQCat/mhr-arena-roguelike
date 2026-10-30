@@ -1,0 +1,256 @@
+{
+  "events": [
+    {
+      "detail": {
+        "active": {
+          "atk": 0,
+          "crit": 0,
+          "def": 0
+        },
+        "critBonus": 0,
+        "pending": {
+          "atk": 0,
+          "crit": 0,
+          "def": 0
+        }
+      },
+      "event": "buff-state",
+      "time": 1793297252
+    },
+    {
+      "detail": {
+        "online": "disabled",
+        "scope": 900102
+      },
+      "event": "runtime-hooks-installed",
+      "time": 1793297254
+    },
+    {
+      "detail": {
+        "active": {
+          "atk": 0,
+          "crit": 0,
+          "def": 0
+        },
+        "critBonus": 0,
+        "pending": {
+          "atk": 20,
+          "crit": 0,
+          "def": 0
+        }
+      },
+      "event": "buff-state",
+      "time": 1793297292
+    },
+    {
+      "detail": {
+        "ok": true
+      },
+      "event": "startup-restored",
+      "time": 1793297293
+    },
+    {
+      "detail": {
+        "active": {
+          "atk": 0,
+          "crit": 0,
+          "def": 0
+        },
+        "critBonus": 0,
+        "pending": {
+          "atk": 0,
+          "crit": 0,
+          "def": 0
+        }
+      },
+      "event": "buff-state",
+      "time": 1793297293
+    },
+    {
+      "detail": {
+        "active": {
+          "atk": 0,
+          "crit": 0,
+          "def": 0
+        },
+        "critBonus": 0,
+        "pending": {
+          "atk": 10,
+          "crit": 0,
+          "def": 0
+        }
+      },
+      "event": "buff-state",
+      "time": 1793297297
+    },
+    {
+      "detail": {
+        "active": {
+          "atk": 0,
+          "crit": 0,
+          "def": 0
+        },
+        "critBonus": 0,
+        "pending": {
+          "atk": 20,
+          "crit": 0,
+          "def": 30
+        }
+      },
+      "event": "buff-state",
+      "time": 1793297298
+    },
+    {
+      "detail": {
+        "experimentalInPlace": false,
+        "plan": {
+          "baseId": 603,
+          "layer": 1,
+          "mapNo": 10,
+          "monsterIds": [
+            98
+          ],
+          "questId": 900102,
+          "sequential": false,
+          "token": 1,
+          "wave": {
+            "dmgMul": 1.0,
+            "hpMul": 0.75,
+            "index": 0,
+            "label": "Single · 单怪：镰鼬龙王",
+            "mode": "single",
+            "monsters": [
+              "镰鼬龙王"
+            ],
+            "rewardMul": 1,
+            "rewardPt": 80,
+            "tier": "weak",
+            "typeTag": "单怪"
+          }
+        },
+        "route": "inPlace"
+      },
+      "event": "wave-published",
+      "time": 1793297298
+    },
+    {
+      "detail": {
+        "active": {
+          "atk": 0,
+          "crit": 0,
+          "def": 0
+        },
+        "critBonus": 0,
+        "pending": {
+          "atk": 20,
+          "crit": 2,
+          "def": 30
+        }
+      },
+      "event": "buff-state",
+      "time": 1793297299
+    },
+    {
+      "detail": {
+        "enabled": true
+      },
+      "event": "test-invincible",
+      "time": 1793297299
+    },
+    {
+      "detail": {
+        "kind": "hp",
+        "multiplier": 0.75,
+        "original": 2.140000104904175,
+        "result": 1.605000078678131,
+        "token": 1
+      },
+      "event": "rate-applied",
+      "time": 1793297301
+    },
+    {
+      "detail": {
+        "camp": {
+          "x": -3.205841991871239e-08,
+          "y": 50.29914474487305,
+          "z": 46.91426086425781
+        },
+        "roster": [
+          0
+        ],
+        "unique": -1418472249
+      },
+      "event": "quest-entered",
+      "time": 1793297302
+    },
+    {
+      "detail": {
+        "captured": false,
+        "dead": false,
+        "position": {
+          "x": 0.0874495804309845,
+          "y": -0.5574594736099243,
+          "z": -80.32381439208984
+        },
+        "token": 1,
+        "typeId": 98,
+        "uid": 0
+      },
+      "event": "monster-observed",
+      "time": 1793297302
+    },
+    {
+      "detail": {
+        "active": {
+          "atk": 20,
+          "crit": 2,
+          "def": 30
+        },
+        "appliedUnique": -1418472249,
+        "critBonus": 20,
+        "layer": 1,
+        "pending": {
+          "atk": 0,
+          "crit": 0,
+          "def": 0
+        }
+      },
+      "event": "buff-state",
+      "time": 1793297302
+    },
+    {
+      "detail": {
+        "active": {
+          "atk": 0,
+          "crit": 0,
+          "def": 0
+        },
+        "critBonus": 0,
+        "pending": {
+          "atk": 0,
+          "crit": 0,
+          "def": 0
+        }
+      },
+      "event": "buff-state",
+      "time": 1793297336
+    },
+    {
+      "detail": {
+        "ok": true
+      },
+      "event": "startup-restored",
+      "time": 1793297378
+    }
+  ],
+  "last": {
+    "detail": {
+      "ok": true
+    },
+    "event": "startup-restored",
+    "time": 1793297378
+  },
+  "ready": true,
+  "status": "Quest 900102: layer 1, monsters 98 / counter: Idle / inPlace inactive",
+  "version": 2
+}

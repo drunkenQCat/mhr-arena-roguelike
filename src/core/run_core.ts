@@ -121,6 +121,22 @@ export class RunCore {
     return ok(`猫车 ${this.state.cartsLeft}/${this.config.maxCarts}`);
   }
 
+  /** 加权抽取：返回选中下标；weights 全 0 时返回 -1。确定性 RNG（可复现）。 */
+  rollWeighted(weights: number[]): number {
+    let total = 0;
+    for (const w of weights) {
+      if (!Number.isFinite(w) || w < 0) return -1;
+      total += w;
+    }
+    if (total <= 0) return -1;
+    let roll = (this.rng.nextUint() / 4294967296) * total;
+    for (let i = 0; i < weights.length; i++) {
+      roll -= weights[i]!;
+      if (roll < 0) return i;
+    }
+    return weights.length - 1;
+  }
+
   /** 重置为新一局（保留配置与 RNG 实例）。 */
   reset(): void {
     const fresh = createState(this.config.startPt, this.config.maxCarts);

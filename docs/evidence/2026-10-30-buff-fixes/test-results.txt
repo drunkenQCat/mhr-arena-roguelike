@@ -1,0 +1,34 @@
+
+ RUN  v2.1.9 C:/TechProjects/About_MyRepos/About_Games/mhr-roguelike-research
+
+ ✓ src/game/native_cart.test.ts (3 tests) 7ms
+ ✓ src/core/rng.test.ts (2 tests) 14ms
+ ✓ src/game/buff_service.test.ts (9 tests) 5ms
+ ✓ src/game/test_tools.test.ts (2 tests) 6ms
+ ✓ src/game/native_ui.test.ts (10 tests) 8ms
+ ✓ src/game/pouch_backup.test.ts (6 tests) 8ms
+ ✓ console/src/api.test.ts (7 tests) 15ms
+ ✓ src/game/equip_wear.test.ts (14 tests) 20ms
+ ✓ src/game/load_config.test.ts (3 tests) 9ms
+ ✓ src/game/gacha.test.ts (8 tests) 9ms
+ ✓ src/game/item_grant.test.ts (7 tests) 10ms
+ ✓ src/core/quest_plan.test.ts (4 tests) 17ms
+ ✓ src/game/inplace_waves.test.ts (5 tests) 17ms
+ ✓ src/core/config.test.ts (23 tests) 30ms
+ ✓ src/core/run_core.test.ts (25 tests) 40ms
+ ✓ console/src/editor-model.test.ts (3 tests) 12ms
+ ✓ src/game/shop_window.test.ts (14 tests) 26ms
+ ✓ src/game/quest_installer.test.ts (3 tests) 17ms
+ ✓ src/core/run_session.test.ts (22 tests) 45ms
+ ✓ src/game/quest_transport.test.ts (6 tests) 13ms
+ ✓ src/game/teleport.test.ts (3 tests) 9ms
+ ✓ src/game/webconsole_bridge.test.ts (8 tests) 57ms
+ ✓ src/game/native_runtime.test.ts (5 tests) 16ms
+ ✓ scripts/gen-types.test.ts (6 tests) 484ms
+   ✓ generated SDK compiler checks > rejects wrong field names, values and method arguments, with an explicit raw escape 478ms
+
+ Test Files  24 passed (24)
+      Tests  198 passed (198)
+   Start at  02:15:00
+   Duration  2.33s (transform 8.86s, setup 0ms, collect 17.58s, tests 892ms, environment 9ms, prepare 8.22s)
+

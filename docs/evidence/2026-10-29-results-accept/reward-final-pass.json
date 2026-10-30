@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "report": {
+    "after": "village",
+    "before": "Reward",
+    "epoch": 2,
+    "frames": 738,
+    "itemBoxDelta": {
+      "68157877": 1,
+      "68157958": 2,
+      "68157959": 3
+    },
+    "kind": "run_script",
+    "methods": {
+      "getDecideButtonTrg": 2,
+      "getDecideMouseEventRep": 6
+    },
+    "pulses": 8,
+    "script": "result_accept.lua",
+    "session": "41084-6575803952",
+    "transitions": [
+      {
+        "cursor": 0,
+        "frame": 6,
+        "node": "Reward",
+        "select": 0
+      },
+      {
+        "cursor": 0,
+        "frame": 78,
+        "node": "PayoffAnimation",
+        "select": 1
+      },
+      {
+        "cursor": 0,
+        "frame": 318,
+        "node": "Save",
+        "select": 1
+      }
+    ],
+    "unique": 1962168110,
+    "verdict": "PASS",
+    "waitingVillage": true
+  }
+}

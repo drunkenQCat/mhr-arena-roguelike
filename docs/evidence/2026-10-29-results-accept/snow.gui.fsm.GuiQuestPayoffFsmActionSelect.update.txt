@@ -1,0 +1,299 @@
+7ff7c15fb500 mov qword ptr [rsp + 8], rbx
+7ff7c15fb505 mov qword ptr [rsp + 0x18], rbp
+7ff7c15fb50a push rsi
+7ff7c15fb50b push rdi
+7ff7c15fb50c push r14
+7ff7c15fb50e sub rsp, 0x70
+7ff7c15fb512 mov rsi, r8
+7ff7c15fb515 mov rdi, rdx
+7ff7c15fb518 mov rbx, rcx
+7ff7c15fb51b test r8, r8
+7ff7c15fb51e jne 0x7ff7c15fb52c
+7ff7c15fb520 mov edx, 0x3c
+7ff7c15fb525 call 0x7ff7c2fc08a0 ; unknown
+7ff7c15fb52a jmp 0x7ff7c15fb538 ; unknown
+7ff7c15fb52c mov rax, qword ptr [rdx]
+7ff7c15fb52f mov rcx, rdi
+7ff7c15fb532 mov rdx, rsi
+7ff7c15fb535 call qword ptr [rax + 0x58]
+7ff7c15fb538 mov rax, qword ptr [rdi + 0x20]
+7ff7c15fb53c mov rcx, qword ptr [rax + 0xb0]
+7ff7c15fb543 mov eax, dword ptr [rcx + 0x20]
+7ff7c15fb546 cmp dword ptr [rcx + 0x1c], eax
+7ff7c15fb549 setl dl
+7ff7c15fb54c xor ebp, ebp
+7ff7c15fb54e mov r14d, ebp
+7ff7c15fb551 test dl, dl
+7ff7c15fb553 je 0x7ff7c15fb559
+7ff7c15fb555 mov r14, qword ptr [rcx + 0x28]
+7ff7c15fb559 mov rax, qword ptr [rip + 0xcf2dde8]
+7ff7c15fb560 mov rcx, qword ptr [rax + 0x480]
+7ff7c15fb567 test rcx, rcx
+7ff7c15fb56a je 0x7ff7c15fb576
+7ff7c15fb56c cmp qword ptr [rcx + 0x10], rbp
+7ff7c15fb570 je 0x7ff7c15fb576
+7ff7c15fb572 xor al, al
+7ff7c15fb574 jmp 0x7ff7c15fb578 ; unknown
+7ff7c15fb576 mov al, 1
+7ff7c15fb578 movzx eax, al
+7ff7c15fb57b test eax, eax
+7ff7c15fb57d jne 0x7ff7c15fb757
+7ff7c15fb583 mov rax, qword ptr [rcx + 0xb0]
+7ff7c15fb58a movzx ecx, byte ptr [rax + 0x50]
+7ff7c15fb58e and cl, 1
+7ff7c15fb591 je 0x7ff7c15fb757
+7ff7c15fb597 test dl, dl
+7ff7c15fb599 je 0x7ff7c15fb5e1
+7ff7c15fb59b mov rax, qword ptr [r14]
+7ff7c15fb59e mov rdx, r14
+7ff7c15fb5a1 mov rcx, rbx
+7ff7c15fb5a4 mov r8, qword ptr [rax - 0x10]
+7ff7c15fb5a8 call qword ptr [r8 + 0x38]
+7ff7c15fb5ac mov rax, qword ptr [r14]
+7ff7c15fb5af mov rdx, r14
+7ff7c15fb5b2 mov rcx, qword ptr [rax - 0x10]
+7ff7c15fb5b6 mov rax, qword ptr [rcx + 0xd0]
+7ff7c15fb5bd mov rcx, rbx
+7ff7c15fb5c0 call rax
+7ff7c15fb5c2 test al, al
+7ff7c15fb5c4 je 0x7ff7c15fb5e1
+7ff7c15fb5c6 mov rdx, qword ptr [rdi + 0x20]
+7ff7c15fb5ca mov r8b, 1
+7ff7c15fb5cd mov rcx, rbx
+7ff7c15fb5d0 mov rdx, qword ptr [rdx + 0xb0]
+7ff7c15fb5d7 call 0x7ff7c11e3220 ; unknown
+7ff7c15fb5dc jmp 0x7ff7c15fb748 ; unknown
+7ff7c15fb5e1 mov byte ptr [rsp + 0x60], bpl
+7ff7c15fb5e6 xor r9d, r9d
+7ff7c15fb5e9 mov byte ptr [rsp + 0x58], bpl
+7ff7c15fb5ee xor r8d, r8d
+7ff7c15fb5f1 mov dword ptr [rsp + 0x50], ebp
+7ff7c15fb5f5 mov rcx, rbx
+7ff7c15fb5f8 mov dword ptr [rsp + 0x48], ebp
+7ff7c15fb5fc mov dword ptr [rsp + 0x40], ebp
+7ff7c15fb600 lea edx, [r9 + 1]
+7ff7c15fb604 mov dword ptr [rsp + 0x38], ebp
+7ff7c15fb608 mov dword ptr [rsp + 0x30], ebp
+7ff7c15fb60c mov dword ptr [rsp + 0x28], ebp
+7ff7c15fb610 mov dword ptr [rsp + 0x20], ebp
+7ff7c15fb614 call 0x7ff7c1c5f090 ; snow.gui.StmGuiInput.andTrg
+7ff7c15fb619 mov rcx, rbx
+7ff7c15fb61c test al, al
+7ff7c15fb61e jne 0x7ff7c15fb72a
+7ff7c15fb624 mov byte ptr [rsp + 0x60], bpl
+7ff7c15fb629 xor r9d, r9d
+7ff7c15fb62c mov byte ptr [rsp + 0x58], bpl
+7ff7c15fb631 xor r8d, r8d
+7ff7c15fb634 mov dword ptr [rsp + 0x50], ebp
+7ff7c15fb638 mov dword ptr [rsp + 0x48], ebp
+7ff7c15fb63c mov dword ptr [rsp + 0x40], ebp
+7ff7c15fb640 lea edx, [r9 + 2]
+7ff7c15fb644 mov dword ptr [rsp + 0x38], ebp
+7ff7c15fb648 mov dword ptr [rsp + 0x30], ebp
+7ff7c15fb64c mov dword ptr [rsp + 0x28], ebp
+7ff7c15fb650 mov dword ptr [rsp + 0x20], ebp
+7ff7c15fb654 call 0x7ff7c1c5f090 ; snow.gui.StmGuiInput.andTrg
+7ff7c15fb659 mov rcx, rbx
+7ff7c15fb65c test al, al
+7ff7c15fb65e jne 0x7ff7c15fb71f
+7ff7c15fb664 mov byte ptr [rsp + 0x60], bpl
+7ff7c15fb669 xor r9d, r9d
+7ff7c15fb66c mov byte ptr [rsp + 0x58], bpl
+7ff7c15fb671 xor r8d, r8d
+7ff7c15fb674 mov dword ptr [rsp + 0x50], ebp
+7ff7c15fb678 mov dword ptr [rsp + 0x48], ebp
+7ff7c15fb67c mov dword ptr [rsp + 0x40], ebp
+7ff7c15fb680 lea edx, [r9 + 1]
+7ff7c15fb684 mov dword ptr [rsp + 0x38], ebp
+7ff7c15fb688 mov dword ptr [rsp + 0x30], ebp
+7ff7c15fb68c mov dword ptr [rsp + 0x28], ebp
+7ff7c15fb690 mov dword ptr [rsp + 0x20], ebp
+7ff7c15fb694 call 0x7ff7c1c5ebd0 ; snow.gui.StmGuiInput.andRep
+7ff7c15fb699 test al, al
+7ff7c15fb69b jne 0x7ff7c15fb717
+7ff7c15fb69d xor r9d, r9d
+7ff7c15fb6a0 mov byte ptr [rsp + 0x20], bpl
+7ff7c15fb6a5 xor r8d, r8d
+7ff7c15fb6a8 xor edx, edx
+7ff7c15fb6aa mov rcx, rbx
+7ff7c15fb6ad call 0x7ff7c1cffb00 ; snow.gui.StmGuiInput.getScrollWheelUpEvent
+7ff7c15fb6b2 test al, al
+7ff7c15fb6b4 jne 0x7ff7c15fb717
+7ff7c15fb6b6 mov byte ptr [rsp + 0x60], bpl
+7ff7c15fb6bb xor r9d, r9d
+7ff7c15fb6be mov byte ptr [rsp + 0x58], bpl
+7ff7c15fb6c3 xor r8d, r8d
+7ff7c15fb6c6 mov dword ptr [rsp + 0x50], ebp
+7ff7c15fb6ca mov rcx, rbx
+7ff7c15fb6cd mov dword ptr [rsp + 0x48], ebp
+7ff7c15fb6d1 mov dword ptr [rsp + 0x40], ebp
+7ff7c15fb6d5 lea edx, [r9 + 2]
+7ff7c15fb6d9 mov dword ptr [rsp + 0x38], ebp
+7ff7c15fb6dd mov dword ptr [rsp + 0x30], ebp
+7ff7c15fb6e1 mov dword ptr [rsp + 0x28], ebp
+7ff7c15fb6e5 mov dword ptr [rsp + 0x20], ebp
+7ff7c15fb6e9 call 0x7ff7c1c5ebd0 ; snow.gui.StmGuiInput.andRep
+7ff7c15fb6ee test al, al
+7ff7c15fb6f0 jne 0x7ff7c15fb70b
+7ff7c15fb6f2 xor r9d, r9d
+7ff7c15fb6f5 mov byte ptr [rsp + 0x20], bpl
+7ff7c15fb6fa xor r8d, r8d
+7ff7c15fb6fd xor edx, edx
+7ff7c15fb6ff mov rcx, rbx
+7ff7c15fb702 call 0x7ff7c1cff610 ; snow.gui.StmGuiInput.getScrollWheelDownEvent
+7ff7c15fb707 test al, al
+7ff7c15fb709 je 0x7ff7c15fb757
+7ff7c15fb70b xor r9d, r9d
+7ff7c15fb70e mov rcx, rbx
+7ff7c15fb711 lea r8d, [r9 + 2]
+7ff7c15fb715 jmp 0x7ff7c15fb733 ; unknown
+7ff7c15fb717 xor r9d, r9d
+7ff7c15fb71a mov rcx, rbx
+7ff7c15fb71d jmp 0x7ff7c15fb72d ; unknown
+7ff7c15fb71f mov r9b, 1
+7ff7c15fb722 mov r8d, 2
+7ff7c15fb728 jmp 0x7ff7c15fb733 ; unknown
+7ff7c15fb72a mov r9b, 1
+7ff7c15fb72d mov r8d, 1
+7ff7c15fb733 mov rdx, qword ptr [rdi + 0x20]
+7ff7c15fb737 mov byte ptr [rsp + 0x20], 1
+7ff7c15fb73c mov rdx, qword ptr [rdx + 0xb0]
+7ff7c15fb743 call 0x7ff7c11ce5f0 ; unknown
+7ff7c15fb748 mov rdx, qword ptr [rdi + 0x20]
+7ff7c15fb74c xor r8d, r8d
+7ff7c15fb74f mov rcx, rbx
+7ff7c15fb752 call 0x7ff7c0b616f0 ; snow.gui.GuiQuestResultFsmManager.updatePayoffUI
+7ff7c15fb757 mov byte ptr [rsp + 0x60], bpl
+7ff7c15fb75c xor r9d, r9d
+7ff7c15fb75f mov byte ptr [rsp + 0x58], bpl
+7ff7c15fb764 xor r8d, r8d
+7ff7c15fb767 mov dword ptr [rsp + 0x50], ebp
+7ff7c15fb76b mov rcx, rbx
+7ff7c15fb76e mov dword ptr [rsp + 0x48], ebp
+7ff7c15fb772 mov dword ptr [rsp + 0x40], ebp
+7ff7c15fb776 lea edx, [r9 + 0xa]
+7ff7c15fb77a mov dword ptr [rsp + 0x38], ebp
+7ff7c15fb77e mov dword ptr [rsp + 0x30], ebp
+7ff7c15fb782 mov dword ptr [rsp + 0x28], ebp
+7ff7c15fb786 mov dword ptr [rsp + 0x20], ebp
+7ff7c15fb78a call 0x7ff7c1c5f090 ; snow.gui.StmGuiInput.andTrg
+7ff7c15fb78f test al, al
+7ff7c15fb791 jne 0x7ff7c15fb86a
+7ff7c15fb797 mov byte ptr [rsp + 0x60], bpl
+7ff7c15fb79c xor r9d, r9d
+7ff7c15fb79f mov byte ptr [rsp + 0x58], bpl
+7ff7c15fb7a4 xor r8d, r8d
+7ff7c15fb7a7 mov dword ptr [rsp + 0x50], ebp
+7ff7c15fb7ab mov rcx, rbx
+7ff7c15fb7ae mov dword ptr [rsp + 0x48], ebp
+7ff7c15fb7b2 mov dword ptr [rsp + 0x40], ebp
+7ff7c15fb7b6 lea edx, [r9 + 9]
+7ff7c15fb7ba mov dword ptr [rsp + 0x38], ebp
+7ff7c15fb7be mov dword ptr [rsp + 0x30], ebp
+7ff7c15fb7c2 mov dword ptr [rsp + 0x28], ebp
+7ff7c15fb7c6 mov dword ptr [rsp + 0x20], ebp
+7ff7c15fb7ca call 0x7ff7c1c5f090 ; snow.gui.StmGuiInput.andTrg
+7ff7c15fb7cf mov rcx, rbx
+7ff7c15fb7d2 test al, al
+7ff7c15fb7d4 jne 0x7ff7c15fb829
+7ff7c15fb7d6 xor r8d, r8d
+7ff7c15fb7d9 xor edx, edx
+7ff7c15fb7db call 0x7ff7bf5ba7d0 ; snow.gui.StmGuiInput.getDecideButtonOrTrg
+7ff7c15fb7e0 test al, al
+7ff7c15fb7e2 jne 0x7ff7c15fb80f
+7ff7c15fb7e4 xor r8d, r8d
+7ff7c15fb7e7 xor edx, edx
+7ff7c15fb7e9 mov rcx, rbx
+7ff7c15fb7ec call 0x7ff7bf5bb630 ; snow.gui.StmGuiInput.getCancelButtonOrTrg
+7ff7c15fb7f1 test al, al
+7ff7c15fb7f3 jne 0x7ff7c15fb80f
+7ff7c15fb7f5 xor r9d, r9d
+7ff7c15fb7f8 mov rdx, r14
+7ff7c15fb7fb mov rcx, rbx
+7ff7c15fb7fe lea r8d, [r9 + 3]
+7ff7c15fb802 call 0x7ff7c1cf4180 ; snow.gui.StmGuiInput.getDecideMouseEventTrg
+7ff7c15fb807 test al, al
+7ff7c15fb809 je 0x7ff7c15fb921
+7ff7c15fb80f mov edx, 0xc93f7486
+7ff7c15fb814 mov rcx, rbx
+7ff7c15fb817 call 0x7ff7c09151d0 ; unknown
+7ff7c15fb81c mov byte ptr [rsi + 0x2a], 1
+7ff7c15fb820 mov byte ptr [rsi + 0x2c], 1
+7ff7c15fb824 jmp 0x7ff7c15fb921 ; unknown
+7ff7c15fb829 mov edx, 0x51371c07
+7ff7c15fb82e call 0x7ff7c09151d0 ; unknown
+7ff7c15fb833 mov rax, qword ptr [rip + 0xcf2db0e]
+7ff7c15fb83a mov rdx, qword ptr [rax + 0x470]
+7ff7c15fb841 test rdx, rdx
+7ff7c15fb844 je 0x7ff7c15fb850
+7ff7c15fb846 cmp qword ptr [rdx + 0x10], rbp
+7ff7c15fb84a je 0x7ff7c15fb850
+7ff7c15fb84c xor al, al
+7ff7c15fb84e jmp 0x7ff7c15fb852 ; unknown
+7ff7c15fb850 mov al, 1
+7ff7c15fb852 movzx eax, al
+7ff7c15fb855 test eax, eax
+7ff7c15fb857 jne 0x7ff7c15fb921
+7ff7c15fb85d mov rcx, rbx
+7ff7c15fb860 call 0x7ff7c0fa0c20 ; snow.gui.GuiResultBack.setBackGroundFilter
+7ff7c15fb865 jmp 0x7ff7c15fb921 ; unknown
+7ff7c15fb86a mov rdx, qword ptr [rip + 0xcf2dad7]
+7ff7c15fb871 mov rcx, qword ptr [rdx + 0x480]
+7ff7c15fb878 test rcx, rcx
+7ff7c15fb87b je 0x7ff7c15fb887
+7ff7c15fb87d cmp qword ptr [rcx + 0x10], rbp
+7ff7c15fb881 je 0x7ff7c15fb887
+7ff7c15fb883 xor al, al
+7ff7c15fb885 jmp 0x7ff7c15fb889 ; unknown
+7ff7c15fb887 mov al, 1
+7ff7c15fb889 movzx eax, al
+7ff7c15fb88c test eax, eax
+7ff7c15fb88e jne 0x7ff7c15fb8d7
+7ff7c15fb890 mov rax, qword ptr [rcx + 0xb0]
+7ff7c15fb897 movzx ecx, byte ptr [rax + 0x50]
+7ff7c15fb89b and cl, 1
+7ff7c15fb89e je 0x7ff7c15fb8d7
+7ff7c15fb8a0 mov rcx, qword ptr [rdx + 0x480]
+7ff7c15fb8a7 test rcx, rcx
+7ff7c15fb8aa je 0x7ff7c15fb8b6
+7ff7c15fb8ac cmp qword ptr [rcx + 0x10], rbp
+7ff7c15fb8b0 je 0x7ff7c15fb8b6
+7ff7c15fb8b2 xor al, al
+7ff7c15fb8b4 jmp 0x7ff7c15fb8b8 ; unknown
+7ff7c15fb8b6 mov al, 1
+7ff7c15fb8b8 movzx eax, al
+7ff7c15fb8bb test eax, eax
+7ff7c15fb8bd jne 0x7ff7c15fb8d2
+7ff7c15fb8bf mov rax, qword ptr [rcx + 0xb0]
+7ff7c15fb8c6 and qword ptr [rax + 0x50], 0xfffffffffffffffe
+7ff7c15fb8cb mov rdx, qword ptr [rip + 0xcf2da76]
+7ff7c15fb8d2 mov r8b, 1
+7ff7c15fb8d5 jmp 0x7ff7c15fb90c ; unknown
+7ff7c15fb8d7 mov rcx, qword ptr [rdx + 0x480]
+7ff7c15fb8de test rcx, rcx
+7ff7c15fb8e1 je 0x7ff7c15fb8ed
+7ff7c15fb8e3 cmp qword ptr [rcx + 0x10], rbp
+7ff7c15fb8e7 je 0x7ff7c15fb8ed
+7ff7c15fb8e9 xor al, al
+7ff7c15fb8eb jmp 0x7ff7c15fb8ef ; unknown
+7ff7c15fb8ed mov al, 1
+7ff7c15fb8ef movzx eax, al
+7ff7c15fb8f2 test eax, eax
+7ff7c15fb8f4 jne 0x7ff7c15fb909
+7ff7c15fb8f6 mov rax, qword ptr [rcx + 0xb0]
+7ff7c15fb8fd or qword ptr [rax + 0x50], 1
+7ff7c15fb902 mov rdx, qword ptr [rip + 0xcf2da3f]
+7ff7c15fb909 xor r8d, r8d
+7ff7c15fb90c mov rcx, rbx
+7ff7c15fb90f call 0x7ff7bf27ee20 ; unknown
+7ff7c15fb914 mov edx, 0x51371c07
+7ff7c15fb919 mov rcx, rbx
+7ff7c15fb91c call 0x7ff7c09151d0 ; unknown
+7ff7c15fb921 lea r11, [rsp + 0x70]
+7ff7c15fb926 mov rbx, qword ptr [r11 + 0x20]
+7ff7c15fb92a mov rbp, qword ptr [r11 + 0x30]
+7ff7c15fb92e mov rsp, r11
+7ff7c15fb931 pop r14
+7ff7c15fb933 pop rdi
+7ff7c15fb934 pop rsi
+7ff7c15fb935 ret 

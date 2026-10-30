@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "receipt": {
+    "configVersion": 1,
+    "id": "submitConfig-mvtuya5n-10e86b39002ee720",
+    "message": "已保存：商店下次交易、曲线与怪池下次生成选择时生效；开局规则和节奏下一局生效。当前波次保持原计划。",
+    "status": "applied"
+  }
+}

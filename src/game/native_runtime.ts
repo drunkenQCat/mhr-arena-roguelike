@@ -5,6 +5,10 @@ import { DEFAULT_RUNTIME, type QuestPlan } from "../core/quest_plan";
 import type { DeathReading, EnemyReading, PlayerReading, RuntimeReading, SessionPort } from "../core/run_session";
 import { QuestInstaller } from "./quest_installer";
 import { QuestTransport } from "./quest_transport";
+import { equipStartupSet, restoreStartup, appendGrantedEntry, type EquipWearPort } from "./equip_wear";
+import { beginPouchIsolation, endPouchIsolation } from "./pouch_backup";
+import { DEFAULT_STARTUP_RULES } from "../core/config";
+import { GachaService } from "./gacha";
 import { snow_QuestManager_Status } from "./gen/enums/snow_QuestManager_Status";
 import { snow_quest_EmEndType } from "./gen/enums/snow_quest_EmEndType";
 import { snow_quest_FailReason } from "./gen/enums/snow_quest_FailReason";
@@ -38,7 +42,8 @@ export class NativeRuntime implements SessionPort {
   private rateKeys: string[] = [];
   private rateEvidence: unknown[] = [];
 
-  constructor(private readonly cfg: RogueConfig, readonly installer: QuestInstaller) {
+  constructor(private readonly cfg: RogueConfig, readonly installer: QuestInstaller,
+    private readonly gacha?: GachaService) {
     this.transport = new QuestTransport(() => installer.getQuest(),
       (cfg.runtime ?? DEFAULT_RUNTIME).postTimeoutSeconds);
     this.questTransport = this.transport;
@@ -205,6 +210,48 @@ export class NativeRuntime implements SessionPort {
     return { time, quest, players, enemies, online, staleQuest,
       deaths: active ? callNative(qm, "getDeathNum") as number : 0,
       canPost: !active && (!!gui?.call("IsCanInvokeQuestBoard") || !!getSingleton("snow.gui.fsm.questcounter.GuiQuestCounterFsmManager")) };
+  }
+
+  private readonly wearPort: EquipWearPort = {
+    beginPouchIsolation: () => beginPouchIsolation(),
+    endPouchIsolation: () => endPouchIsolation(),
+  };
+  private startupNotice: string | null = null;
+
+  /** M3.5 开局准备：穿装 + 零物资袋隔离。不抛异常；袋隔离失败不阻断（返回 notice）。 */
+  startupPrepare(armor: string): { ok: boolean; reason?: string; notice?: string } {
+    const sets = this.cfg.armorSets ?? {};
+    const spec = sets[armor];
+    if (!spec) return { ok: false, reason: `配置缺少开局套装定义: ${armor}` };
+    const rules = this.cfg.startupRules ?? DEFAULT_STARTUP_RULES;
+    this.startupNotice = null;
+    const report = equipStartupSet(armor, spec.series, rules, this.wearPort);
+    if (!report.ok) return { ok: false, reason: report.reason ?? "开局穿装失败" };
+    const notice = report.pouchReason ? `零物资隔离未完成：${report.pouchReason}` : undefined;
+    this.startupNotice = notice ?? null;
+    return { ok: true, ...(notice ? { notice } : {}) };
+  }
+
+  /** V1.3 §2.3 极强击杀掉落：gacha_4 一次，发件并入局末清理（复用件不追踪不清理）。 */
+  ultimateDrop(): { ok: boolean; name?: string; reused?: boolean; reason?: string } {
+    if (!this.gacha) return { ok: false, reason: "GachaService unavailable" };
+    const rolled = this.gacha.roll("gacha_4");
+    if (!rolled.ok) return { ok: false, reason: rolled.reason ?? "抽取失败" };
+    if (!rolled.reused && rolled.id !== undefined && rolled.boxIndex !== undefined) {
+      if (!appendGrantedEntry({ boxIndex: rolled.boxIndex, idVal: rolled.id,
+        idType: rolled.kind === "armor" ? 2 : 1 })) {
+        relog.warn(`[MhwRogue] 极强掉落发件追踪落盘失败：局末可能残留 ${rolled.name ?? rolled.id}`);
+      }
+    }
+    relog.info(`[MhwRogue] 极强击杀掉落：抽取获得：${rolled.name ?? rolled.id}${rolled.reused ? "（已有，复用不清理）" : ""}`);
+    return { ok: true, name: rolled.name, reused: rolled.reused };
+  }
+
+  /** M3.5 回村恢复（equip_wear.restoreStartup 幂等；失败保持待办由 session 重试）。 */
+  startupRestore(): { ok: boolean; reason?: string } {
+    const report = restoreStartup(this.wearPort);
+    if (report.ok) this.startupNotice = null;
+    return report.ok ? { ok: true } : { ok: false, reason: report.reason };
   }
 
   finish(failed: boolean): void {

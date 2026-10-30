@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "waitedMs": 2563,
+  "state": {
+    "bridgeId": "5-1793296383-8b56ffef",
+    "sessionStage": "Selecting",
+    "corePhase": "Choosing",
+    "layer": 3,
+    "pt": 2940,
+    "questUnique": -271886302,
+    "waveToken": 2,
+    "enemies": [
+      {
+        "uid": 0,
+        "dead": true,
+        "captured": false
+      },
+      {
+        "uid": 700,
+        "dead": false,
+        "captured": false
+      }
+    ],
+    "shopAvailable": false
+  }
+}

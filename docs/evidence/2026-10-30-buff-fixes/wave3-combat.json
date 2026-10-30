@@ -1,0 +1,21 @@
+{
+  "ok": false,
+  "exitCode": 5,
+  "error": "等待超时，未满足：stage=Combat",
+  "detail": {
+    "last": {
+      "bridgeId": "5-1793296383-8b56ffef",
+      "sessionStage": "Fault",
+      "corePhase": "Choosing",
+      "layer": 3,
+      "pt": 2940,
+      "questUnique": -271886302,
+      "waveToken": 2,
+      "enemies": [],
+      "shopAvailable": false
+    },
+    "unmet": [
+      "stage=Combat"
+    ]
+  }
+}

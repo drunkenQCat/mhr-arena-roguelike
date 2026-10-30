@@ -1,202 +1,206 @@
 {
- "potion": {
-  "name": "Potion",
-  "id": 68157446
- },
- "mega_potion": {
-  "name": "Mega Potion",
-  "id": 68157447
- },
- "honey": {
-  "name": "Honey",
-  "id": 68157565
- },
- "secret": {
-  "name": "Max Potion",
-  "id": 68157445
- },
- "ancient": {
-  "name": "Ancient Potion",
-  "id": 68157907
- },
- "dust_life": {
-  "name": "Lifepowder",
-  "id": 68157449
- },
- "dust_life_l": {
-  "name": "Dust of Life",
-  "id": 68157908
- },
- "dust_atk": {
-  "name": "Demon Powder",
-  "id": 68157920
- },
- "dust_def": {
-  "name": "Hardshell Powder",
-  "id": 68157925
- },
- "trap_pit": {
-  "name": "Pitfall Trap",
-  "id": 68157563
- },
- "trap_shock": {
-  "name": "Shock Trap",
-  "id": 68157444
- },
- "flash": {
-  "name": "Flash Bomb",
-  "id": 68157603
- },
- "seed_any": {
-  "name": "Might Seed",
-  "id": 68157919
- },
- "ammo_n1": {
-  "name": "Normal Ammo 1",
-  "id": 68157469
- },
- "ammo_n2": {
-  "name": "Normal Ammo 2",
-  "id": 68157470
- },
- "ammo_n3": {
-  "name": "Normal Ammo 3",
-  "id": 68157471
- },
- "ammo_p2": {
-  "name": "Pierce Ammo 2",
-  "id": 68157473
- },
- "ammo_p3": {
-  "name": "Pierce Ammo 3",
-  "id": 68157474
- },
- "ammo_s2": {
-  "name": "Spread Ammo 2",
-  "id": 68157476
- },
- "ammo_s3": {
-  "name": "Spread Ammo 3",
-  "id": 68157477
- },
- "ammo_c2": {
-  "name": "Sticky Ammo 2",
-  "id": 68157479
- },
- "ammo_c3": {
-  "name": "Sticky Ammo 3",
-  "id": 68157592
- },
- "ammo_cl2": {
-  "name": "Cluster Bomb 2",
-  "id": 68157481
- },
- "ammo_cl3": {
-  "name": "Cluster Bomb 3",
-  "id": 68157593
- },
- "ammo_slic": {
-  "name": "Slicing Ammo",
-  "id": 68157495
- },
- "ammo_fire": {
-  "name": "Flaming Ammo",
-  "id": 68157491
- },
- "ammo_water": {
-  "name": "Water Ammo",
-  "id": 68157492
- },
- "ammo_thunder": {
-  "name": "Thunder Ammo",
-  "id": 68157493
- },
- "ammo_ice": {
-  "name": "Freeze Ammo",
-  "id": 68157494
- },
- "ammo_para": {
-  "name": "Paralysis Ammo 1",
-  "id": 68157484
- },
- "ammo_sleep": {
-  "name": "Sleep Ammo 1",
-  "id": 68157486
- },
- "ammo_poison": {
-  "name": "Poison Ammo 1",
-  "id": 68157482
- },
- "ammo_tranq": {
-  "name": "Tranq Ammo",
-  "id": 68157497
- },
- "bottle_pow": {
-  "name": "Power Coating",
-  "id": 68157498
- },
- "bottle_status": {
-  "name": "Para Coating",
-  "id": 68157501
- },
- "mat_husk": {
-  "name": "Huskberry",
-  "id": 68158152
- },
- "mat_nitro": {
-  "name": "Nitroshroom",
-  "id": 68158126
- },
- "mat_powder": {
-  "name": "Gunpowder",
-  "id": 68158167
- },
- "mat_burst": {
-  "name": "Blastnut",
-  "id": 68158155
- },
- "mat_herb_sleep": {
-  "name": "Sleep Herb",
-  "id": 68158144
- },
- "mat_mush_para": {
-  "name": "Parashroom",
-  "id": 68158127
- },
- "mat_mush_poison": {
-  "name": "Toadstool",
-  "id": 68158128
- },
- "mat_fire": {
-  "name": "Flame Sac",
-  "id": 68157542
- },
- "mat_thunder": {
-  "name": "Thunderbug",
-  "id": 68158141
- },
- "mat_ice": {
-  "name": "Freezer Sac",
-  "id": 68157889
- },
- "bottle_close": {
-  "name": "Close-range Coating",
-  "id": 68157504
- },
- "mat_water": {
-  "name": "Aqua Sac",
-  "id": 68157890
- },
- "mat_bottle": {
-  "name": "Small Barrel",
-  "id": 68157464
- },
- "mat_pow_fruit": {
-  "name": "Jumbofruit",
-  "id": 68158480
- },
- "mat_slic_fruit": {
-  "name": "Slashberry",
-  "id": 68158157
- }
+  "potion": {
+    "name": "Potion",
+    "id": 68157446
+  },
+  "mega_potion": {
+    "name": "Mega Potion",
+    "id": 68157447
+  },
+  "honey": {
+    "name": "Honey",
+    "id": 68157565
+  },
+  "secret": {
+    "name": "Max Potion",
+    "id": 68157445
+  },
+  "ancient": {
+    "name": "Ancient Potion",
+    "id": 68157907
+  },
+  "dust_life": {
+    "name": "Lifepowder",
+    "id": 68157449
+  },
+  "dust_life_l": {
+    "name": "Dust of Life",
+    "id": 68157908
+  },
+  "dust_atk": {
+    "name": "Demon Powder",
+    "id": 68157920
+  },
+  "dust_def": {
+    "name": "Hardshell Powder",
+    "id": 68157925
+  },
+  "trap_pit": {
+    "name": "Pitfall Trap",
+    "id": 68157563
+  },
+  "trap_shock": {
+    "name": "Shock Trap",
+    "id": 68157444
+  },
+  "flash": {
+    "name": "Flash Bomb",
+    "id": 68157603
+  },
+  "seed_might": {
+    "name": "怪力种子",
+    "id": 68157919
+  },
+  "seed_adamant": {
+    "name": "忍耐种子",
+    "id": 68157924
+  },
+  "ammo_n1": {
+    "name": "Normal Ammo 1",
+    "id": 68157469
+  },
+  "ammo_n2": {
+    "name": "Normal Ammo 2",
+    "id": 68157470
+  },
+  "ammo_n3": {
+    "name": "Normal Ammo 3",
+    "id": 68157471
+  },
+  "ammo_p2": {
+    "name": "Pierce Ammo 2",
+    "id": 68157473
+  },
+  "ammo_p3": {
+    "name": "Pierce Ammo 3",
+    "id": 68157474
+  },
+  "ammo_s2": {
+    "name": "Spread Ammo 2",
+    "id": 68157476
+  },
+  "ammo_s3": {
+    "name": "Spread Ammo 3",
+    "id": 68157477
+  },
+  "ammo_c2": {
+    "name": "Sticky Ammo 2",
+    "id": 68157479
+  },
+  "ammo_c3": {
+    "name": "Sticky Ammo 3",
+    "id": 68157592
+  },
+  "ammo_cl2": {
+    "name": "Cluster Bomb 2",
+    "id": 68157481
+  },
+  "ammo_cl3": {
+    "name": "Cluster Bomb 3",
+    "id": 68157593
+  },
+  "ammo_slic": {
+    "name": "Slicing Ammo",
+    "id": 68157495
+  },
+  "ammo_fire": {
+    "name": "Flaming Ammo",
+    "id": 68157491
+  },
+  "ammo_water": {
+    "name": "Water Ammo",
+    "id": 68157492
+  },
+  "ammo_thunder": {
+    "name": "Thunder Ammo",
+    "id": 68157493
+  },
+  "ammo_ice": {
+    "name": "Freeze Ammo",
+    "id": 68157494
+  },
+  "ammo_para": {
+    "name": "Paralysis Ammo 1",
+    "id": 68157484
+  },
+  "ammo_sleep": {
+    "name": "Sleep Ammo 1",
+    "id": 68157486
+  },
+  "ammo_poison": {
+    "name": "Poison Ammo 1",
+    "id": 68157482
+  },
+  "ammo_tranq": {
+    "name": "Tranq Ammo",
+    "id": 68157497
+  },
+  "bottle_pow": {
+    "name": "Power Coating",
+    "id": 68157498
+  },
+  "bottle_status": {
+    "name": "Para Coating",
+    "id": 68157501
+  },
+  "mat_husk": {
+    "name": "Huskberry",
+    "id": 68158152
+  },
+  "mat_nitro": {
+    "name": "Nitroshroom",
+    "id": 68158126
+  },
+  "mat_powder": {
+    "name": "Gunpowder",
+    "id": 68158167
+  },
+  "mat_burst": {
+    "name": "Blastnut",
+    "id": 68158155
+  },
+  "mat_herb_sleep": {
+    "name": "Sleep Herb",
+    "id": 68158144
+  },
+  "mat_mush_para": {
+    "name": "Parashroom",
+    "id": 68158127
+  },
+  "mat_mush_poison": {
+    "name": "Toadstool",
+    "id": 68158128
+  },
+  "mat_fire": {
+    "name": "Flame Sac",
+    "id": 68157542
+  },
+  "mat_thunder": {
+    "name": "Thunderbug",
+    "id": 68158141
+  },
+  "mat_ice": {
+    "name": "Freezer Sac",
+    "id": 68157889
+  },
+  "bottle_close": {
+    "name": "Close-range Coating",
+    "id": 68157504
+  },
+  "mat_water": {
+    "name": "Aqua Sac",
+    "id": 68157890
+  },
+  "mat_bottle": {
+    "name": "Small Barrel",
+    "id": 68157464
+  },
+  "mat_pow_fruit": {
+    "name": "Jumbofruit",
+    "id": 68158480
+  },
+  "mat_slic_fruit": {
+    "name": "Slashberry",
+    "id": 68158157
+  }
 }

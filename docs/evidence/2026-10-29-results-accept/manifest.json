@@ -1,0 +1,38 @@
+{
+  "capturedAt": "2026-10-29T12:32:02.068300+00:00",
+  "pid": 41084,
+  "frameworkCommit": "4-2e7ce5b9 (fork, as shown by UI)",
+  "baselineGit": "cc83991",
+  "files": [
+    {
+      "name": "metadata.json",
+      "bytes": 58956,
+      "sha256": "4670ba82a49ec9d096cd2e1cb6296d3e4dd9b3fc30184c80296f4efc3f7d6588"
+    },
+    {
+      "name": "reward-final-pass.json",
+      "bytes": 882,
+      "sha256": "eab1ac18d62097d7e83ca796b165bb2c7ccc5f7783c779fdde1eee8bed0f728d"
+    },
+    {
+      "name": "reward-first-report.json",
+      "bytes": 799,
+      "sha256": "d975d5a2d997c9284c8aaf50d1452d317eaf6d9593e697c43178261dce20e836"
+    },
+    {
+      "name": "reward-second-teardown-error.json",
+      "bytes": 928,
+      "sha256": "0ab224d335eb7f1e9d4f45a5e63802d28213fef7ccacd8ce9b03738cfe42dc9a"
+    },
+    {
+      "name": "snow.gui.fsm.GuiQuestPayoffFsmActionSelect.update.txt",
+      "bytes": 11118,
+      "sha256": "99a2fa0877e64640e4e5514d6967c19d1a3378ec92e9d78906a02fe78c221f0e"
+    },
+    {
+      "name": "snow.gui.fsm.GuiQuestResultFsmActionReword.update.txt",
+      "bytes": 21520,
+      "sha256": "499886804f996c53c21c3104a6eba40734a6316143d6c6b2c1dcdbdbd87885e7"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "ok": false,
+  "exitCode": 6,
+  "error": "killAll-mvtuhwtv-fa5a46a2a97e643a 在 1000ms 内仍为 queued，结果未确定。",
+  "detail": {
+    "requestId": "killAll-mvtuhwtv-fa5a46a2a97e643a",
+    "last": {
+      "id": "killAll-mvtuhwtv-fa5a46a2a97e643a",
+      "message": "等待原生怪物更新执行击杀",
+      "status": "queued"
+    }
+  }
+}

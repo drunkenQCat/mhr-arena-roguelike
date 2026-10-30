@@ -1,5 +1,14 @@
 # MHR Arena Roguelike — M2
 
+## GitHub releases
+
+Release archives are built for Windows x64 and preserve the Monster Hunter Rise game-folder
+layout. Extract the ZIP next to `MonsterHunterRise.exe`; it includes the REFramework fork,
+the generated mod Lua bundle, `webconsole.dll`, and the single-file web console at
+`reframework/plugins/console.html`. Open `http://127.0.0.1:11777/console` in a browser while
+the game is running. The frontend's JavaScript and CSS are embedded in the HTML, and its API
+routes are served by the included plugin.
+
 Monster Hunter Rise 16.0.2.0 / REFramework v1.5.9.1 的斗技场肉鸽研究模组。
 TypeScript 经 TypeScriptToLua 编译为单文件 `reframework/autorun/mhw_rogue.lua`。
 

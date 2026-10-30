@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "command": {
+    "cmd": "choose",
+    "index": 0
+  },
+  "receipt": {
+    "id": "choose-mvtuwrml-73546a328b9d8a25",
+    "status": "applied"
+  }
+}

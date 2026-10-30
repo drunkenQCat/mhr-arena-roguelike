@@ -266,3 +266,183 @@ it("offers an arena shop identity only after clearing and gathering, never durin
  expect(session.shopQuest()).toEqual({ questId: 900102, questUnique: 42 });
  session.choose(0); expect(session.shopQuest()).toBeUndefined();
 });
+
+describe("M3.5 startup equip lifecycle", () => {
+  class StartupGame extends FakeGame {
+    prepares: string[] = [];
+    restores = 0;
+    failPrepare = false;
+    startupPrepare(armor: string): { ok: boolean; reason?: string; notice?: string } {
+      if (this.failPrepare) return { ok: false, reason: "套装缺失" };
+      this.prepares.push(armor);
+      return { ok: true };
+    }
+    startupRestore(): { ok: boolean; reason?: string } {
+      this.restores++;
+      return { ok: true };
+    }
+  }
+
+  function setupStartup(route: "reentry" | "inPlace" = "inPlace") {
+    const config = validateConfig(JSON.parse(readFileSync(new URL("../../data/rogue_config.json", import.meta.url), "utf8")));
+    config.runtime = { ...config.runtime!, route, carveSeconds: 2, campDwellSeconds: 1,
+      spawnTimeoutSeconds: 5, postTimeoutSeconds: 20 };
+    const core = new RunCore(config, 42);
+    const game = new StartupGame();
+    const session = new RunSession(core, catalog, game);
+    const tick = (seconds = 1) => { game.reading.time += seconds; session.tick(); };
+    return { config, core, game, session, tick };
+  }
+
+  it("prepares before the run starts and never restores during an active run", () => {
+    const { core, game, session, tick } = setupStartup();
+    expect(session.start(core.config.armorOptions[0]!).ok).toBe(true);
+    expect(game.prepares).toEqual([core.config.armorOptions[0]!]);
+    // 任务中：不恢复
+    game.reading.quest = { id: core.config.quest.id, unique: 7, playing: true, status: "play" };
+    game.reading.canPost = false;
+    tick();
+    expect(game.restores).toBe(0);
+    // inPlace 首波前 Selecting 也在村庄（quest 未接）：绝不能提前恢复
+    game.reading.quest = null;
+    game.reading.canPost = true;
+    tick();
+    expect(game.restores).toBe(0);
+    // 终局/停止后回到村庄：恢复一次且只一次
+    session.stop();
+    tick();
+    expect(game.restores).toBe(1);
+    tick();
+    expect(game.restores).toBe(1);
+  });
+
+  it("aborts the start when prepare fails and leaves the run untouched", () => {
+    const { core, game, session } = setupStartup();
+    game.failPrepare = true;
+    const result = session.start(core.config.armorOptions[0]!);
+    expect(result.ok).toBe(false);
+    expect(game.prepares).toHaveLength(0);
+    expect(core.state.phase).toBe("Idle");
+    expect(session.stage).toBe("Idle");
+  });
+
+  it("stop() arms the deferred restore; script reload can re-arm it", () => {
+    const { game, session, tick } = setupStartup();
+    expect(session.start("骨套（均衡）").ok).toBe(true);
+    session.stop();
+    game.reading.quest = null;
+    game.reading.canPost = true;
+    tick();
+    expect(game.restores).toBe(1);
+    session.armStartupRestore();
+    tick();
+    expect(game.restores).toBe(2);
+  });
+
+  it("village idle session with no prepare history never fires restore", () => {
+    const { game, session, tick } = setupStartup();
+    tick();
+    expect(game.restores).toBe(0);
+  });
+
+  it("prepare failure reason propagates to the caller message", () => {
+    const { core, session } = setupStartup();
+    const game = session as unknown as { port: StartupGame };
+    game.port.failPrepare = true;
+    const result = session.start(core.config.armorOptions[0]!);
+    expect(result.message).toBe("套装缺失");
+  });
+});
+
+describe("M3.5 test-layer seam", () => {
+  class LayerGame extends FakeGame {
+    startupPrepare(armor: string) { return { ok: true }; }
+  }
+  function setupLayer() {
+    const config = validateConfig(JSON.parse(readFileSync(new URL("../../data/rogue_config.json", import.meta.url), "utf8")));
+    config.runtime = { ...config.runtime!, route: "inPlace", carveSeconds: 2, campDwellSeconds: 1,
+      spawnTimeoutSeconds: 5, postTimeoutSeconds: 20 };
+    const core = new RunCore(config, 42);
+    const game = new LayerGame();
+    const session = new RunSession(core, catalog, game);
+    return { core, session };
+  }
+
+  it("start(testLayer) 跳层后生成 ultimate 单怪 AU 波", () => {
+    const { core, session } = setupLayer();
+    expect(session.start("骨套（均衡）", false, 16).ok).toBe(true);
+    expect(core.state.layer).toBe(16);
+    expect(session.stage).toBe("Selecting");
+    const choices = core.state.currentChoices;
+    expect(choices.length).toBeGreaterThan(0);
+    for (const c of choices) {
+      expect(c.tier).toBe("ultimate");
+      expect(c.typeTag).toBe("极强怪单怪");
+      expect(c.rewardMul).toBeCloseTo(1.7, 5);
+    }
+    // 怪物都在 ultimate 池且 id 为正
+    const catalog = JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8")) as
+      Record<string, { id: number; cn?: string }>;
+    const byCn = new Map(Object.entries(catalog).map(([en, v]) => [v.cn ?? en, v]));
+    for (const c of choices) for (const m of c.monsters) {
+      expect(byCn.get(m)).toBeDefined();
+      expect(byCn.get(m)!.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("testLayer 非法值拒绝开局", () => {
+    const { session } = setupLayer();
+    const r = session.start("骨套（均衡）", false, 0);
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("M3.5 ultimate kill drop", () => {
+  class DropGame extends FakeGame {
+    startupPrepare(armor: string) { return { ok: true }; }
+    drops = 0;
+    ultimateDrop() { this.drops++; return { ok: true, name: "骨制S腰甲" }; }
+  }
+  function setupDrop(layer: number) {
+    const config = validateConfig(JSON.parse(readFileSync(new URL("../../data/rogue_config.json", import.meta.url), "utf8")));
+    config.runtime = { ...config.runtime!, route: "inPlace", carveSeconds: 2, campDwellSeconds: 1,
+      spawnTimeoutSeconds: 5, postTimeoutSeconds: 20 };
+    const core = new RunCore(config, 42);
+    const game = new DropGame();
+    const session = new RunSession(core, catalog, game);
+    const tick = (seconds = 1) => { game.reading.time += seconds; session.tick(); };
+    expect(session.start("骨套（均衡）", false, layer).ok).toBe(true);
+    const c = core.state.currentChoices[0]!;
+    expect(session.choose(c.index).ok).toBe(true);
+    game.reading.quest = { id: config.quest.id, unique: 9, playing: true, status: "play" };
+    game.reading.canPost = false;
+    tick();
+    return { core, game, session, tick };
+  }
+
+  it("ultimate 波清波触发一次顶级抽取掉落", () => {
+    const { core, game, session, tick } = setupDrop(16);
+    const ptBefore = core.state.wallet.pt;
+    game.reading.enemies = session.plan!.monsterIds.map((typeId, i) => ({ uid: i + 100, typeId, dead: true, captured: false }));
+    tick();
+    expect(session.stage).toBe("Carve");
+    expect(game.drops).toBe(1);
+    expect(core.state.killedUltimates).toEqual(session.plan!.wave.monsters);
+    const dropEvent = game.events.find((e) => e.event === "ultimate-drop");
+    expect(dropEvent).toBeDefined();
+    expect((dropEvent!.detail as { name: string }).name).toBe("骨制S腰甲");
+    expect(core.state.wallet.pt).toBeGreaterThan(ptBefore);
+    // 继续读条/集结阶段不再触发第二次
+    tick(2); tick();
+    expect(game.drops).toBe(1);
+  });
+
+  it("非 ultimate 波清波不掉落", () => {
+    const { core, game, session, tick } = setupDrop(1);
+    game.reading.enemies = session.plan!.monsterIds.map((typeId, i) => ({ uid: i + 100, typeId, dead: true, captured: false }));
+    tick();
+    expect(session.stage).toBe("Carve");
+    expect(game.drops).toBe(0);
+    expect(game.events.find((e) => e.event === "ultimate-drop")).toBeUndefined();
+  });
+});

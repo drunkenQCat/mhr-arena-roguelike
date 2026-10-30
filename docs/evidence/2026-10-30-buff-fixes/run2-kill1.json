@@ -1,0 +1,13 @@
+{
+  "ok": false,
+  "exitCode": 6,
+  "error": "killAll-mvtunjtj-d5b7641ae0212586 在 1000ms 内仍为 queued，结果未确定。",
+  "detail": {
+    "requestId": "killAll-mvtunjtj-d5b7641ae0212586",
+    "last": {
+      "id": "killAll-mvtunjtj-d5b7641ae0212586",
+      "message": "等待原生怪物更新执行击杀",
+      "status": "queued"
+    }
+  }
+}

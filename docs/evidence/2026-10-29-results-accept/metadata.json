@@ -1,0 +1,1954 @@
+{
+  "pid": 41084,
+  "session": "41084-6575803952",
+  "historicalAddressesOnly": true,
+  "types": {
+    "snow.gui.StmGuiInput": {
+      "fields": null,
+      "methods": [
+        {
+          "address": "userdata: 00007FF7BF5A5EE0",
+          "name": "isOSInput_AltEnter",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CF2000",
+          "name": "getAnyTrgSYS",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D01A70",
+          "name": "getTitleDispSkipTrg",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D01B30",
+          "name": "getTitlePressAnyButton",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5A8CD0",
+          "name": "getRepSumTimer",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "System.Boolean"
+          ],
+          "returns": "System.Single",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5A9790",
+          "name": "getCrossKeyRepSumTimer",
+          "params": [
+            "System.Boolean"
+          ],
+          "returns": "System.Single",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5AA4B0",
+          "name": "getAnalogRight",
+          "params": [
+            "System.Boolean"
+          ],
+          "returns": "via.vec2",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5AB100",
+          "name": "getAnalogLeft",
+          "params": [
+            "System.Boolean"
+          ],
+          "returns": "via.vec2",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CFAC20",
+          "name": "getMergedAnalogLInput",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean"
+          ],
+          "returns": "via.vec2",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CFAE40",
+          "name": "getMergedAnalogRInput",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean"
+          ],
+          "returns": "via.vec2",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D3FA50",
+          "name": "isPauseWindowButton",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D3F570",
+          "name": "isNetworkErrorWindowButton",
+          "params": [
+            "snow.gui.SnowGuiCommonUtility.MouseCtrlBase"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5B18B0",
+          "name": "getButtonTrgHARD",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5B18B0",
+          "name": "getButtonOnHARD",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5B3E70",
+          "name": "getDecideMouseEventTrgHARD",
+          "params": [
+            "snow.gui.SnowGuiCommonUtility.MouseCtrlBase",
+            "snow.gui.StmGuiInput.MouseEventCheckCtrlType",
+            "System.Int32"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5B4860",
+          "name": "isChangeActiveDevice",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CF37B0",
+          "name": "getConfigOptionKeyType",
+          "params": [
+            "System.Boolean",
+            "snow.StmInputConfig.KeyConfigType"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C73E90",
+          "name": "checkKeyBind",
+          "params": [
+            "snow.StmInputManager.UI_INPUT"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D3F7F0",
+          "name": "isOperationTrg",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D3F790",
+          "name": "isOperationRep",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D3F730",
+          "name": "isOperationOn",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5BA7D0",
+          "name": "getDecideButtonTrg",
+          "params": [
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5BB630",
+          "name": "getCancelButtonTrg",
+          "params": [
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5BA7D0",
+          "name": "getDecideButtonOrTrg",
+          "params": [
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5BB630",
+          "name": "getCancelButtonOrTrg",
+          "params": [
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5BF020",
+          "name": "getDecideButtonRep",
+          "params": [
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5C0250",
+          "name": "getCancelButtonRep",
+          "params": [
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5C1160",
+          "name": "getDecideButtonWeightRep",
+          "params": [
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5C1FB0",
+          "name": "getCancelButtonWeightRep",
+          "params": [
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5C2A00",
+          "name": "getDecideButtonTrgSYS",
+          "params": [
+            "snow.StmInputConfig.KeyConfigType"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5C31A0",
+          "name": "getCancelButtonTrgSYS",
+          "params": [
+            "snow.StmInputConfig.KeyConfigType"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D4F250",
+          "name": "orTrg",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C5F090",
+          "name": "andTrg",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D4E980",
+          "name": "orOn",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C5E4E0",
+          "name": "andOn",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D4ECE0",
+          "name": "orRel",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C5E970",
+          "name": "andRel",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D4EEB0",
+          "name": "orRep",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C5EBD0",
+          "name": "andRep",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D4F080",
+          "name": "orRepWeight",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C5EE30",
+          "name": "andRepWeight",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D4EB50",
+          "name": "orOnDuration",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "System.Boolean",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C5E740",
+          "name": "andOnDuration",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "System.Boolean",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "snow.StmInputConfig.KeyConfigType",
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5F6030",
+          "name": "andTrgSYS",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5F8420",
+          "name": "andOnSYS",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.UI_INPUT"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5F8E70",
+          "name": "get_ConstParam",
+          "params": null,
+          "returns": "snow.StmUIInputData",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF51A4D0",
+          "name": "replaceGUID",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF22B700",
+          "name": "replaceMessage",
+          "params": [
+            "System.String",
+            "System.String",
+            "System.String"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5FB7D0",
+          "name": "isChangeIconState",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5FBEE0",
+          "name": "isMouseKeyboardIconActive",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5FC550",
+          "name": "isReverseMouseClickIcon",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF5FD140",
+          "name": "convertIconTag_addElement",
+          "params": [
+            "via.gui.Text"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C878F0",
+          "name": "convertIconTag_setInput",
+          "params": [
+            "via.gui.Text",
+            "snow.StmInputManager.UI_INPUT",
+            "System.Boolean"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C87A50",
+          "name": "convertIconTag_setInput",
+          "params": [
+            "via.gui.Text",
+            "System.String"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF601670",
+          "name": "convertIconTag_setMessage",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C87CD0",
+          "name": "convertIconTag_setMessage",
+          "params": [
+            "via.gui.Text",
+            "System.String"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C87E30",
+          "name": "convertIconTag_setMessageId",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C87B90",
+          "name": "convertIconTag_setInputMessage",
+          "params": [
+            "via.gui.Text",
+            "snow.StmInputManager.UI_INPUT",
+            "System.Boolean"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C877D0",
+          "name": "convertIconTag_setButtonUI",
+          "params": [
+            "via.gui.Panel",
+            "snow.StmInputManager.UI_INPUT",
+            "System.Boolean"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF607C60",
+          "name": "convertIconTag_setButtonUI",
+          "params": [
+            "via.gui.Panel",
+            "System.String"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C7A520",
+          "name": "convertIconTag_PLOnly_setMessage",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF609ED0",
+          "name": "convertIconTag_PLOnly_getMessage",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C7A690",
+          "name": "convertIconTag_PLOnly_setTextMessage",
+          "params": [
+            "via.gui.Text"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C7A300",
+          "name": "convertIconPL",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D56BA0",
+          "name": "replaceTagPL",
+          "params": [
+            "System.String"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D56A50",
+          "name": "replaceSTMPL",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF60E1C0",
+          "name": "convertIconTag_GuiWeaponCtrl",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF607C60",
+          "name": "convertIconTag_GuiHudSlider",
+          "params": [
+            "via.gui.Panel",
+            "System.String"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D01810",
+          "name": "getTagMessage",
+          "params": [
+            "snow.StmInputManager.UI_INPUT",
+            "System.Boolean"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D56C00",
+          "name": "replaceTagPadOption",
+          "params": [
+            "System.String",
+            "System.String"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF612E00",
+          "name": "replaceTagOpt_OPAD",
+          "params": [
+            "System.String"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF613FF0",
+          "name": "convertIconTag_replaceKeyAssignId",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF6154F0",
+          "name": "convertIconTag_replaceOptionId",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF616770",
+          "name": "convertIconTag_replaceGuideId",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF617650",
+          "name": "convertIconTag_replaceTipsNoteId",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF618C90",
+          "name": "convertIconTag_replaceHNControlsId",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF619AB0",
+          "name": "convertIconTag_replaceHNControlsId_AddElement",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF61AD40",
+          "name": "convertIconTag_replaceHNInstructionId",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF61C210",
+          "name": "convertIconTag_replaceHNInstructionId_AddElement",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF61D540",
+          "name": "convertIconTag_replaceNPCChatInfoId",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF61E630",
+          "name": "convertIconTag_replaceNPCChatInfoId_AddElement",
+          "params": [
+            "via.gui.Text",
+            "System.Guid"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C80B10",
+          "name": "convertIconTag_replaceKeyAssignId",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C82330",
+          "name": "convertIconTag_replaceOptionId",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C7B330",
+          "name": "convertIconTag_replaceGuideId",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C84DE0",
+          "name": "convertIconTag_replaceTipsNoteId",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C7CB40",
+          "name": "convertIconTag_replaceHNControlsId",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C7E5F0",
+          "name": "convertIconTag_replaceHNInstructionId",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C815B0",
+          "name": "convertIconTag_replaceNPCChatInfoId",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C7A800",
+          "name": "convertIconTag_replaceDialogInfoId",
+          "params": [
+            "System.Guid"
+          ],
+          "returns": "System.String",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF625BE0",
+          "name": "get_isMouseCursorVisible",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF626640",
+          "name": "get_isMouseCursorActive",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D04D80",
+          "name": "get_isMouseCursorInScreen",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF6273A0",
+          "name": "isEnableMouseEvent",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CF4180",
+          "name": "getDecideMouseEventTrg",
+          "params": [
+            "snow.gui.SnowGuiCommonUtility.MouseCtrlBase",
+            "snow.gui.StmGuiInput.MouseEventCheckCtrlType",
+            "System.Int32"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CF4200",
+          "name": "getDecideMouseEventTrg",
+          "params": [
+            "via.gui.PlayObject",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CF3F80",
+          "name": "getDecideMouseEventOn",
+          "params": [
+            "snow.gui.SnowGuiCommonUtility.MouseCtrlBase",
+            "snow.gui.StmGuiInput.MouseEventCheckCtrlType",
+            "System.Int32"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CF4080",
+          "name": "getDecideMouseEventRep",
+          "params": [
+            "snow.gui.SnowGuiCommonUtility.MouseCtrlBase",
+            "snow.gui.StmGuiInput.MouseEventCheckCtrlType",
+            "System.Int32"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CF4100",
+          "name": "getDecideMouseEventRepWeight",
+          "params": [
+            "snow.gui.SnowGuiCommonUtility.MouseCtrlBase",
+            "snow.gui.StmGuiInput.MouseEventCheckCtrlType",
+            "System.Int32"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CF4000",
+          "name": "getDecideMouseEventRel",
+          "params": [
+            "snow.gui.SnowGuiCommonUtility.MouseCtrlBase",
+            "snow.gui.StmGuiInput.MouseEventCheckCtrlType",
+            "System.Int32"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CF4350",
+          "name": "getDecideMouseEventTrgSys",
+          "params": [
+            "snow.gui.SnowGuiCommonUtility.MouseCtrlBase",
+            "snow.gui.StmGuiInput.MouseEventCheckCtrlType",
+            "System.Int32"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF631570",
+          "name": "getWheelInputTimerDefault",
+          "params": null,
+          "returns": "snow.StmInputManager.WheelInputTimer",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D40310",
+          "name": "isScrollWheelEvent",
+          "params": [
+            "via.gui.PlayObject",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CFFB00",
+          "name": "getScrollWheelUpEvent",
+          "params": [
+            "via.gui.PlayObject",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.WheelInputTimer",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CFF610",
+          "name": "getScrollWheelDownEvent",
+          "params": [
+            "via.gui.PlayObject",
+            "snow.StmInputManager.UI_INPUT",
+            "snow.StmInputManager.WheelInputTimer",
+            "System.Boolean"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CFF2C0",
+          "name": "getScrollWheelDelta",
+          "params": [
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Int32",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CFF270",
+          "name": "getScrollSmoothWheelDelta",
+          "params": [
+            "System.Boolean",
+            "System.Boolean"
+          ],
+          "returns": "System.Single",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CFF980",
+          "name": "getScrollWheelUpAndShift",
+          "params": [
+            "via.gui.PlayObject"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CFF800",
+          "name": "getScrollWheelUpAndCtrl",
+          "params": [
+            "via.gui.PlayObject"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CFF490",
+          "name": "getScrollWheelDownAndShift",
+          "params": [
+            "via.gui.PlayObject"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1CFF310",
+          "name": "getScrollWheelDownAndCtrl",
+          "params": [
+            "via.gui.PlayObject"
+          ],
+          "returns": "System.Boolean",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF63B750",
+          "name": "getMouseViewCursorPosition",
+          "params": null,
+          "returns": "via.Point",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF63BDE0",
+          "name": "getMouseScreenCursorPosition",
+          "params": null,
+          "returns": "via.Point",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF63C920",
+          "name": "getMousePresentRectCursorPosition",
+          "params": null,
+          "returns": "via.Point",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF63D090",
+          "name": "getMouseDesktopCursorPosition",
+          "params": null,
+          "returns": "via.Point",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF63DEB0",
+          "name": "getMouseMovePosition",
+          "params": null,
+          "returns": "via.Point",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D70560",
+          "name": "setMouseCursorOn",
+          "params": [
+            "via.gui.Control"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1D706A0",
+          "name": "setMouseCursorOn",
+          "params": [
+            "via.gui.Material"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF642B50",
+          "name": "setMouseViewCursorPosition",
+          "params": [
+            "via.Point"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF643BC0",
+          "name": "setMouseScreenCursorPosition",
+          "params": [
+            "via.Point"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF642B50",
+          "name": "setViewCursorPosition",
+          "params": [
+            "via.Point"
+          ],
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF645880",
+          "name": "backupMouseCursorPosition",
+          "params": null,
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF646270",
+          "name": "restoreMouseCursorPosition",
+          "params": null,
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF646A10",
+          "name": "enableActivateMouseCtrl",
+          "params": null,
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7BF6472E0",
+          "name": "enableClipCursorToScreen",
+          "params": null,
+          "returns": "System.Void",
+          "static": true
+        },
+        {
+          "address": "userdata: 00007FF7C1C74B80",
+          "name": "checkMouseCtrlEvent",
+          "params": [
+            "System.Boolean",
+            "snow.gui.SnowGuiCommonUtility.MouseCtrlBase",
+            "snow.gui.StmGuiInput.MouseEventCheckCtrlType",
+            "System.Int32"
+          ],
+          "returns": "System.Void",
+          "static": true
+        }
+      ]
+    },
+    "snow.gui.GuiQuestResultFsmManager": {
+      "fields": [
+        {
+          "name": "RewardListCursor",
+          "offset": 112,
+          "static": false,
+          "type": "snow.gui.SnowGuiCommonUtility.BoxMenuCursor"
+        },
+        {
+          "name": "RewardTypeCursor",
+          "offset": 120,
+          "static": false,
+          "type": "System.Int32"
+        },
+        {
+          "name": "OldRewardListCursor",
+          "offset": 124,
+          "static": false,
+          "type": "System.Int32"
+        },
+        {
+          "name": "OldRewardTypeCursor",
+          "offset": 128,
+          "static": false,
+          "type": "System.Int32"
+        },
+        {
+          "name": "RecvButtonCursor",
+          "offset": 132,
+          "static": false,
+          "type": "System.Int32"
+        },
+        {
+          "name": "SelectState",
+          "offset": 136,
+          "static": false,
+          "type": "snow.gui.GuiQuestResultFsmManager.RewardSelectState"
+        },
+        {
+          "name": "isRewardEnd",
+          "offset": 140,
+          "static": false,
+          "type": "System.Boolean"
+        },
+        {
+          "name": "isSelAllItem",
+          "offset": 141,
+          "static": false,
+          "type": "System.Boolean"
+        },
+        {
+          "name": "SelAllItemYnState",
+          "offset": 144,
+          "static": false,
+          "type": "System.Int32"
+        },
+        {
+          "name": "isShowGUI",
+          "offset": 148,
+          "static": false,
+          "type": "System.Boolean"
+        },
+        {
+          "name": "<RewardScrBarMouseCtrl>k__BackingField",
+          "offset": 152,
+          "static": false,
+          "type": "snow.gui.SnowGuiCommonUtility.MouseScrBarCtrlF"
+        },
+        {
+          "name": "ScrollUnit",
+          "offset": 160,
+          "static": false,
+          "type": "System.Single"
+        },
+        {
+          "name": "<LastCursorPoint>k__BackingField",
+          "offset": 164,
+          "static": false,
+          "type": "via.Point"
+        },
+        {
+          "name": "<RewardCursorPosSavedFlag>k__BackingField",
+          "offset": 172,
+          "static": false,
+          "type": "System.Boolean"
+        },
+        {
+          "name": "Payoff_cursor",
+          "offset": 176,
+          "static": false,
+          "type": "snow.gui.GuiQuestResultFsmManager.DisplayScrollCursor"
+        }
+      ],
+      "methods": [
+        {
+          "address": "userdata: 00007FF7BEEA22B0",
+          "name": "get_RewardScrBarMouseCtrl",
+          "params": null,
+          "returns": "snow.gui.SnowGuiCommonUtility.MouseScrBarCtrlF",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BEEA3420",
+          "name": "set_RewardScrBarMouseCtrl",
+          "params": [
+            "snow.gui.SnowGuiCommonUtility.MouseScrBarCtrlF"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF3BD970",
+          "name": "get_LastCursorPoint",
+          "params": null,
+          "returns": "via.Point",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF3BE8D0",
+          "name": "set_LastCursorPoint",
+          "params": [
+            "via.Point"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF0914B0",
+          "name": "get_RewardCursorPosSavedFlag",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF092C90",
+          "name": "set_RewardCursorPosSavedFlag",
+          "params": [
+            "System.Boolean"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0A334F0",
+          "name": "awake",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BEF75AF0",
+          "name": "start",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BEEA7D60",
+          "name": "reset",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF3ABF70",
+          "name": "onDestroy",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0AF8E90",
+          "name": "initRewardList",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF3C5250",
+          "name": "openRewardWindow",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF3C62D0",
+          "name": "closeRewardWindow",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF3C7020",
+          "name": "setupRewardList",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B167F0",
+          "name": "sendRewardItem",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0AFF790",
+          "name": "isSendItem",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0AFD6B0",
+          "name": "isEmptyList",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0A9A130",
+          "name": "decideSendAllItem",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0A99F70",
+          "name": "decideSellAllItem",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0ABB420",
+          "name": "getNextItemIndex",
+          "params": [
+            "snow.gui.GuiResultReward.RewardInfo",
+            "System.Int32"
+          ],
+          "returns": "System.Int32",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF3CC8D0",
+          "name": "isEndButtonSelect",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0AB24C0",
+          "name": "getCursorPosInventroy",
+          "params": null,
+          "returns": "snow.data.ItemInventoryData",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0ABEAC0",
+          "name": "getSelPriceAllItem",
+          "params": null,
+          "returns": "System.UInt32",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0ABEE00",
+          "name": "getSellPriceRemainingItem",
+          "params": null,
+          "returns": "System.UInt32",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B63EB0",
+          "name": "updateRewordListCursor",
+          "params": [
+            "snow.gui.SnowGuiCommonUtility.SW_TYPE"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B15B30",
+          "name": "saveCursorPosition",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B63840",
+          "name": "updateRewardListCursorFromMouse",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B63AB0",
+          "name": "updateRewardListScrollFromScrBar",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B63BB0",
+          "name": "updateRewardListScrollFromWheel",
+          "params": [
+            "System.Int32"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B636C0",
+          "name": "updateRewardListAfterScroll",
+          "params": [
+            "snow.gui.GuiResultReward.GridsIndex",
+            "System.Boolean"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B63CD0",
+          "name": "updateRewardRecvButtonCursor",
+          "params": [
+            "snow.gui.SnowGuiCommonUtility.SW_TYPE"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B65880",
+          "name": "updateShow",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0AF7190",
+          "name": "initPayoffWindow",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF3D8570",
+          "name": "openPayoffWindow",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF3D9550",
+          "name": "closePayoffWindow",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B616F0",
+          "name": "updatePayoffUI",
+          "params": [
+            "System.Boolean"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C09D5780",
+          "name": "ItemStateFadeIn",
+          "params": [
+            "System.Boolean",
+            "System.Int32"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0AFE560",
+          "name": "isNextAdd",
+          "params": [
+            "System.Int32"
+          ],
+          "returns": "System.Boolean",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0AFC510",
+          "name": "isAddPlus",
+          "params": [
+            "System.Int32"
+          ],
+          "returns": "System.Boolean",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C09E4E80",
+          "name": "ScrollFrameAnim",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF3DEE50",
+          "name": "startAddAnimation",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C09A6720",
+          "name": "AddItem",
+          "params": null,
+          "returns": "System.Int32",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C09AC450",
+          "name": "DisplayItemCount",
+          "params": null,
+          "returns": "System.Int32",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C09AC4E0",
+          "name": "DisplayItemMax",
+          "params": null,
+          "returns": "System.Int32",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B05ED0",
+          "name": "onLoop",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C09E4D50",
+          "name": "ScrollBarVisible",
+          "params": [
+            "System.Boolean"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C09E7030",
+          "name": "SkipAddAniamtion",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B2F5C0",
+          "name": "skipBeforeProcess",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B2F520",
+          "name": "skipAfterProcess",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0AA5810",
+          "name": "enabledSaveBack",
+          "params": [
+            "System.Boolean"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B1E5C0",
+          "name": "setOpenHyakuryuInfo",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0A44720",
+          "name": "closeHyakuryuInfo",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0AFDE60",
+          "name": "isHyakuryuFadeAnimation",
+          "params": null,
+          "returns": "System.Boolean",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0B2F660",
+          "name": "skipHyakuryuFadeAnimation",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C0A24A60",
+          "name": ".ctor",
+          "params": null,
+          "returns": "System.Void",
+          "static": false
+        }
+      ]
+    },
+    "snow.gui.fsm.GuiQuestResultFsmActionReword": {
+      "fields": null,
+      "methods": [
+        {
+          "address": "userdata: 00007FF7BFE36CE0",
+          "name": "start",
+          "params": [
+            "via.behaviortree.ActionArg"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BFE49330",
+          "name": "update",
+          "params": [
+            "via.behaviortree.ActionArg"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BF2B78C0",
+          "name": "end",
+          "params": [
+            "via.behaviortree.ActionArg"
+          ],
+          "returns": "System.Void",
+          "static": false
+        }
+      ]
+    },
+    "snow.gui.fsm.GuiQuestPayoffFsmActionSelect": {
+      "fields": [
+        {
+          "name": "instance",
+          "offset": 32,
+          "static": false,
+          "type": "snow.gui.GuiQuestResultFsmManager"
+        }
+      ],
+      "methods": [
+        {
+          "address": "userdata: 00007FF7C15E6E60",
+          "name": "start",
+          "params": [
+            "via.behaviortree.ActionArg"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C15FB500",
+          "name": "update",
+          "params": [
+            "via.behaviortree.ActionArg"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C1509DB0",
+          "name": "end",
+          "params": [
+            "via.behaviortree.ActionArg"
+          ],
+          "returns": "System.Void",
+          "static": false
+        }
+      ]
+    },
+    "snow.gui.fsm.GuiQuestPayoffFsmActionAnimation": {
+      "fields": [
+        {
+          "name": "ScrollItemCount",
+          "offset": 32,
+          "static": true,
+          "type": "System.Int32"
+        },
+        {
+          "name": "index",
+          "offset": 32,
+          "static": false,
+          "type": "System.Int32"
+        },
+        {
+          "name": "instance",
+          "offset": 40,
+          "static": false,
+          "type": "snow.gui.GuiQuestResultFsmManager"
+        }
+      ],
+      "methods": [
+        {
+          "address": "userdata: 00007FF7C1364050",
+          "name": "start",
+          "params": [
+            "via.behaviortree.ActionArg"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C1375290",
+          "name": "update",
+          "params": [
+            "via.behaviortree.ActionArg"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7C11EEA60",
+          "name": "AddItem",
+          "params": [
+            "System.Boolean"
+          ],
+          "returns": "System.Void",
+          "static": false
+        },
+        {
+          "address": "userdata: 00007FF7BEEA93C0",
+          "name": "end",
+          "params": [
+            "via.behaviortree.ActionArg"
+          ],
+          "returns": "System.Void",
+          "static": false
+        }
+      ]
+    }
+  }
+}

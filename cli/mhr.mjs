@@ -72,6 +72,7 @@ function parseArgs(argv) {
   const words = [];
   const options = { json: false, baseUrl: undefined, timeoutS: 3, receiptTimeoutS: 15,
     sampleMs: 1600, armor: undefined, index: undefined, item: undefined, file: undefined,
+    testLayer: undefined,
     version: undefined, stage: undefined, layer: undefined, questUnique: undefined,
     waveToken: undefined, uidAlive: [], uidDead: [], shop: false, timeout: undefined,
     report: undefined, category: undefined, probeTimeoutS: undefined };
@@ -81,6 +82,7 @@ function parseArgs(argv) {
     "--receipt-timeout": (v) => { options.receiptTimeoutS = Number(v); },
     "--sample-ms": (v) => { options.sampleMs = Number(v); },
     "--armor": (v) => { options.armor = v; },
+    "--test-layer": (v) => { options.testLayer = Number(v); },
     "--index": (v) => { options.index = Number(v); },
     "--item": (v) => { options.item = v; },
     "--file": (v) => { options.file = v; },
@@ -333,6 +335,9 @@ ${v.error}` : "没有记录的脚本错误");
         if (command.cmd === "startRun" && options.armor &&
             !(identity.state.armorOptions ?? []).includes(options.armor)) {
           throw usage(`未知护甲 ${options.armor}；可选：${(identity.state.armorOptions ?? []).join(", ")}`);
+        }
+        if (command.cmd === "startRun" && options.testLayer !== undefined) {
+          command.testLayer = options.testLayer;
         }
         if (command.cmd === "choose" && !Number.isInteger(options.index)) throw usage("run choose 需要 --index");
         const { id, receipt } = await submit(baseUrl, command, { identity, timeoutMs, receiptTimeoutMs });

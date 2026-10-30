@@ -1,0 +1,131 @@
+{
+  "ok": true,
+  "report": {
+    "epoch": 9,
+    "kind": "run_script",
+    "script": "probe_risen_valstrax.lua",
+    "session": "67492-9138391530",
+    "steps": [
+      {
+        "detail": {
+          "emSetId": 9,
+          "listCount": 10,
+          "orderIndex": 3,
+          "sourceType": 107,
+          "taskSlot": 1,
+          "type": 2134,
+          "uid": 900
+        },
+        "frame": 1,
+        "ok": true,
+        "step": "mounted"
+      },
+      {
+        "detail": {
+          "boss": {
+            "etype": 2134,
+            "hpMax": 470,
+            "pos": {
+              "x": -0.08,
+              "y": -0.56,
+              "z": -80.25
+            },
+            "scale_Base": 0.899,
+            "scale_Quest": 0,
+            "scale_Total": 1,
+            "uid": 900
+          },
+          "bossCount": 2,
+          "frames": 12,
+          "slotState": 1
+        },
+        "frame": 12,
+        "ok": true,
+        "step": "native-loaded"
+      },
+      {
+        "detail": {
+          "frames": 60,
+          "inBounds": true,
+          "pos": {
+            "x": -0.09,
+            "y": -0.56,
+            "z": -80.25
+          }
+        },
+        "frame": 60,
+        "ok": true,
+        "step": "settle-poll"
+      },
+      {
+        "detail": {
+          "boss": {
+            "etype": 2134,
+            "hpMax": 470,
+            "pos": {
+              "x": -0.09,
+              "y": -0.56,
+              "z": -80.25
+            },
+            "scale_Base": 0.899,
+            "scale_Quest": 0,
+            "scale_Total": 1,
+            "uid": 900
+          },
+          "fence": {
+            "note": "settled inside arena map-10 bounds",
+            "xBound": 150,
+            "zBound": 150
+          },
+          "frames": 60,
+          "inBounds": true
+        },
+        "frame": 60,
+        "ok": true,
+        "step": "readings"
+      },
+      {
+        "detail": {
+          "frame": 60,
+          "note": "stock damage queued; elder death flow takes ~40-60s",
+          "uid": 900
+        },
+        "frame": 60,
+        "ok": true,
+        "step": "kill-stocking"
+      },
+      {
+        "detail": {
+          "die": {
+            "etype": 2134,
+            "hpMax": 470,
+            "pos": {
+              "x": -0.09,
+              "y": -0.56,
+              "z": -80.25
+            },
+            "scale_Base": 0.899,
+            "scale_Quest": 0,
+            "scale_Total": 1,
+            "uid": 900
+          },
+          "frames": 614
+        },
+        "frame": 614,
+        "ok": true,
+        "step": "death-event"
+      },
+      {
+        "detail": {
+          "frames": 1815,
+          "note": "corpse cleanup slower than window; death already evidenced",
+          "released": false
+        },
+        "frame": 1815,
+        "ok": true,
+        "step": "slot-released"
+      }
+    ],
+    "verdict": "PASS"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "ok": true,
+  "report": {
+    "at": "done",
+    "box": true,
+    "boxEntries": 5000,
+    "callErr": "caught (...) exception",
+    "epoch": 12,
+    "found": false,
+    "kind": "run_script",
+    "scanFound": false,
+    "script": "probe_grant_check.lua",
+    "session": "67492-9138391530",
+    "spells": {
+      "nospace": false,
+      "space": true
+    },
+    "stateFile": {
+      "active": false,
+      "grantedCount": 0
+    },
+    "verdict": "PASS",
+    "wornIdVals": [
+      139461048,
+      202375220,
+      203423839,
+      204472372,
+      205521019,
+      206569524,
+      135266324,
+      -1
+    ]
+  }
+}

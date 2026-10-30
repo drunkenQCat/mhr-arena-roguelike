@@ -1,0 +1,66 @@
+{
+  "ok": true,
+  "report": {
+    "epoch": 5,
+    "kind": "run_script",
+    "samples": [
+      {
+        "_AtkUpAlive": 0,
+        "_Attack": 340,
+        "_CriticalRate": -25,
+        "_DefUpAlive": 0,
+        "_Defence": 75,
+        "frame": 15,
+        "totalAttack": null
+      },
+      {
+        "_AtkUpAlive": 0,
+        "_Attack": 340,
+        "_CriticalRate": -25,
+        "_DefUpAlive": 0,
+        "_Defence": 75,
+        "frame": 30,
+        "totalAttack": null
+      },
+      {
+        "_AtkUpAlive": 0,
+        "_Attack": 340,
+        "_CriticalRate": -25,
+        "_DefUpAlive": 0,
+        "_Defence": 75,
+        "frame": 45,
+        "totalAttack": null
+      },
+      {
+        "_AtkUpAlive": 0,
+        "_Attack": 340,
+        "_CriticalRate": -25,
+        "_DefUpAlive": 0,
+        "_Defence": 75,
+        "frame": 60,
+        "totalAttack": null
+      },
+      {
+        "_AtkUpAlive": 0,
+        "_Attack": 340,
+        "_CriticalRate": -25,
+        "_DefUpAlive": 0,
+        "_Defence": 75,
+        "frame": 75,
+        "totalAttack": null
+      },
+      {
+        "_AtkUpAlive": 0,
+        "_Attack": 340,
+        "_CriticalRate": -25,
+        "_DefUpAlive": 0,
+        "_Defence": 75,
+        "frame": 90,
+        "totalAttack": null
+      }
+    ],
+    "script": "buff_sample_wave3_unbuffed.lua",
+    "session": "67492-9138391530",
+    "verdict": "PASS"
+  }
+}

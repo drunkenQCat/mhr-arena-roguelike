@@ -96,3 +96,69 @@ it("passes the between-wave quest identity to delivery and logs blocked queued p
   expect(mock.dumps).toHaveBeenLastCalledWith("mhw_rogue_shop_transaction.json", expect.objectContaining({ blocked: true }), 2);
   expect(mock.grant).toHaveBeenCalledTimes(1);
 });
+
+describe("M3.6 service delivery", () => {
+  function serviceFixture() {
+    const config = validateConfig(defaultConfig);
+    config.shop = [
+      { id: "buff_atk", name: "单轮攻击UP", category: "翻盘服务", price: 80, cap: 0, mode: "service" },
+      { id: "gacha_1", name: "初级抽取", category: "翻盘服务", price: 120, cap: 0, mode: "service" },
+      { id: "gacha_9", name: "未配置池", category: "翻盘服务", price: 120, cap: 0, mode: "service" },
+      { id: "cart_restore", name: "猫车恢复", category: "翻盘服务", price: 400, cap: 0, mode: "service", globalLimit: 1 },
+    ];
+    const core = new RunCore(config, 42);
+    core.startRun(config.armorOptions[0]!); core.generateChoices();
+    const buffBuy = vi.fn(() => ({ ok: true, total: 10 }));
+    const gachaBuy = vi.fn(() => ({ ok: true, name: "合金头盔", kind: "armor" as const, id: 1, boxIndex: 3, reused: false }));
+    const shop = new ShopWindow(core, () => mock.selecting, () => undefined,
+      { buffBuy, gachaBuy, hasGachaPool: (id) => id === "gacha_1" });
+    return { core, shop, buffBuy, gachaBuy };
+  }
+
+  it("闸门：有服务的 buff/gacha 开放，无池 gacha 不开放", () => {
+    const { shop } = serviceFixture();
+    const cats = shop.catalogue(true).categories;
+    const all = Object.values(cats).flat();
+    const byId = Object.fromEntries(all.map((e) => [e.id, e]));
+    expect(byId["buff_atk"]!.canBuy).toBe(true);
+    expect(byId["gacha_1"]!.canBuy).toBe(true);
+    expect(byId["gacha_9"]!.canBuy).toBe(false);
+  });
+
+  it("buff 购买走效果交付并成功结算", () => {
+    const { shop, buffBuy, core } = serviceFixture();
+    expect(shop.requestPurchase("buff_atk").ok).toBe(true);
+    shop.tick();
+    expect(buffBuy).toHaveBeenCalledWith("buff_atk");
+    expect(shop.lastTransaction?.status).toBe("applied");
+    expect(core.state.wallet.pt).toBe(core.config.startPt - 80);
+  });
+
+  it("gacha 购买成功播报名字", () => {
+    const { shop, gachaBuy } = serviceFixture();
+    expect(shop.requestPurchase("gacha_1").ok).toBe(true);
+    shop.tick();
+    expect(gachaBuy).toHaveBeenCalledWith("gacha_1");
+    expect(shop.lastTransaction?.status).toBe("applied");
+    expect(shop.lastTransaction?.message).toContain("合金头盔");
+  });
+
+  it("gacha 不确定结果进入 unresolved，不回滚 PT", () => {
+    const { shop, gachaBuy, core } = serviceFixture();
+    gachaBuy.mockReturnValueOnce({ ok: false, uncertain: true, reason: "槽位被触碰" });
+    expect(shop.requestPurchase("gacha_1").ok).toBe(true);
+    shop.tick();
+    expect(shop.lastTransaction?.status).toBe("uncertain");
+    expect(core.state.wallet.pt).toBe(core.config.startPt - 120);
+    expect(shop.busy).toBe(true);
+  });
+
+  it("gacha 明确失败回滚 PT", () => {
+    const { shop, gachaBuy, core } = serviceFixture();
+    gachaBuy.mockReturnValueOnce({ ok: false, reason: "装备箱无空槽" });
+    expect(shop.requestPurchase("gacha_1").ok).toBe(true);
+    shop.tick();
+    expect(shop.lastTransaction?.status).toBe("rejected");
+    expect(core.state.wallet.pt).toBe(core.config.startPt);
+  });
+});

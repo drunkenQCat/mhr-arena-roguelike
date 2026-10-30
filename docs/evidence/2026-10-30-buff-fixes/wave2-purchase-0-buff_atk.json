@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "receipt": {
+    "id": "buy-mvtuheh9-5abdf9a894ded0cc",
+    "message": "增益已累计（当前总加值 10），下一场狩猎生效",
+    "status": "applied"
+  },
+  "before": {
+    "owned": 0,
+    "pt": 3380
+  },
+  "after": {
+    "owned": 0,
+    "pt": 3380
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "ok": false,
+  "exitCode": 4,
+  "error": "rejected：Error: Previous native bosses are still alive",
+  "detail": {
+    "receipt": {
+      "id": "choose-mvtui10b-e5b4f2ac2942d8d3",
+      "message": "Error: Previous native bosses are still alive",
+      "status": "rejected"
+    }
+  }
+}

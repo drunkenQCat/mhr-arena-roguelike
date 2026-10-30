@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "waitedMs": 3573,
+  "state": {
+    "bridgeId": "5-1793296383-8b56ffef",
+    "sessionStage": "Combat",
+    "corePhase": "Combat",
+    "layer": 1,
+    "pt": 3480,
+    "questUnique": 229892058,
+    "waveToken": 4,
+    "enemies": [
+      {
+        "uid": 0,
+        "dead": false,
+        "captured": false
+      }
+    ],
+    "shopAvailable": false
+  }
+}

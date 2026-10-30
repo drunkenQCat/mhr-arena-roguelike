@@ -1,0 +1,85 @@
+name: Build and release MHR Arena Roguelike
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out mod source
+        uses: actions/checkout@v4
+        with:
+          path: mod
+
+      - name: Check out REFramework fork
+        uses: actions/checkout@v4
+        with:
+          repository: drunkenQCat/REFramework
+          ref: plugin-script-reset
+          path: reframework-src
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mod/package-lock.json
+
+      - name: Build mod Lua bundle
+        working-directory: mod
+        run: |
+          npm ci
+          npm run build:nocopy
+
+      - name: Build web console HTML
+        working-directory: mod
+        run: |
+          npm --prefix console ci
+          npm --prefix console run build
+
+      - name: Build web console native plugin
+        working-directory: mod
+        shell: pwsh
+        run: ./native/webconsole/build.ps1 -Target Plugin -Configuration Release
+
+      - name: Build REFramework for Monster Hunter Rise
+        shell: pwsh
+        run: |
+          cmake -S reframework-src -B reframework-src/build -A x64 -DDEVELOPER_MODE=ON "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+          cmake --build reframework-src/build --config Release --target MHRISE --parallel
+
+      - name: Package game-folder release
+        working-directory: mod
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "dev-$env:GITHUB_RUN_NUMBER" }
+          ./scripts/package-release.ps1 `
+            -FrameworkDirectory "../reframework-src" `
+            -StageDirectory "../release-stage" `
+            -OutputArchive "../MHR-Arena-Roguelike-$version.zip" `
+            -Version $version `
+            -ModRevision "${{ github.sha }}"
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MHR-Arena-Roguelike-${{ github.ref_name }}
+          path: MHR-Arena-Roguelike-*.zip
+          if-no-files-found: error
+
+      - name: Publish private GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: MHR Arena Roguelike ${{ github.ref_name }}
+          generate_release_notes: true
+          files: MHR-Arena-Roguelike-*.zip

@@ -38,6 +38,12 @@ export interface SessionPort {
   finish(failed: boolean): void;
   takeDeaths(): DeathReading[];
   report(event: string, detail: unknown): void;
+  /** M3.5 开局准备（穿装+袋隔离）；实现方保证不抛异常。缺省=测试假 port。notice=非阻断警告。 */
+  startupPrepare?(armor: string): { ok: boolean; reason?: string; notice?: string };
+  /** 回村恢复原装（幂等）；失败返回 ok=false，会话稍后重试。 */
+  startupRestore?(): { ok: boolean; reason?: string };
+  /** V1.3 §2.3 极强击杀掉落：ultimate 波清波后触发一次顶级抽取（免费、发件入局末清理）。 */
+  ultimateDrop?(): { ok: boolean; name?: string; reused?: boolean; reason?: string };
 }
 
 export type SessionStage = "Idle" | "Selecting" | "AwaitQuest" | "Combat" | "Carve" | "Returning" | "Finished" | "Fault";
@@ -53,6 +59,18 @@ export class RunSession {
   private token = 0;
   private lastPoll = -1;
   private nextRunConfig: RogueConfig | null = null;
+  /** 开局准备已成功、原装尚未恢复（回村后由 tick 执行恢复）。 */
+  private startupRestorePending = false;
+  /** 本会话成功执行过开局准备（fault/stop 时据此决定是否需要恢复）。 */
+  private startupPrepared = false;
+  private startupNotice: string | null = null;
+
+  /** 脚本重载后恢复"上局未恢复"状态（main.ts 读持久化文件后调用）。 */
+  armStartupRestore(): void {
+    if (this.port.startupRestore) this.startupRestorePending = true;
+  }
+
+  get startupMessage(): string | null { return this.startupNotice; }
 
   configForEditing(): RogueConfig { return this.nextRunConfig ?? this.core.config; }
 
@@ -142,7 +160,7 @@ export class RunSession {
 
   private announce(event: string, detail: unknown): void { this.port.report(event, detail); }
 
-  start(armor: string, spike = false): Result {
+  start(armor: string, spike = false, testLayer?: number): Result {
     try {
       const reading = this.port.read();
       if (!this.port.ready()) return fail("任务安装器尚未就绪");
@@ -159,8 +177,26 @@ export class RunSession {
         Object.assign(this.settings, this.core.config.runtime ?? DEFAULT_RUNTIME);
         this.nextRunConfig = null;
       }
+      // M3.5 开局准备（穿装+袋隔离）必须在接任务之前：任务装备包在接任务时快照。
+      if (this.port.startupPrepare) {
+        const prep = this.port.startupPrepare(armor);
+        this.startupNotice = prep.ok ? prep.notice ?? null : null;
+        if (!prep.ok) { this.startupRestorePending = true; return fail(prep.reason ?? "开局穿装失败"); }
+        this.startupPrepared = true;
+      }
       const result = this.core.startRun(armor);
-      if (!result.ok) return result;
+      if (!result.ok) {
+        // 穿装已完成但 PT 发放失败：仍需回村恢复原装
+        if (this.port.startupPrepare) this.startupRestorePending = true;
+        return result;
+      }
+      this.startupRestorePending = this.port.startupPrepare !== undefined;
+      // 测试直跳层（仅单人离线；跳过逐层进程直接检验目标层生成与结算）
+      if (testLayer !== undefined) {
+        if (!Number.isInteger(testLayer) || testLayer < 1) return fail("testLayer 必须是正整数");
+        this.core.state.layer = testLayer;
+        this.announce("test-layer", { layer: testLayer });
+      }
       // startRun resets layer/PT but keeps the combat log; the new session must not
       // inherit the previous run's log lines.
       this.core.state.log = [];
@@ -270,8 +306,9 @@ export class RunSession {
     this.port.policy(null, false);
     this.core.abortRun("Run stopped");
     if (this.plan && reading.quest?.id === this.plan.questId && reading.quest.playing) this.port.finish(true);
+    if (this.port.startupPrepare) this.startupRestorePending = true;
     this.stage = "Finished";
-    this.message = "已终止；原生返回流程已恢复";
+    this.message = "已终止；回村后自动恢复原装备";
   }
 
   tick(): void {
@@ -282,6 +319,21 @@ export class RunSession {
       if (reading.time - this.lastPoll < this.settings.pollSeconds) return;
       this.lastPoll = reading.time;
       this.readingSnapshot = reading;
+      // M3.5 恢复检查在 stage 早退之前：Finished/Fault 后回到村庄也要恢复原装。
+      // 不能在活跃局内触发——inPlace 首波前 Selecting 与 reentry 波间 Selecting 都在村庄。
+      if (this.startupRestorePending && this.port.startupRestore &&
+        ["Idle", "Finished", "Fault"].includes(this.stage)) {
+        const backInVillage = reading.canPost && !reading.online && (!reading.quest || reading.staleQuest === true);
+        if (backInVillage) {
+          const restore = this.port.startupRestore();
+          if (restore.ok) {
+            this.startupRestorePending = false;
+            this.startupPrepared = false;
+            this.startupNotice = null;
+            this.announce("startup-restored", restore);
+          } else this.message = `原装恢复待办：${restore.reason ?? "未知"}`;
+        }
+      }
       if (["Idle", "Finished", "Fault"].includes(this.stage)) return;
       if (reading.online) { this.fault("Online session detected; native hooks released"); return; }
       const postError = this.port.postingError();
@@ -360,6 +412,10 @@ export class RunSession {
         this.observe(reading);
         if (this.resolved.length === this.plan!.monsterIds.length) {
           this.core.killWave();
+          // V1.3 §2.3：极强波清波掉落一次顶级抽取（"古龙临时毕业装备"）
+          if (this.plan!.wave.tier === "ultimate" && this.port.ultimateDrop) {
+            this.announce("ultimate-drop", this.port.ultimateDrop());
+          }
           this.stage = "Carve";
           this.clearAt = reading.time;
           this.campSince = null;
@@ -455,6 +511,7 @@ export class RunSession {
     this.message = String(error);
     this.port.policy(null, false);
     this.port.cancelPost();
+    if (this.startupPrepared) this.startupRestorePending = true;
     this.announce("runtime-error", { error: this.message, plan: this.plan });
     return fail(this.message);
   }

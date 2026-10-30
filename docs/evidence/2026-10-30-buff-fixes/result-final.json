@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "report": {
+    "after": "village",
+    "before": "Payoffselect",
+    "epoch": 6,
+    "frames": 432,
+    "itemBoxDelta": null,
+    "kind": "run_script",
+    "methods": {
+      "getDecideButtonTrg": 1
+    },
+    "pulses": 1,
+    "script": "result_final.lua",
+    "session": "67492-9138391530",
+    "transitions": [
+      {
+        "cursor": 0,
+        "frame": 6,
+        "node": "Save",
+        "select": 0
+      }
+    ],
+    "unique": -1418472249,
+    "verdict": "PASS",
+    "waitingVillage": true
+  }
+}

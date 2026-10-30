@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { RogueConfig, ShopItem } from "./config";
+import { validateConfig, type RogueConfig, type ShopItem } from "./config";
 import { RunCore } from "./run_core";
 
 /** 与 C# 测试同款的迷你配置：2 弱怪池 + 3 商品，刻意不配 unlockChain。 */
@@ -33,7 +34,7 @@ function cfg(): RogueConfig {
       {
         from: 16, to: 999, tier: "ultimate",
         weak: ["土砂龙"], strong: null,
-        ultimate: ["天彗龙", "爵银龙", "冥渊龙"],
+        ultimate: ["天彗龙", "爵银龙", "激昂金狮子", "嗟怨怨虎龙", "冥渊龙"],
         types: ["A"],
       },
     ],
@@ -260,4 +261,69 @@ it.each([1, 2, 3, 4])("offers more PT and slightly easier stats for the same sim
  expect(sim!.dmgMul).toBeCloseTo(seq!.dmgMul * 0.95, 4);
  c.pickChoice(sim!.index); c.killWave();
  expect(c.state.wallet.pt).toBe(150 + sim!.rewardPt);
+});
+
+describe("M3.5 ultimate pool (Rise 终盘重排)", () => {
+  const ULTIMATE_CFG = (): RogueConfig => {
+    const raw = JSON.parse(readFileSync(new URL("../../data/rogue_config.json", import.meta.url), "utf8")) as unknown;
+    return validateConfig(raw);
+  };
+
+  it("data/rogue_config.json Ultimate 含激昂金狮子/嗟怨怨虎龙/冥渊龙且校验通过", () => {
+    const config = ULTIMATE_CFG();
+    const ultimate = config.pools.find((p) => p.tier === "ultimate")!.ultimate ?? [];
+    for (const name of ["激昂金狮子", "嗟怨怨虎龙", "冥渊龙"]) {
+      expect(ultimate).toContain(name);
+    }
+    // 名字↔ID 对应（策划案需要的 1303/1369/135 三个 id）
+    const catalog = JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8")) as
+      Record<string, { id: number; cn?: string }>;
+    expect(catalog["Furious Rajang"]).toMatchObject({ id: 1303, cn: "激昂金狮子" });
+    expect(catalog["Scorned Magnamalo"]).toMatchObject({ id: 1369, cn: "嗟怨怨虎龙" });
+    expect(catalog["Gaismagorm"]).toMatchObject({ id: 135, cn: "冥渊龙" });
+  });
+
+  it("layer16 AU 波可抽到激昂金狮子/嗟怨怨虎龙/冥渊龙（确定性种子覆盖）", () => {
+    const c = new RunCore(cfg(), 7);
+    expect(c.startRun("骨套（均衡）").ok).toBe(true);
+    c.state.layer = 16;
+    const seen = new Set<string>();
+    for (let i = 0; i < 400; i++) {
+      c.state.phase = "Prep"; // generateChoices 在非 Prep 时返回缓存选项，须显式重采样
+      for (const choice of c.generateChoices()) {
+        expect(choice.tier).toBe("ultimate");
+        for (const m of choice.monsters) {
+          // 未讨伐爵银龙：冥渊龙必须被 unlockChain 过滤
+          expect(m).not.toBe("冥渊龙");
+          seen.add(m);
+        }
+      }
+    }
+    for (const name of ["激昂金狮子", "嗟怨怨虎龙", "天彗龙", "爵银龙"]) {
+      expect(seen.has(name)).toBe(true);
+    }
+  });
+
+  it("讨伐爵银龙后冥渊龙可选且 id=135", () => {
+    const c = new RunCore(cfg(), 7);
+    expect(c.startRun("骨套（均衡）").ok).toBe(true);
+    c.state.layer = 16;
+    c.state.killedUltimates.push("爵银龙");
+    const seen = new Set<string>();
+    for (let i = 0; i < 400; i++) {
+      c.state.phase = "Prep";
+      for (const choice of c.generateChoices()) {
+        for (const m of choice.monsters) seen.add(m);
+      }
+    }
+    expect(seen.has("冥渊龙")).toBe(true);
+    // 每个可选怪都在目录里且 id 为正（quest_plan 按中文名反查的前提）
+    const catalog = JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8")) as
+      Record<string, { id: number; cn?: string }>;
+    const byCn = new Map(Object.entries(catalog).map(([en, v]) => [v.cn ?? en, v]));
+    for (const name of seen) {
+      expect(byCn.get(name)).toBeDefined();
+      expect(byCn.get(name)!.id).toBeGreaterThan(0);
+    }
+  });
 });

@@ -7,8 +7,12 @@
  *   getInventoryDataList(InventoryTypes)          按分类读（普通/临时/弹瓶/常驻/翔虫/狗袋…）
  *   clear(InventoryTypes)                         按分类清空（禁止一把清所有分类）
  *
- * InventoryTypes 枚举值以运行时 dump 的 snow.data.ItemPouch.InventoryTypes 为准
- * （sdk_types.json 已含）；脚本加载时读取并缓存，读不到则本模块整体停用。
+ * InventoryTypes 枚举值以运行时 dump 的 snow.data.ItemPouch.InventoryTypes 为准；
+ * 脚本加载时读取并缓存，读不到则本模块整体停用。
+ * 2026-10-29 实机枚举：Normal=0, Temporary=1, BulletBottle=2, Regular=3,
+ * WireJumpInsect=4, OtDogItemPouch=5。玩家物资袋只有 Normal + BulletBottle；
+ * Temporary（任务补给临时袋）/Regular（常驻砥石等）/翔虫/狗袋不动。
+ * （首版写的 "NORMAL/AMMO/BOTTLE" 是不存在的名字，clear 全部静默跳过——已修正。）
  *
  * 已知边界（design doc §4.1，均未实测）：
  * - 原生备份是进程内状态，不解决崩溃恢复——正式隔离仍需自有带标识的恢复记录；
@@ -16,7 +20,7 @@
  * - loadFromBackupInventory 的布尔参数语义（排除翔虫钥）按名推断，需实机确认。
  */
 
-import { findTypeDefinition, getSingleton, relog, type REManagedObject, type RETypeDefinition } from "./sdk";
+import { findTypeDefinition, getSingleton, relog, rejson, type REManagedObject, type RETypeDefinition } from "./sdk";
 
 const POUCH = "snow.data.ItemPouch";
 
@@ -56,6 +60,7 @@ function itemPouch(): REManagedObject | null {
 export interface PouchSnapshot {
   ok: boolean;
   reason?: string;
+  recoveryRequired?: boolean;
   /** 每分类的物品数（记录用；恢复走原生备份，不逐项重建）。 */
   counts?: Record<string, number>;
 }
@@ -86,7 +91,7 @@ function categoryCounts(pouch: REManagedObject, typeName: string): Record<string
 /**
  * 开局快照：把当前道具袋存入引擎备份区，并清空玩家可见的分类。
  * 分类清单来自运行时 InventoryTypes 中可识别的玩家袋分类；
- * 保守策略：只清 NORMAL / AMMO / BOTTLE（衣服、翔虫钥、狗袋不碰）。
+ * 保守策略：只清 Normal / BulletBottle（临时袋、常驻砥石、翔虫钥、狗袋不碰）。
  * 若 InventoryTypes 枚举读不到对应名，跳过该分类并记录。
  *
  * 隔离期保护（2026-10-28 审查补充）：
@@ -95,62 +100,84 @@ function categoryCounts(pouch: REManagedObject, typeName: string): Record<string
  * - 隔离期间记录快照摘要，end 时读回比对，恢复异常必须上报而不是静默成功。
  */
 let isolationActive = false;
+const SNAPSHOT_FILE = "mhw_rogue_pouch_state.json";
+type InventorySnapshot = Record<string, Record<string, number>>;
+const RESTORE_TYPES = [0, 1, 2, 3, 5]; // native load(true) excludes wirebugs (4)
+
+function countList(list: REManagedObject | null): Record<string, number> {
+  if (!list) throw new Error("Inventory list unavailable");
+  const count = list.call("get_Count") as number;
+  if (!Number.isInteger(count) || count < 0 || count > 10000) throw new Error("Invalid inventory length");
+  const items: Record<string, number> = {};
+  for (let i = 0; i < count; i++) {
+    const slot = list.call("get_Item", i) as REManagedObject | null;
+    if (!slot) throw new Error("Inventory slot unavailable");
+    const id = slot.call("get_ItemId") as number;
+    const n = slot.call("get_Count") as number;
+    if (!Number.isInteger(n) || n < 0) throw new Error("Invalid inventory count");
+    if (n > 0) items[String(id)] = (items[String(id)] ?? 0) + n;
+  }
+  return items;
+}
+function inventorySnapshot(pouch: REManagedObject, backup: boolean): InventorySnapshot {
+  const groups = backup ? pouch.call("get_BackupInventoryDataList") as REManagedObject | null : null;
+  if (backup && !groups) throw new Error("Backup unavailable (not an empty backup)");
+  const out: InventorySnapshot = {};
+  for (const t of RESTORE_TYPES) out[String(t)] = countList(backup
+    ? groups!.call("get_Item", t) as REManagedObject | null
+    : pouch.call("getInventoryDataList", t) as REManagedObject | null);
+  return out;
+}
+function sameSnapshot(a: InventorySnapshot, b: InventorySnapshot): boolean {
+  for (const t of RESTORE_TYPES) {
+    const x = a[String(t)] ?? {}, y = b[String(t)] ?? {};
+    if (!x || !y || Object.keys(x).length !== Object.keys(y).length) return false;
+    for (const id of Object.keys(x)) if (x[id] !== y[id]) return false;
+  }
+  return true;
+}
 
 export function beginPouchIsolation(): PouchSnapshot {
-  if (isolationActive) {
-    return { ok: false, reason: "隔离已在进行中；重复 begin 会覆盖备份区，已拒绝" };
-  }
-  const pouch = itemPouch();
-  if (!pouch) return { ok: false, reason: "DataManager/_ItemPouch unavailable" };
-  const table = inventoryTypesTable();
-  const counts: Record<string, number> = {};
+  let recoveryRequired = false;
   try {
+    if (isolationActive || (rejson.load_file(SNAPSHOT_FILE) as { active?: boolean } | null)?.active) return { ok: false, recoveryRequired: true, reason: "Pouch recovery already pending" };
+    const pouch = itemPouch();
+    if (!pouch) return { ok: false, recoveryRequired: false, reason: "Item pouch unavailable" };
+    const table = inventoryTypesTable();
+    if (table.Normal !== 0 || table.BulletBottle !== 2) return { ok: false, recoveryRequired: false, reason: "Inventory categories unavailable" };
+    const original = inventorySnapshot(pouch, false);
+    // A durable obligation exists before any native mutation.
+    if (rejson.dump_file(SNAPSHOT_FILE, { active: true, items: original }, 2) !== true) return { ok: false, recoveryRequired: false, reason: "Cannot journal original pouch" };
+    isolationActive = true;
+    recoveryRequired = true;
     pouch.call("saveToBackupInventory");
-    const cleared: string[] = [];
-    for (const typeName of ["NORMAL", "AMMO", "BOTTLE"]) {
-      const value = table[typeName];
-      if (value === undefined) { counts[typeName] = -1; continue; }
-      counts[typeName] = Object.keys(categoryCounts(pouch, typeName) ?? {}).length;
-      pouch.call("clear", value);
-      cleared.push(typeName);
+    if (!sameSnapshot(original, inventorySnapshot(pouch, true))) throw new Error("Native backup differs from original pouch");
+    for (const t of [table.Normal, table.BulletBottle]) {
+      pouch.call("clear", t);
+      if (Object.keys(countList(pouch.call("getInventoryDataList", t) as REManagedObject)).length !== 0)
+        throw new Error("Pouch clear readback failed");
     }
-    isolationActive = true;
-    relog.info(`[MhwRogue] 零物资隔离完成，清空分类：${cleared.join(", ") || "（无可识别分类）"}`);
-    return { ok: true, counts };
+    return { ok: true, recoveryRequired };
   } catch (error) {
-    // save 已发生但 clear 中途失败：袋处于半清空状态——必须允许 end 恢复，不锁定
-    isolationActive = true;
-    relog.error(`[MhwRogue] beginPouchIsolation 失败：${String(error)}`);
-    return { ok: false, reason: String(error), counts };
+    return { ok: false, recoveryRequired, reason: String(error) };
   }
 }
 
-/** 结束/中止恢复：从引擎备份区还原并读回核验（isExceptWireJumpInsectItem=true 按原版语义）。 */
 export function endPouchIsolation(): PouchSnapshot {
   const pouch = itemPouch();
-  if (!pouch) return { ok: false, reason: "DataManager/_ItemPouch unavailable" };
+  if (!pouch) return { ok: false, reason: "Item pouch unavailable" };
   try {
+    const journal = rejson.load_file(SNAPSHOT_FILE) as { active: boolean; items: InventorySnapshot } | null;
+    const saved = journal?.active ? journal.items : null;
+    const backup = inventorySnapshot(pouch, true);
+    const expected = saved ?? backup; // legacy recovery records predate the durable snapshot
+    if (!sameSnapshot(expected, backup)) throw new Error("Native backup changed; original pouch recovery retained");
     pouch.call("loadFromBackupInventory", true);
-    // 恢复后核验：白名单分类任一非空即视为恢复成功（隔离时已清空，恢复后应回到备份时数量）
-    const evidence: Record<string, number> = {};
-    let nonEmpty = 0;
-    for (const typeName of ["NORMAL", "AMMO", "BOTTLE"]) {
-      const counts = categoryCounts(pouch, typeName);
-      const total = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : -1;
-      evidence[typeName] = total;
-      if (total > 0) nonEmpty++;
-    }
+    if (!sameSnapshot(expected, inventorySnapshot(pouch, false))) throw new Error("Pouch item IDs/counts do not match original");
+    if (rejson.dump_file(SNAPSHOT_FILE, { active: false }, 2) !== true) throw new Error("Cannot retire pouch journal");
     isolationActive = false;
-    // 至少一个分类有物品才认定恢复发生（备份区为空时引擎可能什么都不做）
-    if (nonEmpty === 0) {
-      relog.error("[MhwRogue] 恢复后白名单分类全部为空——备份区可能为空，物资未恢复");
-      return { ok: false, reason: "恢复后白名单分类全部为空（备份区可能为空）", counts: evidence };
-    }
-    relog.info(`[MhwRogue] 道具袋已从原生备份恢复（白名单非空分类 ${nonEmpty}/3）`);
-    return { ok: true, counts: evidence };
+    return { ok: true };
   } catch (error) {
-    isolationActive = false;
-    relog.error(`[MhwRogue] endPouchIsolation 失败：${String(error)}`);
     return { ok: false, reason: String(error) };
   }
 }

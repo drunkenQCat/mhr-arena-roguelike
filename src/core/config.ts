@@ -63,6 +63,48 @@ export interface UnlockRule {
   requiresKilling: string;
 }
 
+/** 开局套装（V1.3 §1.2 初始二选一）。series = PlArmorId 系列号：合金 9、骨制 146（已实测）。 */
+export interface ArmorSetSpec {
+  series: number;
+  desc?: string;
+}
+
+/** 抽取奖池条目（第一版只做武器+防具：链路已实测；护石/虫笼后置）。 */
+export interface GachaEntry {
+  kind: "weapon" | "armor";
+  /** weapon: ContentsIdSystem.WeaponId；armor: PlArmorId（0x0C<部位><系列>）。 */
+  id: number;
+  w: number;
+}
+
+export interface GachaPoolSpec {
+  entries: GachaEntry[];
+}
+
+/** 单轮增益数值（V1.3 §3.6；叠加购买=累加）。 */
+export interface BuffAmounts {
+  atk: number;
+  def: number;
+  crit: number;
+}
+
+export const DEFAULT_BUFF_AMOUNTS: BuffAmounts = { atk: 10, def: 15, crit: 10 };
+
+/** 开局规则细节；weaponId 是"收武器"的预留口子（null=保留玩家武器）。 */
+export interface StartupRules {
+  stripTalismans: boolean;
+  stripInsect: boolean;
+  keepPlayerWeapon: boolean;
+  weaponId: number | null;
+}
+
+export const DEFAULT_STARTUP_RULES: StartupRules = {
+  stripTalismans: true,
+  stripInsect: false,
+  keepPlayerWeapon: true,
+  weaponId: null,
+};
+
 /** 入口斗技场任务的注册参数（对应 free_arena 原型）。 */
 export interface QuestSpec {
   id: number;
@@ -81,6 +123,12 @@ export interface RogueConfig {
   reward: RewardSpec;
   typeRewardMul: Record<RewardType, number>;
   armorOptions: string[];
+  /** 开局套装定义；缺省=不换装（沿用玩家装备）。armorOptions 引用的键必须存在。 */
+  armorSets?: Record<string, ArmorSetSpec>;
+  startupRules?: StartupRules;
+  /** 抽取奖池；缺省=gacha 商品全部不开放。 */
+  gachaPools?: Record<string, GachaPoolSpec>;
+  buffAmounts?: BuffAmounts;
   pools: PoolTier[];
   shop: ShopItem[];
   quest: QuestSpec;
@@ -147,6 +195,65 @@ export function validateConfig(raw: unknown): RogueConfig {
   number(c.cartRestoreLimit, "cartRestoreLimit", 0, true);
   number(c.choiceCount, "choiceCount", 1, true);
   strings(c.armorOptions, "armorOptions", true);
+
+  // 开局套装：可选字段；给了 armorOptions 且 armorSets 非空时，键必须一一对应。
+  const armorSetsRaw = c.armorSets === undefined || c.armorSets === null
+    ? {} : object(c.armorSets, "armorSets");
+  const armorSets: Record<string, ArmorSetSpec> = {};
+  for (const key of Object.keys(armorSetsRaw)) {
+    const spec = object(armorSetsRaw[key], `armorSets.${key}`);
+    armorSets[key] = { series: number(spec.series, `armorSets.${key}.series`, 0, true),
+      ...(spec.desc === undefined ? {} : { desc: text(spec.desc, `armorSets.${key}.desc`) }) };
+  }
+  if (Object.keys(armorSets).length > 0) {
+    for (const option of c.armorOptions as string[]) {
+      if (!armorSets[option]) fail(`armorOptions 引用了未定义的套装: ${option}`);
+    }
+  }
+  c.armorSets = armorSets;
+
+  const rulesRaw = c.startupRules === undefined || c.startupRules === null
+    ? {} : object(c.startupRules, "startupRules");
+  const startupRules: StartupRules = {
+    stripTalismans: rulesRaw.stripTalismans === undefined ? DEFAULT_STARTUP_RULES.stripTalismans
+      : rulesRaw.stripTalismans === true,
+    stripInsect: rulesRaw.stripInsect === undefined ? DEFAULT_STARTUP_RULES.stripInsect
+      : rulesRaw.stripInsect === true,
+    keepPlayerWeapon: rulesRaw.keepPlayerWeapon === undefined ? DEFAULT_STARTUP_RULES.keepPlayerWeapon
+      : rulesRaw.keepPlayerWeapon === true,
+    weaponId: rulesRaw.weaponId === undefined || rulesRaw.weaponId === null
+      ? null : number(rulesRaw.weaponId, "startupRules.weaponId", 1, true),
+  };
+  if (!startupRules.keepPlayerWeapon && startupRules.weaponId === null) {
+    fail("startupRules：keepPlayerWeapon=false 时必须提供 weaponId（收武器口子）");
+  }
+  c.startupRules = startupRules;
+
+  // 抽取奖池：可选；条目 kind/weight 必须合法
+  const poolsRaw = c.gachaPools === undefined || c.gachaPools === null
+    ? {} : object(c.gachaPools, "gachaPools");
+  const gachaPools: Record<string, GachaPoolSpec> = {};
+  for (const key of Object.keys(poolsRaw)) {
+    const pool = object(poolsRaw[key], `gachaPools.${key}`);
+    const entriesRaw = array(pool.entries, `gachaPools.${key}.entries`, true);
+    const entries: GachaEntry[] = [];
+    for (let i = 0; i < entriesRaw.length; i++) {
+      const e = object(entriesRaw[i], `gachaPools.${key}.entries[${i}]`);
+      if (e.kind !== "weapon" && e.kind !== "armor") fail(`gachaPools.${key}.entries[${i}].kind`);
+      entries.push({ kind: e.kind as "weapon" | "armor", id: number(e.id, `gachaPools.${key}.entries[${i}].id`, 1, true),
+        w: number(e.w, `gachaPools.${key}.entries[${i}].w`, 0) });
+    }
+    gachaPools[key] = { entries };
+  }
+  c.gachaPools = gachaPools;
+
+  const amountsRaw = c.buffAmounts === undefined || c.buffAmounts === null
+    ? {} : object(c.buffAmounts, "buffAmounts");
+  c.buffAmounts = {
+    atk: amountsRaw.atk === undefined ? DEFAULT_BUFF_AMOUNTS.atk : number(amountsRaw.atk, "buffAmounts.atk", 0),
+    def: amountsRaw.def === undefined ? DEFAULT_BUFF_AMOUNTS.def : number(amountsRaw.def, "buffAmounts.def", 0),
+    crit: amountsRaw.crit === undefined ? DEFAULT_BUFF_AMOUNTS.crit : number(amountsRaw.crit, "buffAmounts.crit", 0),
+  };
 
   const scaling = object(c.scaling, "scaling");
   for (const key of ["hpBase", "hpCap", "dmgBase", "dmgCap", "dualCompensation",

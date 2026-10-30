@@ -1,6 +1,6 @@
 /** Native BOSSRUSH data writer. Owns every mutated array; never calls a spawn API. */
 import type { RogueConfig } from "../core/config";
-import { normalPatch, type QuestPlan } from "../core/quest_plan";
+import { normalPatch, ultimateVitalTbl, type QuestPlan } from "../core/quest_plan";
 import { snow_quest_QuestType } from "./gen/enums/snow_quest_QuestType";
 import { snow_QuestManager_BossSetCondition } from "./gen/enums/snow_QuestManager_BossSetCondition";
 import { snow_quest_QuestTargetType } from "./gen/enums/snow_quest_QuestTargetType";
@@ -68,6 +68,21 @@ export class QuestInstaller {
     return copy;
   }
 
+  private enemy: REManagedObject | null = null;
+
+  /** 极强单怪：把模板最高难度档重排到首槽（ultimateVitalTbl；其余 tier 不动）。 */
+  private applyEnemyVitals(enemy: REManagedObject, plan: QuestPlan): void {
+    const current = enemy.get_field("_VitalTbl") as REManagedArray | null;
+    if (!current) return;
+    const template: number[] = [];
+    const size = current.get_size();
+    for (let i = 0; i < size; i++) template.push(current.call("Get", i) as number);
+    const reordered = ultimateVitalTbl(template, plan.wave.tier, plan.monsterIds.length);
+    if (!reordered) return;
+    for (let i = 0; i < size; i++) current.call("Set", i, reordered[i] ?? 0);
+    relog.info(`[MhwRogue] 极强单怪难度档重排：_VitalTbl ${template.join("/")} → ${reordered.join("/")}`);
+  }
+
   private patch(normal: REManagedObject, plan: QuestPlan): void {
     const patch = normalPatch(plan, snow_QuestManager_BossSetCondition.DEFAULT,
       snow_QuestManager_BossSetCondition.EM1_HP, snow_quest_QuestType.BOSSRUSH,
@@ -91,6 +106,7 @@ export class QuestInstaller {
         throw new Error("Cannot patch an unrelated or inactive quest");
       }
       this.patch(this.normal, plan);
+      if (this.enemy) this.applyEnemyVitals(this.enemy, plan);
       this.currentPlan = plan;
       this.status = `In-place table published for layer ${plan.layer} (spawn behavior unverified)`;
       return;
@@ -113,6 +129,7 @@ export class QuestInstaller {
       const enemy = this.clone(source.call("get_RawEnemy") as REManagedObject, next);
       this.patch(normal, plan);
       enemy.set_field("_QuestNo", plan.questId);
+      this.applyEnemyVitals(enemy, plan);
       // Preserve enemy _EmsSetNo, route/init names and difficulty table INDICES.
       const allocated = createInstance("snow.quest.QuestData", true);
       if (!allocated) throw new Error("Cannot allocate QuestData");
@@ -124,6 +141,7 @@ export class QuestInstaller {
       const previous = this.retained;
       this.quest = quest;
       this.normal = normal;
+      this.enemy = enemy;
       this.retained = next;
       this.currentPlan = plan;
       this.stopped = false;
