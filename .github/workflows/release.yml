@@ -1,7 +1,6 @@
 name: Build and release MHR Arena Roguelike
 
 on:
-  workflow_dispatch:
   push:
     tags:
       - "v*"
@@ -26,6 +25,21 @@ jobs:
           path: reframework-src
           submodules: recursive
           fetch-depth: 0
+
+      - name: Record REFramework revision
+        id: framework-revision
+        shell: pwsh
+        run: |
+          "sha=$(git -C reframework-src rev-parse HEAD)" >> $env:GITHUB_OUTPUT
+
+      - name: Restore REFramework build cache
+        id: framework-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: reframework-src/build
+          key: windows-mhrise-ref-release-v1-${{ steps.framework-revision.outputs.sha }}
+          restore-keys: |
+            windows-mhrise-ref-release-v1-
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -52,9 +66,10 @@ jobs:
         run: ./native/webconsole/build.ps1 -Target Plugin -Configuration Release
 
       - name: Build REFramework for Monster Hunter Rise
+        if: steps.framework-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          cmake -S reframework-src -B reframework-src/build -A x64 -DDEVELOPER_MODE=ON "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+          cmake -S reframework-src -B reframework-src/build -G "Visual Studio 18 2026" -A x64 -DDEVELOPER_MODE=ON "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
           cmake --build reframework-src/build --config Release --target MHRISE
 
       - name: Package game-folder release
@@ -68,6 +83,13 @@ jobs:
             -OutputArchive "../MHR-Arena-Roguelike-$version.zip" `
             -Version $version `
             -ModRevision "${{ github.sha }}"
+
+      - name: Save REFramework build cache
+        if: success() && steps.framework-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: reframework-src/build
+          key: windows-mhrise-ref-release-v1-${{ steps.framework-revision.outputs.sha }}
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
