@@ -28,7 +28,7 @@ const code = ref("");
     </div>
     <p>本机任务码：<strong class="mono">{{ entry?.code ?? '未准备' }}</strong> · 任务编号 {{ entry?.questId ?? 900103 }}</p>
     <p v-if="entry?.code && !entry.planMatchesLobby" class="alert">大厅身份已变化，请重新选择／导入任务码。</p>
-    <button v-if="entry?.role === 'host'" :disabled="busy || !entry.code || !entry.planMatchesLobby || !entry.canPrepare || entry.playing || entry.transport !== 'Idle'" @click="emit('command', 'mpEntry', { sub: 'post' })">承接联机任务（不自动出发）</button>
+    <button v-if="entry?.role === 'host'" :disabled="busy || !entry.code || !entry.planMatchesLobby || !entry.canPrepare || entry.playing || entry.posting" @click="emit('command', 'mpEntry', { sub: 'post' })">承接联机任务（不自动出发）</button>
     <p class="notice">{{ entry?.message ?? '等待游戏加载新版 Lua。' }}</p>
     <p class="muted">当前原生任务 {{ entry?.activeQuest ?? '—' }} · {{ entry?.playing ? '正在任务中' : '未在战斗' }} · 承接阶段 {{ entry?.transport ?? '—' }}。原生任务人数 {{ entry?.nativeQuestPlayerCount ?? '—' }}。任务码是本版固定怪物表，不是联机密码；两端必须同版本。详情见压缩包内《测试与反馈》。</p>
   </section>

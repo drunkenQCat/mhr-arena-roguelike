@@ -75,6 +75,7 @@ export class MultiplayerEntry {
   }
 
   post(): void {
+    this.requireIdle();
     const identity = readLobbyIdentity();
     if (!this.canPrepare() || identity.role !== "host" || identity.host !== this.owner || !this.code || !this.installer)
       throw new Error("请由当前大厅房主先选择联机波次。");
@@ -101,7 +102,7 @@ export class MultiplayerEntry {
     const identity = readLobbyIdentity(), qm = questManager();
     return { ...identity, questId: ENTRY_QUEST_ID, code: this.code,
       planMatchesLobby: this.owner !== null && identity.host === this.owner,
-      transport: this.transport?.getStatus() ?? "Idle", message: this.message,
+      transport: this.transport?.getStatus() ?? "Idle", posting: this.transport?.isActive() ?? false, message: this.message,
       activeQuest: qm?.call("get_ActiveQuestNo") ?? null,
       playing: qm?.call("isPlayQuest") ?? false,
       nativeQuestPlayerCount: getSingleton("snow.LobbyManager")?.get_field("currentQuestPlayerCount") ?? null,

@@ -65,3 +65,11 @@ it("invalidates host posting when the lobby owner changes", () => {
   mock.running = true; e.tick();
   expect(mock.cancel).toHaveBeenCalled();
 });
+
+it("does not replace a quest accepted after the host prepared the table", () => {
+  mock.host = 0; mock.self = 0;
+  const e = entry(); e.choose(0);
+  mock.active = true;
+  expect(() => e.post()).toThrow("承接任务");
+  expect(mock.request).not.toHaveBeenCalled();
+});

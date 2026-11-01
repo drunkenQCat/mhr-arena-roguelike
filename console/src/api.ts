@@ -2,7 +2,7 @@ export interface ShopEntry { id: string; name: string; category: string; price: 
 export interface Choice { index: number; label: string; monsters: string[]; mode?: string; hpMul: number; dmgMul: number; rewardPt: number; }
 export interface ConsoleState {
   multiplayerEntry?: { role: string; host: number | null; self: number | null; questId: number;
-    code: string | null; planMatchesLobby: boolean; transport: string; message: string;
+    code: string | null; planMatchesLobby: boolean; transport: string; posting: boolean; message: string;
     activeQuest: number | null; playing: boolean; canPrepare: boolean; nativeQuestPlayerCount: number | null;
     options: { index: number; mode: string; code: string; label: string }[] | null };
   testMode?: boolean;
