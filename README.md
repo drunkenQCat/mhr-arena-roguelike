@@ -1,4 +1,4 @@
-# 斗技场肉鸽 · 单人测试版
+# 斗技场肉鸽 · 联机入场实验版
 
 Windows Steam《怪物猎人：崛起》/ Sunbreak 实验模组。提供同场波次、Single / Sequential / Simultaneous 三选一、PT 商店和电脑/手机网页控制台。
 

@@ -93,7 +93,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); });
     <p v-if="state?.testMode" class="alert">隔离验证环境：执行编译后的 Lua，玩家、怪物、背包与传输使用测试替身，不会操作实际游戏。</p>
     <p v-if="state && state.protocol !== 4" class="alert">当前 Lua 仍使用旧版协议，无法提供位置与商店资格。请在 REFramework → ScriptRunner 执行 Reset scripts；网页已禁止向旧脚本发送操作。</p>
     <div class="toolbar topnav"><button :class="{ selected: page === 'multiplayer' }" @click="page = 'multiplayer'">联机入场测试</button><button :class="{ selected: page === 'play' }" @click="page = 'play'">游戏与商店</button><button :class="{ selected: page === 'design' }" @click="page = 'design'">策划工作台</button><button :class="{ selected: page === 'events' }" @click="page = 'events'">命令记录</button><button :class="{ selected: page === 'help' }" @click="page = 'help'">安装与手机连接</button></div>
-    <p class="muted">单人测试版 · 当前不支持真实联机同步。多人 mock 仅供开发验证，不会生成队友。</p>
+    <p class="muted">联机入场实验版 · 房主选波、队友原生任务板加入；完整多人续波与奖励同步尚未实现。</p>
     <ConnectionHelp v-if="page === 'help'" v-model:developer="developerMode" />
     <p class="notice" role="status">{{ notice }}</p>
     <MultiplayerEntry v-if="page === 'multiplayer'" :entry="state?.multiplayerEntry" :busy="busy || !connected" @command="send" />
