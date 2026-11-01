@@ -57,3 +57,6 @@ node cli/mhr.mjs game run-script reframework/autorun-probe/probe_playtest_snapsh
 6. Release 附使用说明、测试反馈模板和 build-manifest；确认没有存档、恢复 journal、IP 快照或本机日志。
 
 当前恢复/多人等评审问题未因打包整理自动修复，见对应 review 文档。发行文字必须保持单人测试版定位。
+
+
+联机入场实验以《测试与反馈》为准，完整多人肉鸽未实现。CI 可复用 REFramework fork 的固定成功构建 40834594055（commit 2e7ce5b97dce68cc742b5c80ad421213c551c803）；同时核对产物 revision 和 dinput8.dll SHA256 BCB318D59FAA28B979BE26460CA8DF815D602197E2605DC6D90E4AAF1AEEDB15。下载失败、过期、权限或哈希不符时回退从固定源码构建，绝不采用浮动 latest 二进制。

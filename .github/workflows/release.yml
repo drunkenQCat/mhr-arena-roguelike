@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build-release:
@@ -70,12 +71,33 @@ jobs:
         shell: pwsh
         run: ./native/webconsole/build.ps1 -Target Plugin -Configuration Release
 
-      - name: Build REFramework for Monster Hunter Rise
+      - name: Reuse verified upstream CI framework binary
         if: steps.framework-cache.outputs.cache-hit != 'true'
+        id: framework-prebuilt
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Immutable successful upstream run for the pinned source above. Expired
+          # artifacts or inaccessible Actions fall back to building that source.
+          gh run download 40834594055 --repo drunkenQCat/REFramework --name MHRISE --dir framework-ci
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned framework artifact unavailable; build from source.' }
+          Expand-Archive -LiteralPath framework-ci/MHRISE.zip -DestinationPath framework-ci/extracted
+          $revision = (Get-Content framework-ci/extracted/reframework_revision.txt -Raw).Trim()
+          if ($revision -ne '${{ steps.framework-revision.outputs.sha }}') { throw 'Framework artifact source mismatch.' }
+          $hash = (Get-FileHash framework-ci/extracted/dinput8.dll -Algorithm SHA256).Hash
+          if ($hash -ne 'BCB318D59FAA28B979BE26460CA8DF815D602197E2605DC6D90E4AAF1AEEDB15') { throw 'Framework artifact hash mismatch.' }
+          New-Item -ItemType Directory -Force reframework-src/build/bin/MHRISE | Out-Null
+          Copy-Item framework-ci/extracted/dinput8.dll reframework-src/build/bin/MHRISE/dinput8.dll
+          'ready=true' >> $env:GITHUB_OUTPUT
+
+      - name: Build REFramework for Monster Hunter Rise
+        if: steps.framework-cache.outputs.cache-hit != 'true' && steps.framework-prebuilt.outputs.ready != 'true'
         shell: pwsh
         run: |
           cmake -S reframework-src -B reframework-src/build -A x64 -DDEVELOPER_MODE=ON "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
-          cmake --build reframework-src/build --config Release --target MHRISE
+          cmake --build reframework-src/build --config Release --target MHRISE --parallel 4
 
       - name: Package game-folder release
         working-directory: mod
