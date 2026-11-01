@@ -33,7 +33,7 @@ function fixture() {
   const session = new RunSession(core, { Izuchi: { id: 98, cn: "镰鼬龙王" },
     ...JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8")) }, port);
   const tools = { invincible: false, message: "ok", toggleGod: vi.fn(() => { tools.invincible = !tools.invincible; }), requestKill: vi.fn() };
-  const runtime = { status: () => "ready", testTools: tools, teleportPlayer: vi.fn(),
+  const runtime = { ready: () => true, status: () => "ready", testTools: tools, teleportPlayer: vi.fn(),
     nearestAliveMonsterPosition: vi.fn(() => ({ x: 100, y: 5, z: 80 })) } as unknown as NativeRuntime;
   const shop = new ShopWindow(core, () => session.canShop(), () => session.shopQuest());
   const bridge = new WebConsoleBridge(session, runtime, shop);
@@ -47,6 +47,27 @@ function fixture() {
   return { cfg, core, session, runtime, tools, shop, bridge, command, tick, state, reading };
 }
 beforeEach(() => { host.now = 10; host.files = {}; host.count = 0; host.failWrite = ""; host.commands = []; });
+
+it("publishes authoritative controls and preserves route changes after staged rules", () => {
+  const f = fixture(); f.tick();
+  expect(f.state().control.ready).toBe(true);
+  expect(f.state().capabilities.start).toBe(true);
+  expect(f.state().control.testLayers).toEqual(f.cfg.pools.map(p => p.from));
+  f.session.applyConfig({ ...f.cfg, runtime: { ...f.cfg.runtime!, route: 'inPlace' } });
+  expect(f.command('setRoute', { route: 'reentry' }).status).toBe('applied');
+  f.tick();
+  expect(f.state().control.nextRoute).toBe('reentry');
+  expect(f.command('startRun', { armor: f.cfg.armorOptions[0] }).status).toBe('applied');
+  expect(f.session.route).toBe('reentry');
+});
+
+it("rejects unsupported test layers before preparing the run", () => {
+  const f = fixture(); f.tick();
+  const start = vi.spyOn(f.session, 'start');
+  expect(f.command('startRun', { armor: f.cfg.armorOptions[0], testLayer: 999999 }).status).toBe('rejected');
+  expect(start).not.toHaveBeenCalled();
+  expect(f.session.stage).toBe('Idle');
+});
 
 it("updates wave, position, gathering and shop eligibility with no PT change at preparation", () => {
   const f = fixture(); f.tick(); f.session.start(f.cfg.armorOptions[0]!); f.tick();
@@ -143,4 +164,97 @@ it("rejects village and stale TP; deduplicates a native task origin request", ()
   f.command("teleport", { to: "origin" }, "tp-once");
   expect(f.runtime.teleportPlayer).toHaveBeenCalledTimes(1);
   expect(f.command("teleport", { to: "monster" }).target).toEqual({ x: 104, y: 5, z: 80 });
+});
+
+function combatFixture() {
+ const f=fixture(); f.tick(); f.session.start(f.cfg.armorOptions[0]!); f.tick();
+ f.session.choose(0); f.reading.quest={id:f.cfg.quest.id,unique:42,playing:true,status:"play"};
+ f.reading.canPost=false;f.reading.enemies=[{uid:9,typeId:f.session.plan!.monsterIds[0]!,dead:false,captured:false}];f.tick();return f;
+}
+it("settles kill receipt only after the requested targets have native death evidence",()=>{
+ const f=combatFixture();expect(f.command("killAll",{},"kill-verified").status).toBe("queued");
+ f.reading.enemies[0]!.dead=true;f.tick();
+ expect(host.files["webconsole_results.json"].last.status).toBe("applied");expect(f.tools.requestKill).toHaveBeenCalledTimes(1);
+});
+it("settles TP from later position evidence and marks an unverified kill uncertain",()=>{
+ const f=combatFixture();expect(f.command("teleport",{to:"monster"},"move").status).toBe("queued");
+ f.reading.players[0]!.position={x:104,y:5,z:80};f.tick();
+ expect(host.files["webconsole_results.json"].last.status).toBe("applied");
+ expect(f.command("killAll",{},"kill-timeout").status).toBe("queued");host.now+=13;f.tick();
+ expect(host.files["webconsole_results.json"].last.status).toBe("uncertain");
+});
+
+// ---------- 评审二轮（2026-10-31）针对性回归 ----------
+
+it("REVIEW2#1: reset 后旧 id 购买不再命中缓存/扣款（generation 门禁）", () => {
+  const f = fixture(); f.tick();
+  const gen1 = f.command("party", { sub: "create", mockPlayers: 1 }, "r-create1");
+  expect(gen1.status).toBe("applied");
+  const generation = (gen1.businessParty as any).generation;
+  const buy = f.command("party", { sub: "buy", playerId: "p2", itemId: "potion", generation }, "old-buy");
+  expect(buy.status).toBe("applied"); expect(buy.playerPt).toBe(140);
+  f.command("party", { sub: "reset" }, "r-reset");
+  f.command("party", { sub: "create", mockPlayers: 1 }, "r-create2");
+  // 旧 generation 查询被拒绝（不能泄露新一代身份到旧代请求的回执里）。
+  const staleState = f.command("party", { sub: "state", generation }, "r-state2");
+  expect(staleState.status).toBe("rejected");
+  // 当前代从 state 顶层 partyGeneration 读取（CLI 同款通道）。
+  f.tick();
+  const generation2 = f.state().partyGeneration;
+  expect(generation2).toBe(generation + 1);
+  // 旧 id 旧 generation（重放者不自知）：服务端按旧代拒绝——不再回放旧成功。
+  const stale = f.command("party", { sub: "buy", playerId: "p2", itemId: "potion", generation }, "old-buy");
+  expect(stale.status).toBe("rejected"); expect(stale.message).toContain("已更换");
+  // 缺 generation 的旧客户端：拒绝。
+  const noGen = f.command("party", { sub: "buy", playerId: "p2", itemId: "potion" }, "old-buy");
+  expect(noGen.status).toBe("rejected"); expect(noGen.message).toContain("generation");
+  // 当前代新请求才有效。
+  const cur = f.command("party", { sub: "buy", playerId: "p2", itemId: "potion", generation: generation2 }, "fresh-buy");
+  expect(cur.status).toBe("applied");
+  const view = f.command("party", { sub: "state", playerId: "p2", generation: generation2 }, "read-current");
+  expect((view.businessParty as any).members[0].wallet.pt).toBe(140);
+});
+
+it("REVIEW2#2: 同 id 异载荷后端拒绝（传输 id 唯一契约）", () => {
+  const f = fixture(); f.tick();
+  const gen = f.command("party", { sub: "create", mockPlayers: 1 }, "c1");
+  const g = (gen.businessParty as any).generation;
+  expect(f.command("party", { sub: "state", playerId: "p2", generation: g }, "same-id").status).toBe("applied");
+  const conflict = f.command("party", { sub: "state", playerId: "host", generation: g }, "same-id");
+  expect(conflict.status).toBe("rejected");
+  expect(conflict.message).toContain("传输 id 必须唯一");
+});
+
+it("REVIEW2#2: 失效 bridge 请求在缓存窗口内也被拒绝", () => {
+  const f = fixture(); f.tick();
+  const gen = f.command("party", { sub: "create", mockPlayers: 1 }, "c2");
+  const g = (gen.businessParty as any).generation;
+  expect(f.command("party", { sub: "state", playerId: "p2", generation: g }, "sb-1").status).toBe("applied");
+  host.commands.push(JSON.stringify({ id: "sb-1", bridgeId: "stale-bridge",
+    questUnique: null, waveToken: null, cmd: "party", sub: "state", playerId: "host", generation: g }));
+  f.tick();
+  const last = host.files["webconsole_results.json"].last;
+  expect(last.status).toBe("rejected");
+});
+
+it("REVIEW2#3: submitConfig 同 id 异载荷拒绝（config/configVersion 入指纹）", () => {
+  const f = fixture(); f.tick();
+  const edited250 = { ...f.cfg, startPt: 250 };
+  expect(f.command("submitConfig", { config: edited250, configVersion: 0 }, "same-config-id").status).toBe("applied");
+  const replay = f.command("submitConfig", { config: { ...f.cfg, startPt: 350 }, configVersion: 1 }, "same-config-id");
+  expect(replay.status).toBe("rejected");
+  expect(f.session.configForEditing().startPt).toBe(250);
+});
+
+it("REVIEW2#4: expired 墓碑有界（容量上限）且 reset 清空", () => {
+  const f = fixture();
+  const p = (f.bridge as any).party;
+  p.create("host", 1);
+  const gen = p.summary().generation;
+  for (let i = 0; i < 1000; i++) p.buy("p2", `bad-${i}`, "unknown-item", gen);
+  p.prune(host.now + 601);
+  expect(p.dedupe.size).toBe(0);
+  expect(p.expired.size).toBeLessThanOrEqual(4096);
+  p.reset();
+  expect(p.expired.size).toBe(0); // reset 清墓碑
 });

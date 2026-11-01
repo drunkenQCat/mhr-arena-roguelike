@@ -12,24 +12,32 @@ export class InplaceWaves {
   private issued: number[] = [];
   private ended: number[] = [];
   private nextPoll = 0;
+  waitingForCapacity = false;
   status = "inPlace inactive";
-  constructor(private readonly report: (event: string, detail: unknown) => void) {}
+  constructor(private readonly report: (event: string, detail: unknown) => void,
+    private readonly configureSlot: (plan: QuestPlan, slot: number, type: number, id: number) => void = () => {}) {}
 
   prepare(plan: QuestPlan): void {
     const q = this.scope(plan);
     const em = getSingleton("snow.enemy.EnemyManager");
     if (!em || plan.mapNo !== 10 || plan.monsterIds.length < 1 || plan.monsterIds.length > 2) throw new Error("Unsupported inPlace wave");
     if (((em.get_field("_EnemySetInfoList") as REManagedObject).call("get_Count") as number) + plan.monsterIds.length > 512) throw new Error("inPlace record safety limit reached; finish and reenter the quest");
+    const corpses: REManagedObject[] = [];
     for (let i = 0; i < (em.call("getBossEnemyCount") as number); i++) {
       const e = em.call("getBossEnemy", i) as REManagedObject;
       if (!e.call("isDieBehaviorActive") && !e.call("isCapture")) throw new Error("Previous native bosses are still alive");
+      corpses.push(e);
     }
+    // prepare() is reached only after the carve interval, gathering and next choice.
+    // Let the native destruction queue release actors/slots; never erase a live boss.
+    for (const corpse of corpses) em.call("registerRequestDestroyEnemyList", corpse);
     this.plan = plan;
     this.unique = q.call("getActiveQuestUniqueNo") as number;
     this.pending = [...plan.monsterIds]; this.issued = []; this.ended = []; this.nextPoll = 0;
+    this.waitingForCapacity = false;
     this.status = "inPlace waiting for reusable native slots";
   }
-  cancel(): void { this.plan = null; this.pending = []; this.issued = []; this.ended = []; this.status = "inPlace inactive"; }
+  cancel(): void { this.waitingForCapacity = false; this.plan = null; this.pending = []; this.issued = []; this.ended = []; this.status = "inPlace inactive"; }
   death(uid: number): void { if (this.issued.includes(uid) && !this.ended.includes(uid)) this.ended.push(uid); }
 
   tick(now: number): void {
@@ -45,8 +53,11 @@ export class InplaceWaves {
     if (q.get_field("_ExtraEmRno") !== 10) { this.status = "inPlace waiting native scheduler"; return; }
     for (let i = 0; i < (em.call("getBossEnemyCount") as number); i++) {
       const e = em.call("getBossEnemy", i) as REManagedObject;
-      if (!e.call("isDieBehaviorActive") && !e.call("isCapture")) { this.status = `inPlace waiting actor ${e.call("get_UniqueId")} to end`; return; }
+      if (!e.call("isDieBehaviorActive") && !e.call("isCapture") &&
+          (this.plan.sequential || !this.issued.includes(e.call("get_UniqueId") as number))) { this.status = `inPlace waiting actor ${e.call("get_UniqueId")} to end`; return; }
     }
+    this.waitingForCapacity = (em.call("getBossEnemyCount") as number) >= 3;
+    if (this.waitingForCapacity) { this.status = "inPlace waiting native actor capacity (corpses still occupy actors)"; return; }
     const slots = q.get_field("_BossSet") as REManagedArray;
     const freeSlots: number[] = [];
     for (let i = 2; i < slots.get_size(); i++) {
@@ -54,7 +65,9 @@ export class InplaceWaves {
     }
     const order = q.get_field("_BossSetNoTbl") as REManagedArray;
     if (slots.get_size() < 4 || order.get_size() < 5) throw new Error("Unexpected native boss-array capacity");
-    const ids = this.plan.sequential ? this.pending.slice(0, 1) : [...this.pending];
+    // Native CheckNext stops on DEFAULT. Kick RequestLoad once per actor;
+    // simultaneous groups allow already-issued living actors to remain.
+    const ids = this.pending.slice(0, 1);
     if (freeSlots.length < ids.length) { this.status = "inPlace waiting free task slots"; return; }
     const source = (em.call("getEnemySetInfo(System.Int32)", 0) as REManagedObject).call("get_EnemySetParam") as REManagedObject;
     if (!source) throw new Error("Original native spawn parameters missing");
@@ -78,6 +91,7 @@ export class InplaceWaves {
     for (let i = 2; i < order.get_size(); i++) order.call("Set", i, -1);
     fresh.forEach((entry, i) => {
       const slotNo = freeSlots[i]!;
+      this.configureSlot(this.plan!, slotNo, entry.type, entry.id);
       const slot = slots.get_element(slotNo) as REManagedObject;
       slot.set_field("EmSetId", entry.id); slot.set_field("EmType", entry.type); slot.set_field("State", 0);
       slot.set_field("Param0", 0); slot.set_field("Param1", 0);

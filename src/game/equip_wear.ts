@@ -213,14 +213,13 @@ function identity(obj: REManagedObject): string | undefined {
 export interface GrantedEntry { boxIndex: number; idVal: number; idType: number; identity?: string; removed?: boolean }
 
 function recordedEntry(box: REManagedObject, entry: GrantedEntry): REManagedObject | null {
-  const obj = boxEntry(box, entry.boxIndex);
-  if (!obj) throw new Error("Equipment slot unavailable");
-  if (obj.get_field("_IdType") === 0) return null;
-  if (obj.get_field("_IdType") !== entry.idType || obj.get_field("_IdVal") !== entry.idVal ||
-      (entry.identity !== undefined && identity(obj) !== entry.identity)) {
-    throw new Error("Equipment instance changed; recovery retained for manual inspection");
-  }
-  return obj;
+  const hint = boxEntry(box, entry.boxIndex);
+  if (!hint) throw new Error("Recorded equipment slot unavailable; cleanup retained");
+  if (hint.get_field("_IdType") === 0) return null;
+  if (hint.get_field("_IdType") !== entry.idType || hint.get_field("_IdVal") !== entry.idVal ||
+      (entry.identity !== undefined && identity(hint) !== entry.identity))
+    throw new Error("Equipment ownership uncertain; refusing to delete a matching user item");
+  return hint;
 }
 
 export interface StartupWearReport {
@@ -252,6 +251,7 @@ interface PersistedState {
   prevPack: number[];
   granted: GrantedEntry[];
   pouchIsolated: boolean;
+  wornPack?: number[];
 }
 
 export function persistStartupState(state: PersistedState | null): boolean {
@@ -362,6 +362,7 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
 
   report.ok = true;
   report.wornPack = finalPack;
+  journal.wornPack = finalPack.slice();
   report.granted = granted;
   if (pouch) {
     // Arm recovery BEFORE any pouch mutation, including partially failed clears.
@@ -441,7 +442,9 @@ export function restoreStartup(pouch: EquipWearPort | null): RestoreReport {
       const obj = recordedEntry(box, entry);
       if (obj) {
         box.call("subEquipment", obj);
-        if (recordedEntry(box, entry) !== null) throw new Error("Equipment removal readback failed");
+        // 读回=记录的槽位已空（同 id 双件合法并存，全箱 id 消失不是必要条件）
+        const slot = boxEntry(box, entry.boxIndex);
+        if (slot && slot.get_field("_IdType") !== 0) throw new Error("Equipment removal readback failed");
         result.removedEntries = removed() + 1;
       } else result.skippedEntries = skipped() + 1;
       entry.removed = true;
@@ -460,4 +463,19 @@ export function restoreStartup(pouch: EquipWearPort | null): RestoreReport {
   if (!persistStartupState(null)) return { ...result, ok: false, reason: "Cannot retire recovery journal" };
   relog.info(`[MhwRogue] 开局装备已恢复（发件清理 ${result.removedEntries}/${state.granted.length}）`);
   return result;
+}
+
+/** The engine may restore its own equipment backup on quest return. */
+export function reapplyStartup(): { ok: boolean; reason?: string } {
+  try {
+    const state = loadStartupState();
+    if (!state?.wornPack) return { ok: true }; // Legacy recovery-only journals.
+    const edm = equipDataManager();
+    if (!edm || state.wornPack.length !== PACK_LEN) throw new Error("Run equipment snapshot unavailable");
+    const box = equipmentBox(dataManager());
+    if (!box) throw new Error("Equipment box unavailable");
+    for (const entry of state.granted) if (!entry.removed && !recordedEntry(box, entry)) throw new Error("Run equipment disappeared");
+    for (let i = 0; i < PACK_LEN; i++) if (!writePackSlot(edm, i, state.wornPack[i]!)) throw new Error("Run equipment reapply failed");
+    return { ok: true };
+  } catch (error) { return { ok: false, reason: String(error) }; }
 }

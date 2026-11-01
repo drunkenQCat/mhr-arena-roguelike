@@ -17,6 +17,7 @@ export class TestTools {
   private killTargets: number[] = [];
   private questUnique: number | null = null;
   private killed: number[] = [];
+  private lastStock: Record<string, number> = {};
   private health: { uid: number; hp: number; maxHp: number; at: number }[] = [];
   private pending: { event: string; detail: unknown }[] = [];
   getHealth(uid: number): { hp: number; maxHp: number } | null {
@@ -38,10 +39,13 @@ export class TestTools {
         const hp = callNative(vital, "get_Current") as number;
         const maxHp = callNative(vital, "get_Max") as number;
         const at = clockSeconds();
-        if (this.killUntil >= at && this.killTargets.includes(uid) && hp >= 0 && !this.killed.includes(uid) && !callNative(enemy, "isCapture") && !callNative(enemy, "isDieBehaviorActive")) {
+        if (this.killUntil >= at && this.killTargets.includes(uid) && hp >= 0 && (this.lastStock[String(uid)] === undefined || at - this.lastStock[String(uid)]! >= 1) && !callNative(enemy, "isCapture") && !callNative(enemy, "isDieBehaviorActive")) {
           callNative(enemy, "stockDirectForceKillDamage");
-          this.killed.push(uid);
-          this.pending.push({ event: "test-kill", detail: { uid, hpBefore: hp, nativeDeathsOnly: true } });
+          this.lastStock[String(uid)] = at;
+          if (!this.killed.includes(uid)) {
+            this.killed.push(uid);
+            this.pending.push({ event: "test-kill", detail: { uid, hpBefore: hp, nativeDeathsOnly: true } });
+          }
         }
         const entry = { uid, hp, maxHp, at };
         const old = this.health.findIndex((item) => item.uid === uid);
@@ -90,7 +94,7 @@ export class TestTools {
     this.bossUids = [];
     if (this.scoped()) {
       const unique = callNative(questManager()!, "getActiveQuestUniqueNo") as number;
-      if (unique !== this.questUnique) { this.health = []; this.questUnique = unique; }
+      if (unique !== this.questUnique) { this.health = []; this.questUnique = unique; this.killUntil = 0; this.killTargets = []; }
       const manager = getSingleton("snow.enemy.EnemyManager");
       if (manager) {
         const count = callNative(manager, "getBossEnemyCount") as number;
@@ -110,7 +114,8 @@ export class TestTools {
     if (!this.scoped()) { this.message = "Enter solo arena quest 900101/900102 first"; return; }
     this.killed = [];
     this.killTargets = [...this.bossUids];
-    this.killUntil = clockSeconds() + 3;
+    this.lastStock = {};
+    this.killUntil = clockSeconds() + 10;
     this.message = "Kill queued for spawned monsters (native update)";
   }
   shutdown(): void { this.invincible = false; this.killRequested = false; this.killUntil = 0; }

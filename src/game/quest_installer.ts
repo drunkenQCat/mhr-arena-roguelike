@@ -27,7 +27,8 @@ export class QuestInstaller {
   private stopped = false;
   private currentPlan: QuestPlan | null = null;
 
-  constructor(private readonly cfg: RogueConfig, private readonly initialPlan: QuestPlan) {}
+  constructor(private readonly cfg: RogueConfig, private readonly initialPlan: QuestPlan,
+    private readonly multiplayerEntry = false) {}
   getStatus(): string { return this.status; }
   isInstalled(): boolean { return this.quest !== null && !this.stopped; }
   getQuest(): REManagedObject | null { return this.quest; }
@@ -87,6 +88,15 @@ export class QuestInstaller {
     const patch = normalPatch(plan, snow_QuestManager_BossSetCondition.DEFAULT,
       snow_QuestManager_BossSetCondition.EM1_HP, snow_quest_QuestType.BOSSRUSH,
       snow_quest_QuestTargetType.AllMainEnemy);
+    if (this.multiplayerEntry) {
+      // Keep the native hub template rank; the solo patch intentionally sets Village rank.
+      const template = questManager()?.call("getQuestData(System.Int32)", plan.baseId) as REManagedObject | null;
+      const raw = template?.call("get_RawNormal") as REManagedObject | null;
+      if (!raw) throw new Error("Multiplayer template unavailable");
+      patch._QuestLv = raw.get_field("_QuestLv");
+      patch._EnemyLv = raw.get_field("_EnemyLv");
+      patch._TimeLimit = 50;
+    }
     for (const name of Object.keys(patch)) {
       const value = patch[name];
       if (Array.isArray(value)) {
@@ -156,6 +166,34 @@ export class QuestInstaller {
     }
   }
 
+  /** Populate every reused task slot from a real template boss, never its zero tail.
+   * getQuestEnemyNando indexes these arrays directly by EmSetId (native read
+   * uses r13 = emSetId with no bounds check), not by reusable task slot. */
+  prepareInplaceSlot(plan: QuestPlan, slot: number, type: number, emSetId = slot): void {
+    if (!Number.isInteger(emSetId) || emSetId < 0 || emSetId >= 512) throw new Error("Invalid native enemy parameter index");
+    const qm = questManager();
+    if (!qm || !this.enemy || !this.normal || qm.call("get_ActiveQuestNo") !== plan.questId || !qm.call("isPlayQuest")) throw new Error("Cannot configure an unrelated inPlace slot");
+    const source = (qm.call("getQuestData(System.Int32)", plan.baseId) as REManagedObject).call("get_RawEnemy") as REManagedObject;
+    for (const name of ["_VitalTbl", "_AttackTbl", "_PartsTbl", "_OtherTbl", "_StaminaTbl", "_Scale", "_ScaleTbl", "_Difficulty", "_BossMulti", "_IndividualType", "_SubType", "_RouteNo", "_InitSetName"]) {
+      const base = source.get_field(name) as REManagedArray;
+      let target = this.enemy.get_field(name) as REManagedArray;
+      if (!base || !target) throw new Error(`Missing boss parameter array ${name}`);
+      if (target.get_size() <= emSetId) {
+        const expanded = retain(createManagedArray(target.get_type_definition().get_full_name().slice(0, -2), emSetId + 1), this.retained);
+        for (let i = 0; i <= emSetId; i++) expanded.call("Set", i, i < target.get_size() ? target.call("Get", i) : base.call("Get", 0));
+        this.enemy.set_field(name, expanded); target = expanded;
+      }
+      let value = base.call("Get", 0);
+      if (name === "_VitalTbl" && plan.wave.tier === "ultimate") {
+        for (let i = 1; i < base.get_size(); i++) value = Math.max(value as number, base.call("Get", i) as number);
+      }
+      target.call("Set", emSetId, value);
+    }
+    (this.normal.get_field("_BossEmType") as REManagedArray).call("Set", slot, type);
+    this.currentPlan = plan;
+    this.status = `In-place layer ${plan.layer}: slot ${slot}, monster ${type}`;
+  }
+
   private installHooks(): void {
     if (this.hooks) return;
     const text = findTypeDefinition("snow.quest.QuestData")?.get_method("getQuestTextCore");
@@ -165,7 +203,9 @@ export class QuestInstaller {
       const storage = reframework.getHookStorage();
       storage.mhw_rogue_text_v2 = null;
       if (this.quest && args[2] === toPtr(this.quest)) {
-        const replacement = TEXT[toInt64(args[3])];
+        const textId = toInt64(args[3]);
+        const replacement = this.multiplayerEntry && textId === 0
+          ? "MP ENTRY TEST / 联机入场测试" : TEXT[textId];
         if (replacement) {
           storage.mhw_rogue_text_v2 = replacement;
           return PRE_HOOK.SKIP_ORIGINAL;
@@ -178,7 +218,7 @@ export class QuestInstaller {
     });
     hookMethod(list, () => {}, (retval) => {
       const values = toManagedObject(retval);
-      if (this.quest && values && values.call("Contains", 101) && !values.call("Contains", this.cfg.quest.id)) {
+      if (this.quest && values && values.call("Contains", this.multiplayerEntry ? this.cfg.quest.baseId : 101) && !values.call("Contains", this.cfg.quest.id)) {
         values.call("Add", this.cfg.quest.id);
       }
       return retval;

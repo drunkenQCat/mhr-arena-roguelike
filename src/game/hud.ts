@@ -6,15 +6,22 @@ import { imguiApi } from "./sdk";
 
 /** Real event-driven M2 controls. No simulated clear / next-layer buttons. */
 export function drawHud(session: RunSession, runtime: NativeRuntime, shop: ShopWindow): void {
-  if (!imguiApi.tree_node("MHR Arena Roguelike - M2")) return;
+  if (!imguiApi.tree_node("斗技场肉鸽（单人测试版）")) return;
   const core = session.core;
   const state = core.state;
   const action = (result: Result): void => { if (!result.ok) session.message = result.message ?? "操作失败"; };
   try {
-    imguiApi.text("TEST TOOLS (900101/900102, solo only)");
+    if (imguiApi.tree_node("开发测试工具（普通游玩无需打开）")) {
+    try {
     if (imguiApi.button(`无敌：${runtime.testTools.invincible ? "开" : "关"}`)) runtime.testTools.toggleGod();
     if (imguiApi.button("击杀当前已出场怪物")) runtime.testTools.requestKill();
     imguiApi.text(runtime.testTools.message);
+    if (["Idle", "Finished", "Fault"].includes(session.stage) && imguiApi.button("M2a: test 2 native sequential monsters (0 PT)")) {
+      const armor = core.armorOptions()[0];
+      if (armor) action(session.start(armor, true));
+    }
+    } finally { imguiApi.tree_pop(); }
+    }
     imguiApi.separator();
     imguiApi.text(runtime.ready() ? "原生钩子就绪（仅单人）" : "等待中 / 未就绪");
     imguiApi.text(runtime.status());
@@ -31,10 +38,6 @@ export function drawHud(session: RunSession, runtime: NativeRuntime, shop: ShopW
     if (["Idle", "Finished", "Fault"].includes(session.stage)) {
       for (const armor of core.armorOptions()) {
         if (imguiApi.button(`开局：${armor}`)) action(session.start(armor));
-      }
-      if (imguiApi.button("M2a: test 2 native sequential monsters (0 PT)")) {
-        const armor = core.armorOptions()[0];
-        if (armor) action(session.start(armor, true));
       }
       if (imguiApi.button(`切换路线（当前 ${session.settings.route}）`)) {
         session.settings.route = session.settings.route === "reentry" ? "inPlace" : "reentry";

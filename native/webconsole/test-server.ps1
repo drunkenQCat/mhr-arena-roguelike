@@ -49,6 +49,13 @@ try {
     }
     if (-not $ready) { throw "Server did not become ready on port $Port." }
     Write-Host "PASS health on port $Port"
+        $connection = (Request 'api/connection').Content | ConvertFrom-Json
+        if ($connection.port -ne $Port -or $connection.localUrl -ne "http://127.0.0.1:$Port/console") { throw 'Incorrect connection URLs.' }
+        if ($null -eq $connection.addresses -or -not ($connection.enumerationOk -is [bool])) { throw 'Invalid connection response schema.' }
+        foreach ($address in $connection.addresses) {
+            if ($address.url -notmatch "^http://(?:[0-9]{1,3}\.){3}[0-9]{1,3}:$Port/console$") { throw 'Invalid phone URL.' }
+        }
+        Write-Host 'PASS GET /api/connection (empty address list is valid on offline hosts)'
     if (-not $HealthOnly) {
         $probe = (Request 'api/probe').Content | ConvertFrom-Json
         if ($probe.module -ne 'webconsole' -or $probe.export -ne 'luaopen_webconsole') { throw 'api/probe does not describe the webconsole module.' }

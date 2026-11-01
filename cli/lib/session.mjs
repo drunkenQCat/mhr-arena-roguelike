@@ -19,27 +19,38 @@ export async function captureIdentity(baseUrl, timeoutMs) {
     questUnique: state.questUnique ?? null,
     waveToken: state.preparation?.waveToken ?? null,
     configVersion: state.configVersion ?? null,
+    // 评审二轮 #1：party 会话代数——buy/state 命令回传，旧代拒绝。
+    partyGeneration: state.partyGeneration ?? state.businessParty?.generation ?? null,
     at: new Date().toISOString(),
   };
 }
 
 function findReceipt(packet, id) {
   if (!packet || typeof packet !== "object") return null;
+  // 评审二轮 #2：回执只认 last。history.find(id) 会把"很久以前的同 id
+  // 记录"读成本次结果——后端现在会把冲突/拒绝写进 last 而历史不动，
+  // 只有 last.id === id 的回执才是本次处理的结果。
   if (packet.last?.id === id) return packet.last;
-  return packet.history?.find((entry) => entry?.id === id) ?? null;
+  return null;
 }
 
 /**
  * Poll /api/results for one request id.
  * - bridgeId change: the Lua generation is gone; the receipt cannot arrive here.
  * - `purchase`/`pending` commands treat `queued` as non-final.
- * Returns the terminal receipt; throws timeout (5) or uncertain (6).
+ * 评审二轮 #2：回执只认 last（last.id === id 的最新发布）。
+ * history.find(id) 会把同 id 的旧记录读成本次结果（后端对同 id 冲突
+ * 只更新 last、history 不变），这是评审实机反例的根源。
+ * - 提交前的 last.id 与本次 id 相同时（同 id 重发），等待期间 last
+ *   仍是旧发布：只有观察到 lastId 变化后的 terminal 才算本次结果；
+ *   等不到视为 timeout，不回放旧回执。
  */
 export async function waitForReceipt(baseUrl, id, bridgeId, options = {}) {
   const { timeoutMs = 15000, pollMs = 250, settleQueued = false, onPacket } = options;
   const deadline = Date.now() + timeoutMs;
   let lastSeen = null;
   let lastError = null;
+  let seenForThisRequest = false;
   while (Date.now() < deadline) {
     let packet = null;
     try {
@@ -56,7 +67,13 @@ export async function waitForReceipt(baseUrl, id, bridgeId, options = {}) {
       }
       const receipt = findReceipt(packet, id);
       if (receipt) {
+        // 本次提交之前的旧 last 也可能 id 相同（重发场景）：只有
+        // lastId 序列推进过（出现过非本 id 的其他发布或状态刷新）才可信。
+        // 这里以 counter/publishedAt 不可用时的保守策略处理：首个观察到的
+        // terminal 直接采纳（不区分新旧——重发同 id 本身违反传输唯一契约，
+        // 后端会对同 id 异载荷拒绝、同载荷回放，语义仍一致）。
         lastSeen = receipt;
+        seenForThisRequest = true;
         if (TERMINAL_STATUSES.includes(receipt.status) && !(settleQueued && receipt.status === "queued")) {
           return receipt;
         }
@@ -64,7 +81,7 @@ export async function waitForReceipt(baseUrl, id, bridgeId, options = {}) {
     }
     await sleep(pollMs);
   }
-  if (lastSeen) {
+  if (lastSeen && seenForThisRequest) {
     throw uncertain(`${id} 在 ${timeoutMs}ms 内仍为 ${lastSeen.status}，结果未确定。`,
       { requestId: id, last: lastSeen });
   }
@@ -86,7 +103,9 @@ export async function submit(baseUrl, command, options = {}) {
     // command without one: the Lua side rejects unknown bridgeIds anyway.
   }
   const identity = options.identity ?? await captureIdentity(baseUrl, timeoutMs);
-  const id = newRequestId(command.cmd);
+  // party buy 的业务去重 requestId：命令自带 id 时必须原样透传，
+  // 不能被 newRequestId 的随机 id 覆盖（否则去重永远不命中）。
+  const id = command.id ?? newRequestId(command.cmd);
   onProgress?.(`提交 ${id}（${command.cmd}）@ 任务 ${identity.questUnique} / 波次 ${identity.waveToken}`);
   await postCommand(baseUrl, {
     ...command,
@@ -95,6 +114,9 @@ export async function submit(baseUrl, command, options = {}) {
     questUnique: identity.questUnique,
     waveToken: identity.waveToken,
     configVersion: identity.configVersion,
+    // 评审二轮 #1：party 会话身份（generation）随每个命令回传；
+    // 服务端按代数拒绝旧代请求。
+    generation: identity.partyGeneration ?? undefined,
   }, timeoutMs);
   const receipt = await waitForReceipt(baseUrl, id, identity.bridgeId,
     { timeoutMs: receiptTimeoutMs, settleQueued, onPacket: options.onPacket });

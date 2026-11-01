@@ -6,6 +6,9 @@
 #include "memory_bridge.h"
 
 #include "httplib.h"
+#include <iphlpapi.h>
+#include <netioapi.h>
+#include <set>
 
 #include <filesystem>
 #include <sstream>
@@ -45,6 +48,57 @@ std::string json_escape(const std::string& text)
         }
     }
     return out;
+}
+
+// Only enumerate addresses when the help page asks. No periodic adapter polling.
+std::string connection_json()
+{
+    ULONG size = 16 * 1024;
+    std::vector<unsigned char> buffer(size);
+    ULONG result = ERROR_BUFFER_OVERFLOW;
+    for (int retry = 0; retry < 3 && result == ERROR_BUFFER_OVERFLOW; ++retry) {
+        buffer.resize(size);
+        result = GetAdaptersAddresses(AF_INET, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
+            GAA_FLAG_SKIP_DNS_SERVER, nullptr,
+            reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()), &size);
+    }
+    std::ostringstream out;
+    out << "{\"ok\":true,\"port\":" << g_listen_port
+        << ",\"localUrl\":\"http://127.0.0.1:" << g_listen_port << "/console\",\"addresses\":[";
+    bool first = true;
+    std::set<std::string> seen;
+    if (result == NO_ERROR) {
+        for (auto* adapter = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()); adapter; adapter = adapter->Next) {
+            if (adapter->OperStatus != IfOperStatusUp ||
+                (adapter->IfType != IF_TYPE_ETHERNET_CSMACD && adapter->IfType != IF_TYPE_IEEE80211)) continue;
+            MIB_IF_ROW2 row = {};
+            row.InterfaceLuid = adapter->Luid;
+            if (GetIfEntry2(&row) != NO_ERROR || !row.InterfaceAndOperStatusFlags.HardwareInterface) continue;
+            std::string name;
+            if (adapter->FriendlyName) {
+                const int count = WideCharToMultiByte(CP_UTF8, 0, adapter->FriendlyName, -1, nullptr, 0, nullptr, nullptr);
+                if (count > 1) {
+                    std::vector<char> text(count);
+                    WideCharToMultiByte(CP_UTF8, 0, adapter->FriendlyName, -1, text.data(), count, nullptr, nullptr);
+                    name = text.data();
+                }
+            }
+            for (auto* addr = adapter->FirstUnicastAddress; addr; addr = addr->Next) {
+                if (!addr->Address.lpSockaddr || addr->Address.lpSockaddr->sa_family != AF_INET) continue;
+                const auto* ipv4 = reinterpret_cast<const sockaddr_in*>(addr->Address.lpSockaddr);
+                const auto host = ntohl(ipv4->sin_addr.s_addr);
+                if (host == 0 || (host >> 24) == 127 || (host >> 16) == 0xa9fe) continue;
+                char ip[INET_ADDRSTRLEN] = {};
+                if (!inet_ntop(AF_INET, &ipv4->sin_addr, ip, sizeof(ip)) || !seen.insert(ip).second) continue;
+                if (!first) out << ',';
+                first = false;
+                out << "{\"adapter\":\"" << json_escape(name) << "\",\"url\":\"http://"
+                    << ip << ':' << g_listen_port << "/console\"}";
+            }
+        }
+    }
+    out << "],\"enumerationOk\":" << (result == NO_ERROR || result == ERROR_NO_DATA ? "true" : "false") << '}';
+    return out.str();
 }
 
 // Shared origin check for every POST endpoint: empty Origin (curl, CLI) passes;
@@ -125,6 +179,11 @@ void run_server()
         ss << "{\"ok\":true,\"plugin\":\"webconsole\",\"version\":\"" << PLUGIN_VERSION
            << "\",\"session\":\"" << json_escape(g_session_id) << "\"}";
         res.set_content(ss.str(), "application/json");
+    });
+
+    svr.Get("/api/connection", [](const httplib::Request&, httplib::Response& res) {
+        res.set_header("Cache-Control", "no-store");
+        res.set_content(connection_json(), "application/json");
     });
 
     // DLL identity endpoint: lets the probe/page separate "DLL up" from "Lua loaded".

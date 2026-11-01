@@ -101,6 +101,8 @@ function categoryCounts(pouch: REManagedObject, typeName: string): Record<string
  */
 let isolationActive = false;
 const SNAPSHOT_FILE = "mhw_rogue_pouch_state.json";
+/** Diagnostic boot tag only; verification is never relaxed after reload. */
+const BOOT_ID = "boot:" + String(Math.random());
 type InventorySnapshot = Record<string, Record<string, number>>;
 const RESTORE_TYPES = [0, 1, 2, 3, 5]; // native load(true) excludes wirebugs (4)
 
@@ -146,8 +148,18 @@ export function beginPouchIsolation(): PouchSnapshot {
     const table = inventoryTypesTable();
     if (table.Normal !== 0 || table.BulletBottle !== 2) return { ok: false, recoveryRequired: false, reason: "Inventory categories unavailable" };
     const original = inventorySnapshot(pouch, false);
+    const stacks: Record<string, { id: number; n: number }[]> = {};
+    for (const t of RESTORE_TYPES) {
+      const list = pouch.call("getInventoryDataList", t) as REManagedObject;
+      stacks[String(t)] = [];
+      for (let i = 0; i < (list.call("get_Count") as number); i++) {
+        const slot = list.call("get_Item", i) as REManagedObject;
+        const n = slot.call("get_Count") as number;
+        if (n > 0) stacks[String(t)]!.push({ id: slot.call("get_ItemId") as number, n });
+      }
+    }
     // A durable obligation exists before any native mutation.
-    if (rejson.dump_file(SNAPSHOT_FILE, { active: true, items: original }, 2) !== true) return { ok: false, recoveryRequired: false, reason: "Cannot journal original pouch" };
+    if (rejson.dump_file(SNAPSHOT_FILE, { active: true, boot: BOOT_ID, items: original, stacks }, 2) !== true) return { ok: false, recoveryRequired: false, reason: "Cannot journal original pouch" };
     isolationActive = true;
     recoveryRequired = true;
     pouch.call("saveToBackupInventory");
@@ -163,21 +175,54 @@ export function beginPouchIsolation(): PouchSnapshot {
   }
 }
 
+/** Rebuild from the durable IDs/counts when quest result processing overwrote the
+ * engine's single backup. Preflight every category before changing any slot. */
+function restoreDurable(pouch: REManagedObject, expected: InventorySnapshot, stacks?: Record<string, { id: number; n: number }[]>): void {
+  const work: { slots: REManagedObject[]; items: { id: number; n: number }[] }[] = [];
+  for (const t of RESTORE_TYPES) {
+    const list = pouch.call("getInventoryDataList", t) as REManagedObject;
+    const count = list.call("get_Count") as number;
+    const items = stacks?.[String(t)] ?? Object.entries(expected[String(t)] ?? {}).map(([id, n]) => ({ id: Number(id), n }));
+    if (!Number.isInteger(count) || count < items.length || count > 10000) throw new Error("Pouch restore capacity mismatch");
+    if (items.some((x) => !Number.isInteger(x.id) || x.id <= 0 || !Number.isInteger(x.n) || x.n <= 0)) throw new Error("Invalid original pouch journal");
+    const slots: REManagedObject[] = [];
+    for (let i = 0; i < count; i++) {
+      const slot = list.call("get_Item", i) as REManagedObject;
+      if (!slot || !slot.get_type_definition().get_method("setEmpty") ||
+          !slot.get_type_definition().get_method("add(snow.data.ContentsIdSystem.ItemId, System.UInt32)")) throw new Error("Pouch restore API unavailable");
+      slots.push(slot);
+    }
+    work.push({ slots, items });
+  }
+  for (const group of work) {
+    for (const slot of group.slots) slot.call("setEmpty");
+    group.items.forEach((item, i) => group.slots[i]!.call("add(snow.data.ContentsIdSystem.ItemId, System.UInt32)", item.id, item.n));
+  }
+}
+
 export function endPouchIsolation(): PouchSnapshot {
   const pouch = itemPouch();
   if (!pouch) return { ok: false, reason: "Item pouch unavailable" };
   try {
-    const journal = rejson.load_file(SNAPSHOT_FILE) as { active: boolean; items: InventorySnapshot } | null;
-    const saved = journal?.active ? journal.items : null;
-    const backup = inventorySnapshot(pouch, true);
-    const expected = saved ?? backup; // legacy recovery records predate the durable snapshot
-    if (!sameSnapshot(expected, backup)) throw new Error("Native backup changed; original pouch recovery retained");
-    pouch.call("loadFromBackupInventory", true);
-    if (!sameSnapshot(expected, inventorySnapshot(pouch, false))) throw new Error("Pouch item IDs/counts do not match original");
+    const journal = rejson.load_file(SNAPSHOT_FILE) as { active: boolean; items: InventorySnapshot; stacks?: Record<string, { id: number; n: number }[]> } | null;
+    if (!journal?.active) {
+      if (isolationActive) throw new Error("Original pouch journal unavailable; recovery retained");
+      return { ok: true };
+    }
+    const expected = journal.items;
+    if (!expected || typeof expected !== "object") throw new Error("Original pouch snapshot unavailable");
+    // Reading the live pouch must succeed even after Reset scripts or a restart.
+    if (!sameSnapshot(expected, inventorySnapshot(pouch, false))) {
+      let backup: InventorySnapshot | null = null;
+      try { backup = inventorySnapshot(pouch, true); } catch { /* Durable journal remains authoritative. */ }
+      if (backup && sameSnapshot(expected, backup)) pouch.call("loadFromBackupInventory", true);
+      else restoreDurable(pouch, expected, journal.stacks);
+    }
+    if (!sameSnapshot(expected, inventorySnapshot(pouch, false))) throw new Error("Pouch item IDs/counts do not match original; recovery retained");
     if (rejson.dump_file(SNAPSHOT_FILE, { active: false }, 2) !== true) throw new Error("Cannot retire pouch journal");
     isolationActive = false;
     return { ok: true };
   } catch (error) {
-    return { ok: false, reason: String(error) };
+    return { ok: false, recoveryRequired: true, reason: String(error) };
   }
 }

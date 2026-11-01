@@ -33,7 +33,7 @@ target_include_directories(webconsole PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
-target_link_libraries(webconsole PRIVATE lua54 ws2_32.lib crypt32.lib)
+target_link_libraries(webconsole PRIVATE lua54 ws2_32.lib crypt32.lib iphlpapi.lib)
 
 # ---- 独立测试 exe（游戏外复现全部端点行为；不含 REFramework 插件入口） ----
 add_executable(webconsole_test
@@ -45,12 +45,12 @@ target_include_directories(webconsole_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 target_compile_definitions(webconsole_test PRIVATE WEBCONSOLE_STANDALONE)
-target_link_libraries(webconsole_test PRIVATE lua54 ws2_32.lib crypt32.lib)
+target_link_libraries(webconsole_test PRIVATE lua54 ws2_32.lib crypt32.lib iphlpapi.lib)
 
 include(CTest)
 if(BUILD_TESTING)
     add_executable(bridge_lifecycle_test tests/bridge_lifecycle.cpp src/lua_bridge.cpp src/http_server.cpp)
     target_include_directories(bridge_lifecycle_test PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(bridge_lifecycle_test PRIVATE lua54 ws2_32.lib crypt32.lib)
+    target_link_libraries(bridge_lifecycle_test PRIVATE lua54 ws2_32.lib crypt32.lib iphlpapi.lib)
     add_test(NAME bridge_lifecycle COMMAND bridge_lifecycle_test)
 endif()

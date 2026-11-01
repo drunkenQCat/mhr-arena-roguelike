@@ -29,3 +29,5 @@ src/game/gen/
 
 # logs
 *.log
+/*.zip
+/release-stage/

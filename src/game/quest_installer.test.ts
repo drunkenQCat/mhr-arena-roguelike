@@ -122,3 +122,30 @@ describe("native BOSSRUSH writer", () => {
     expect(() => installer.publish(plan, false)).toThrow("accepted quest");
   });
 });
+
+it("initializes reused slots from real boss parameters, including resized init-name arrays",()=>{
+ const f=fixture();f.installer.publish(f.plan,false);f.play();
+ const live=f.dictionary.get(f.plan.questId)!.fields.enemy;
+ f.installer.prepareInplaceSlot(f.plan,3,92,119);
+ for(const field of ["_VitalTbl","_AttackTbl","_Scale","_ScaleTbl","_RouteNo","_InitSetName"])
+  expect(live.fields[field].elements[119]).toBe(f.enemy.fields[field].elements[0]);
+ expect(f.enemy.fields._VitalTbl.elements[3]).toBe(0);
+ const ultimate={...f.plan,wave:{...f.plan.wave,tier:"ultimate" as const}};
+ f.installer.prepareInplaceSlot(ultimate,2,1369);
+ expect(live.fields._VitalTbl.elements[2]).toBe(80);
+ f.installer.prepareInplaceSlot(f.plan,2,92);
+ expect(live.fields._VitalTbl.elements[2]).toBe(68);
+});
+
+it("keeps hub rank and enemy level for the independent multiplayer entry table", () => {
+  const f = fixture();
+  const cfg = { ...f.config, quest: { ...f.config.quest, id: 900103 } };
+  const plan = { ...f.plan, questId: 900103 };
+  const installer = new QuestInstaller(cfg, plan, true);
+  installer.publish(plan, false);
+  const copy = f.dictionary.get(900103)!.fields.normal;
+  expect(copy.fields._QuestLv).toBe(f.normal.fields._QuestLv);
+  expect(copy.fields._EnemyLv).toBe(f.normal.fields._EnemyLv);
+  expect(copy.fields._TimeLimit).toBe(50);
+  expect(f.dictionary.has(900102)).toBe(false);
+});

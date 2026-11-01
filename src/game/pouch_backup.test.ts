@@ -1,41 +1,63 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const h=vi.hoisted(()=>({bag:[] as any[],backup:null as any,saved:null as any,failClear:false,failRead:false,failSave:false}));
-const list=(items:any[])=>({call:(m:string,i:number)=>m==="get_Count"?items.length:{call:(n:string)=>n==="get_ItemId"?items[i].id:items[i].n}});
+const h=vi.hoisted(()=>({bag:[] as any[],backup:null as any,saved:null as any,failClear:false,failRead:false,failSave:false,failAdd:false}));
+function list(items:any[]) { return {call:(m:string,i:number)=>m==="get_Count"?items.length:{
+ get_type_definition:()=>({get_method:()=>({})}),
+ call:(n:string,...args:number[])=>{
+  if(n==="get_ItemId")return items[i].id;
+  if(n==="get_Count")return items[i].n;
+  if(n==="setEmpty")items[i]={id:0,n:0};
+  if(n.startsWith("add(")&&!h.failAdd)items[i]={id:args[0],n:args[1]};
+ }
+}}; }
 vi.mock("./sdk",()=>({
-  getSingleton:()=>({get_field:()=>({call:(m:string,t:number)=>{
-    if(m==="getInventoryDataList") {if(h.failRead)throw Error("unreadable");return list(h.bag[t]);}
-    if(m==="get_BackupInventoryDataList")return h.backup?{call:(n:string,i:number)=>n==="get_Count"?6:list(h.backup[i])}:null;
-    if(m==="saveToBackupInventory")h.backup=structuredClone(h.bag);
-    if(m==="clear") {if(h.failClear&&t===2)throw Error("partial");h.bag[t]=[];}
-    if(m==="loadFromBackupInventory") {if(h.backup)h.bag=structuredClone(h.backup);}
-  }})}),
-  findTypeDefinition:()=>({get_fields:()=>["Normal","Temporary","BulletBottle","Regular","WireJumpInsect","OtDogItemPouch"].map((name,i)=>({get_name:()=>name,is_static:()=>true,get_data:()=>i}))}),
-  rejson:{load_file:()=>h.saved,dump_file:(_p:string,d:any)=>{if(h.failSave)return false;h.saved=structuredClone(d);return true;}},
-  relog:{info:vi.fn(),warn:vi.fn(),error:vi.fn()}
+ getSingleton:()=>({get_field:()=>({call:(m:string,t:number)=>{
+  if(m==="getInventoryDataList") {if(h.failRead)throw Error("unreadable");return list(h.bag[t]);}
+  if(m==="get_BackupInventoryDataList")return h.backup?{call:(_n:string,i:number)=>list(h.backup[i])}:null;
+  if(m==="saveToBackupInventory") {h.backup=structuredClone(h.bag);h.bag=empty();}
+  if(m==="clear") {if(h.failClear&&t===2)throw Error("partial");h.bag[t]=empty()[t];}
+  if(m==="loadFromBackupInventory"&&h.backup)h.bag=structuredClone(h.backup);
+ }})}),
+ findTypeDefinition:()=>({get_fields:()=>["Normal","Temporary","BulletBottle","Regular","WireJumpInsect","OtDogItemPouch"].map((name,i)=>({get_name:()=>name,is_static:()=>true,get_data:()=>i}))}),
+ rejson:{load_file:()=>h.saved,dump_file:(_p:string,d:any)=>{if(h.failSave)return false;h.saved=structuredClone(d);return true;}},
+ relog:{info:vi.fn(),warn:vi.fn(),error:vi.fn()}
 }));
-import {beginPouchIsolation,endPouchIsolation} from "./pouch_backup";
-beforeEach(()=>{h.failClear=false;h.failRead=false;h.failSave=false;h.bag=Array.from({length:6},()=>[]);h.backup=structuredClone(h.bag);h.saved=null;endPouchIsolation();h.bag[0]=[{id:1,n:10}];h.bag[2]=[{id:2,n:20}];});
-it("backs up first, clears only player categories, and exactly restores IDs and counts",()=>{
-  const before=structuredClone(h.bag);expect(beginPouchIsolation().ok).toBe(true);
-  expect(h.bag[0]).toEqual([]);expect(h.bag[2]).toEqual([]);
-  expect(endPouchIsolation().ok).toBe(true);expect(h.bag).toEqual(before);
+const empty=()=>Array.from({length:6},()=>Array.from({length:8},()=>({id:0,n:0})));
+let beginPouchIsolation:typeof import("./pouch_backup").beginPouchIsolation;
+let endPouchIsolation:typeof import("./pouch_backup").endPouchIsolation;
+beforeEach(async()=>{
+ vi.resetModules();({beginPouchIsolation,endPouchIsolation}=await import("./pouch_backup"));
+ Object.assign(h,{failClear:false,failRead:false,failSave:false,failAdd:false,bag:empty(),backup:empty(),saved:null});
+ h.bag[0][0]={id:1,n:10};h.bag[2][0]={id:2,n:20};
+});
+it("journals before native backup moves the pouch, then restores exact original counts",()=>{
+ const before=structuredClone(h.bag);expect(beginPouchIsolation().ok).toBe(true);
+ expect(h.bag[0].every((x:any)=>x.n===0)).toBe(true);
+ expect(endPouchIsolation().ok).toBe(true);expect(h.bag).toEqual(before);
 });
 it("refuses a second begin without overwriting the original backup",()=>{
-  expect(beginPouchIsolation().ok).toBe(true);expect(beginPouchIsolation().ok).toBe(false);
-  expect(h.backup[0][0].n).toBe(10);
+ expect(beginPouchIsolation().ok).toBe(true);expect(beginPouchIsolation().ok).toBe(false);expect(h.backup[0][0].n).toBe(10);
 });
-it("partial clear failure remains recoverable",()=>{
-  h.failClear=true;expect(beginPouchIsolation().ok).toBe(false);expect(h.bag[0]).toEqual([]);
-  expect(endPouchIsolation().ok).toBe(true);expect(h.bag[0][0].n).toBe(10);
+it("partial clear failure retains a recoverable obligation",()=>{
+ h.failClear=true;expect(beginPouchIsolation().ok).toBe(false);expect(h.saved.active).toBe(true);
+ expect(endPouchIsolation().ok).toBe(true);expect(h.bag[0][0].n).toBe(10);
 });
-it("a genuinely empty original pouch restores successfully",()=>{
-  h.bag=Array.from({length:6},()=>[]);expect(beginPouchIsolation().ok).toBe(true);expect(endPouchIsolation().ok).toBe(true);
+it("restores an originally empty pouch even when the native backup was overwritten",()=>{
+ h.bag=empty();beginPouchIsolation();h.bag[0][0]={id:9,n:1};h.backup=structuredClone(h.bag);
+ expect(endPouchIsolation().ok).toBe(true);expect(h.bag[0][0].n).toBe(0);expect(h.saved.active).toBe(false);
 });
-it("missing and overwritten backups do not masquerade as empty/successful recovery",()=>{
-  beginPouchIsolation();h.backup=null;expect(endPouchIsolation().ok).toBe(false);expect(h.saved.active).toBe(true);
-  h.backup=Array.from({length:6},()=>[]);expect(endPouchIsolation().ok).toBe(false);
+it("reconstructs original stacks from the journal after a reload and an empty engine backup",async()=>{
+ h.bag[0][1]={id:1,n:10};const before=structuredClone(h.bag);beginPouchIsolation();h.backup=empty();
+ vi.resetModules();const fresh=await import("./pouch_backup");
+ expect(fresh.endPouchIsolation().ok).toBe(true);expect(h.bag).toEqual(before);
 });
-it("journal failure prevents clearing; failed reads never prove recovery",()=>{
-  h.failSave=true;expect(beginPouchIsolation().ok).toBe(false);expect(h.bag[0][0].n).toBe(10);
-  h.failSave=false;beginPouchIsolation();h.failRead=true;expect(endPouchIsolation().ok).toBe(false);expect(h.saved.active).toBe(true);
+it("retains recovery on failed native writes, including after a new Lua boot",async()=>{
+ beginPouchIsolation();h.backup=null;h.failAdd=true;vi.resetModules();const fresh=await import("./pouch_backup");
+ expect(fresh.endPouchIsolation().ok).toBe(false);expect(h.saved.active).toBe(true);
+});
+it("never treats failed reads as proof of recovery",async()=>{
+ beginPouchIsolation();h.failRead=true;vi.resetModules();const fresh=await import("./pouch_backup");
+ expect(fresh.endPouchIsolation().ok).toBe(false);expect(h.saved.active).toBe(true);
+});
+it("does not mutate the pouch when the journal cannot be saved",()=>{
+ h.failSave=true;expect(beginPouchIsolation().ok).toBe(false);expect(h.bag[0][0].n).toBe(10);
 });

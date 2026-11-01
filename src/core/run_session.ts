@@ -35,6 +35,7 @@ export interface SessionPort {
   /** Optional: re-point the transport after a stopped run left its quest registered. */
   retarget?(questId: number): void;
   postingError(): string | null;
+  waitingForSpawnCapacity?(): boolean;
   finish(failed: boolean): void;
   takeDeaths(): DeathReading[];
   report(event: string, detail: unknown): void;
@@ -44,6 +45,8 @@ export interface SessionPort {
   startupRestore?(): { ok: boolean; reason?: string };
   /** V1.3 §2.3 极强击杀掉落：ultimate 波清波后触发一次顶级抽取（免费、发件入局末清理）。 */
   ultimateDrop?(): { ok: boolean; name?: string; reused?: boolean; reason?: string };
+  /** 离线队友调研 §6C：权威参战人数（混合实机 mock 名单）。null=沿用原生人数。 */
+  partySize?(): number | null;
 }
 
 export type SessionStage = "Idle" | "Selecting" | "AwaitQuest" | "Combat" | "Carve" | "Returning" | "Finished" | "Fault";
@@ -71,6 +74,15 @@ export class RunSession {
   }
 
   get startupMessage(): string | null { return this.startupNotice; }
+  get startupStatus() { return { prepared: this.startupPrepared, restorePending: this.startupRestorePending, message: this.startupNotice }; }
+  get nextRoute(): RuntimeSettings["route"] { return this.nextRunConfig?.runtime?.route ?? this.settings.route; }
+  setRunRoute(route: RuntimeSettings["route"]): void {
+    if (!["Idle", "Finished", "Fault"].includes(this.stage)) throw new Error("路线只能在开局前切换");
+    this.settings.route = route; this.route = route;
+    const next = this.configForEditing();
+    this.nextRunConfig = { ...next, runtime: { ...(next.runtime ?? DEFAULT_RUNTIME), route } };
+  }
+
 
   configForEditing(): RogueConfig { return this.nextRunConfig ?? this.core.config; }
 
@@ -210,7 +222,7 @@ export class RunSession {
       this.port.policy(null, false);
       this.plan = null;
       this.retryWave = false;
-      this.generate(reading.players.length || 1);
+      this.generate(this.partySize(reading));
       if (spike) {
         const wave: WaveOption = { index: 0, typeTag: "M2a sequential spike",
           label: "M2a: Great Izuchi -> Great Baggi", monsters: ["Great Izuchi", "Great Baggi"],
@@ -220,6 +232,12 @@ export class RunSession {
       }
       return ok();
     } catch (error) { return this.fault(error); }
+  }
+
+  /** 权威参战人数：混合实机取 PartySession 名单，默认原生玩家数。 */
+  private partySize(reading: RuntimeReading): number {
+    const fromParty = this.port.partySize?.() ?? null;
+    return fromParty ?? (reading.players.length || 1);
   }
 
   private generate(players: number): void {
@@ -353,7 +371,7 @@ export class RunSession {
             this.port.policy(this.plan, true);
             this.resetTracking(reading, false);
             this.requestPost(reading);
-          } else this.generate(reading.players.length || 1);
+          } else this.generate(this.partySize(reading));
         }
         return;
       }
@@ -421,7 +439,7 @@ export class RunSession {
           this.campSince = null;
           this.message = "Wave cleared. Carve, then return to the captured starting point.";
           this.announce("wave-cleared", { token: this.plan!.token, reward: this.plan!.wave.rewardPt, resolved: this.resolved });
-        } else if (reading.time - this.progressAt > this.settings.spawnTimeoutSeconds &&
+        } else if (reading.time - this.progressAt > (this.port.waitingForSpawnCapacity?.() ? Math.max(180, this.settings.spawnTimeoutSeconds) : this.settings.spawnTimeoutSeconds) &&
           !reading.enemies.some((enemy) => !enemy.dead && !enemy.captured && this.plan!.monsterIds.includes(enemy.typeId) && !this.excludedUids.includes(enemy.uid))) {
           if (this.route === "inPlace") {
             this.route = "reentry";
@@ -496,7 +514,7 @@ export class RunSession {
     if (reading.time - this.campSince < this.settings.campDwellSeconds) return;
     this.core.returnToCamp();
     this.announce("camp-gathered", { token: this.plan!.token });
-    if (this.route === "inPlace" && !this.testOnly) this.generate(reading.players.length || 1);
+    if (this.route === "inPlace" && !this.testOnly) this.generate(this.partySize(reading));
     else {
       this.port.policy(this.plan, false);
       this.port.finish(false);

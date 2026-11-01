@@ -57,7 +57,7 @@ vi.mock("./sdk", () => ({
 }));
 
 import { armorId, equipStartupSet, grantEquip, loadStartupState, readPack,
-  restoreStartup, writePackSlot, appendGrantedEntry, type EquipWearPort } from "./equip_wear";
+  restoreStartup, reapplyStartup, writePackSlot, appendGrantedEntry, type EquipWearPort } from "./equip_wear";
 
 let packFacade: { get_field(n: string): unknown };
 let boxFacade: {
@@ -240,4 +240,16 @@ it("a pouch retry never deletes equipment a second time", () => {
   expect(restoreStartup({beginPouchIsolation:()=>({ok:true}),endPouchIsolation:()=>({ok:false})}).ok).toBe(false);
   const removed=host.removedIds.length;
   expect(restoreStartup(pouchPort).ok).toBe(true); expect(host.removedIds.length).toBe(removed);
+});
+
+it("reapplies the chosen run pack after native reentry restored the old one, without granting twice",()=>{
+ const r=equipStartupSet("test",9,RULES,pouchPort);expect(r.ok).toBe(true);
+ for(let i=0;i<INITIAL.length;i++)host.packArr![i]=INITIAL[i]!;
+ expect(reapplyStartup().ok).toBe(true);expect([...host.packArr!]).toEqual(r.wornPack);
+ expect((host.persisted as any).granted).toHaveLength(5);
+});
+it("never searches for a user-owned same-ID replacement when the recorded slot changes",()=>{
+ const id=armorId(9,1);host.entries[0]={_IdType:2,_IdVal:id};host.entries[1]={_IdType:2,_IdVal:123};
+ host.persisted={active:true,prevPack:[],granted:[{boxIndex:1,idType:2,idVal:id}],pouchIsolated:false};
+ expect(restoreStartup(null).ok).toBe(false);expect(host.entries[0]._IdType).toBe(2);
 });

@@ -14,7 +14,9 @@ function fixture(types = [60]) {
  const fields = { _BossSet: array(Array.from({ length: 7 }, () => object({ EmSetId: -1, State: 2 }))), _BossSetNoTbl: array([0, 1, 2, 3, 2, -1, -1]), _ExtraEmRno: 10, _BossSetCount: 5, _BossSetCond: array(Array(7).fill(0)), _BossLoadStartOk: array(Array(7).fill(true)), _BossLoadDone: array(Array(7).fill(1)) };
  const q = object(fields, (n) => n === "isPlayQuest" ? true : n === "get_ActiveQuestNo" ? 900102 : n === "getActiveQuestUniqueNo" ? unique : null);
  const registrations: number[] = [];
+ const cleanup: any[] = [];
  const em = object({ _EnemySetInfoList: object({}, () => nextId) }, (n, arg) => {
+  if (n === "registerRequestDestroyEnemyList") { cleanup.push(arg); return; }
   if (n === "getBossEnemyCount") return bosses.length;
   if (n === "getBossEnemy") return bosses[arg];
   if (n === "getEnemySetInfo(System.Int32)") return object({}, () => source);
@@ -28,7 +30,7 @@ function fixture(types = [60]) {
  api.create.mockImplementation(() => object({}));
  const report = vi.fn(); const backend = new InplaceWaves(report);
  const plan = { questId: 900102, mapNo: 10, sequential: true, token: 2, monsterIds: types } as QuestPlan;
- return { backend, plan, fields, registrations, report, sourceFields, setOnline: () => { online = true; }, changeQuest: () => { unique++; }, setBosses: (v: any[]) => { bosses = v; }, setCount: (v: number) => { nextId = v; } };
+ return { backend, plan, fields, registrations, report, cleanup, sourceFields, setOnline: () => { online = true; }, changeQuest: () => { unique++; }, setBosses: (v: any[]) => { bosses = v; }, setCount: (v: number) => { nextId = v; } };
 }
 beforeEach(() => vi.clearAllMocks());
 it("rejects online, live actors, and a growing registration list before mutating the scheduler", () => {
@@ -62,13 +64,30 @@ it("does not continue a queued wave in a replacement quest or after cancellation
  f.backend.cancel(); f.backend.tick(2); expect(f.registrations).toEqual([]);
 });
 
-it("publishes both simultaneous records and unconditional native slots in one loader batch", () => {
+it("kicks a separate native load for the second simultaneous actor while the first remains alive", () => {
  const f = fixture([60, 54]); f.plan.sequential = false;
  f.backend.prepare(f.plan); f.backend.tick(1);
+ expect(f.registrations).toEqual([60]);
+ f.fields._ExtraEmRno = 10;
+ f.setBosses([object({}, (n) => n === "get_UniqueId" ? 11900 : false)]);
+ f.backend.tick(2);
  expect(f.registrations).toEqual([60, 54]);
- expect(f.fields._BossSetNoTbl.call("Get", 2)).toBe(2);
- expect(f.fields._BossSetNoTbl.call("Get", 3)).toBe(3);
+ expect(f.fields._BossSetNoTbl.call("Get", 2)).toBe(3);
+ expect(f.fields._BossSetNoTbl.call("Get", 3)).toBe(-1);
  expect(f.fields._BossSetCond.call("Get", 2)).toBe(1);
  expect(f.fields._BossSetCond.call("Get", 3)).toBe(1);
- expect(f.report).toHaveBeenCalledTimes(1);
+ expect(f.report).toHaveBeenCalledTimes(2);
+});
+it("waits before registering when three corpse actors occupy the native actor budget",()=>{
+ const f=fixture([60]);const corpse=()=>object({},(n)=>n==="isDieBehaviorActive");
+ f.setBosses([corpse(),corpse(),corpse()]);f.backend.prepare(f.plan);f.backend.tick(1);
+ expect(f.registrations).toEqual([]);expect(f.backend.waitingForCapacity).toBe(true);
+ f.setBosses([corpse(),corpse()]);f.backend.tick(2);expect(f.registrations).toEqual([60]);
+});
+
+it("queues old corpses only after every previous actor has been verified ended",()=>{
+ const f=fixture();const dead=object({},n=>n==="isDieBehaviorActive");
+ f.setBosses([dead,object({},()=>false)]);expect(()=>f.backend.prepare(f.plan)).toThrow("still alive");
+ expect(f.cleanup).toEqual([]);
+ f.setBosses([dead]);f.backend.prepare(f.plan);expect(f.cleanup).toEqual([dead]);
 });

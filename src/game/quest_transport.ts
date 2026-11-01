@@ -28,6 +28,7 @@ export class QuestTransport {
   private hooks = false;
   private error: string | null = null;
   private lastSelection: unknown = null;
+  private hall = false;
 
   constructor(private readonly currentQuest: () => REManagedObject | null, private readonly timeout: number) {}
   isActive(): boolean { return this.stage !== "Idle"; }
@@ -43,7 +44,7 @@ export class QuestTransport {
   getError(): string | null { return this.error; }
   getStatus(): string { return this.error ?? this.stage; }
 
-  request(id: number): void {
+  request(id: number, hall = false): void {
     if (this.isActive()) throw new Error("Quest post already running");
     const qm = questManager();
     const gui = getSingleton("snow.gui.GuiManager");
@@ -52,6 +53,7 @@ export class QuestTransport {
     if (!qm || !gui || (callNative(gui, "IsCanInvokeQuestBoard") !== true && !getSingleton(COUNTER))) {
       throw new Error("Quest counter is not available; retry from the village");
     }
+    this.hall = hall;
     this.installHooks();
     this.error = null;
     this.target = id;
@@ -151,7 +153,11 @@ export class QuestTransport {
           this.stage = "Close";
         }
       } else if (this.stage === "Close") {
-        if (!counter) this.stage = "Depart";
+        if (!counter) {
+          // Hub entry deliberately waits for native teammate joining/readiness and manual departure.
+          if (this.hall) this.cancel(false);
+          else this.stage = "Depart";
+        }
       } else if (this.stage === "Depart") {
         const flow = callNative(gui, "get_refQuestStartFlowHandler") as REManagedObject;
         if (!flow) throw new Error("Native quest departure flow missing");
@@ -183,7 +189,8 @@ export class QuestTransport {
     hookMethod(selected, () => {}, (retval) => this.isActive() && this.currentQuest() ? toPtr(this.currentQuest()) : retval);
     hookMethod(awake, (args) => {
       if (this.isActive()) toManagedObject(args[2]).call("set_QuestCounterType",
-        snow_gui_fsm_questcounter_GuiQuestCounterFsmManager_QuestCounterAccessType.VillageCounter);
+        this.hall ? snow_gui_fsm_questcounter_GuiQuestCounterFsmManager_QuestCounterAccessType.HallCounter
+          : snow_gui_fsm_questcounter_GuiQuestCounterFsmManager_QuestCounterAccessType.VillageCounter);
       return PRE_HOOK.CALL_ORIGINAL;
     });
     hookMethod(input, () => {}, (retval) => this.isActive() ? toPtr(1) : retval);

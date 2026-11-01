@@ -136,3 +136,20 @@ describe("bounded native quest transport", () => {
     action.get_field = original;
   });
 });
+
+it("uses the hall counter and releases controls without auto-departing before teammates join", () => {
+  const { state, transport, hooks, flow, action } = fixture();
+  state.questId = 900103;
+  transport.request(900103, true);
+  const counter = { call: vi.fn() };
+  hooks("snow.gui.fsm.questcounter.GuiQuestCounterFsmManager", "awake").pre({ 2: counter });
+  expect(counter.call).toHaveBeenCalledWith("set_QuestCounterType", 1);
+  transport.tick(); transport.tick();
+  state.active = true;
+  transport.tick(); transport.tick(); transport.tick();
+  expect(transport.getError()).toBeNull();
+  expect(transport.isActive()).toBe(false);
+  expect(flow.call).not.toHaveBeenCalled();
+  expect(action.release).toHaveBeenCalledOnce();
+  expect(hooks("snow.gui.GuiManager", "IsPlayerAllInputDisable").post(99)).toBe(99);
+});

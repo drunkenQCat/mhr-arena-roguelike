@@ -4,6 +4,7 @@
 // Commands and exit codes are documented in docs/cli.md. Every mutation goes
 // through the same submit protocol: fresh identity -> unique request id -> POST ->
 // wait for a terminal receipt. Nothing here retries a command automatically.
+import { scriptPayload, isExecutionReport } from "./lib/script-run.mjs";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -72,7 +73,7 @@ function parseArgs(argv) {
   const words = [];
   const options = { json: false, baseUrl: undefined, timeoutS: 3, receiptTimeoutS: 15,
     sampleMs: 1600, armor: undefined, index: undefined, item: undefined, file: undefined,
-    testLayer: undefined,
+    testLayer: undefined, players: undefined, as: undefined, requestId: undefined,
     version: undefined, stage: undefined, layer: undefined, questUnique: undefined,
     waveToken: undefined, uidAlive: [], uidDead: [], shop: false, timeout: undefined,
     report: undefined, category: undefined, probeTimeoutS: undefined };
@@ -83,6 +84,9 @@ function parseArgs(argv) {
     "--sample-ms": (v) => { options.sampleMs = Number(v); },
     "--armor": (v) => { options.armor = v; },
     "--test-layer": (v) => { options.testLayer = Number(v); },
+    "--players": (v) => { options.players = Number(v); },
+    "--as": (v) => { options.as = v; },
+    "--request-id": (v) => { options.requestId = v; },
     "--index": (v) => { options.index = Number(v); },
     "--item": (v) => { options.item = v; },
     "--file": (v) => { options.file = v; },
@@ -191,9 +195,10 @@ ${v.error}` : "没有记录的脚本错误");
         if (!file) throw usage("用法: game run-script <本地文件或游戏目录相对路径> [--timeout S]");
         let content = null;
         try { content = readFileSync(resolve(file), "utf8"); } catch { content = null; }
-        const script = file.split(/[\\/]/).pop();
-        // 本地读得到就按内容上传（不要求文件已在游戏目录里）；读不到视为游戏树内路径。
-        const payload = content !== null ? { name: script, content } : { path: file.replaceAll("\\", "/") };
+        let execution;
+        try { execution = scriptPayload(file.replaceAll("\\", "/"), content); }
+        catch (error) { throw usage(`Lua preflight: ${error.message}`); }
+        const { script, executionId, payload } = execution;
         const submitted = await postJson(baseUrl, "/api/script/run", payload, timeoutMs * 1000);
         if (submitted.status !== 200) {
           const { status, body } = submitted;
@@ -209,7 +214,7 @@ ${v.error}` : "没有记录的脚本错误");
           const probe = await getRaw(baseUrl, "/api/probe/report", timeoutMs * 1000);
           // 探针契约：报告自带 script 与 epoch；两者都对上才认定是本轮触发的结果。
           if (probe.status === 200 && probe.body &&
-              probe.body.script === script && probe.body.epoch === queuedEpoch) {
+              isExecutionReport(probe.body, script, queuedEpoch, executionId)) {
             report = probe.body;
             break;
           }
@@ -220,7 +225,7 @@ ${v.error}` : "没有记录的脚本错误");
             ? `框架记录了脚本错误：${err.body.error}`
             : "脚本未发布报告（可能仍在排队，或加载阶段即失败）";
           throw new CliError(EXIT.TIMEOUT, `等待 ${waitS}s 未收到 ${script} 的报告。${detail}`,
-            { script, queuedEpoch, lastError: err.body ?? null });
+            { script, queuedEpoch, executionId, lastError: err.body ?? null });
         }
         const ok = report.verdict === "PASS";
         output.result({ ok, report },
@@ -395,6 +400,33 @@ ${v.error}` : "没有记录的脚本错误");
           }
         }
         output.result({ ok: false, receipt, target, position, verified: false }); return EXIT.TIMEOUT;
+      }
+      if (sub === "party") {
+        const op = words[2];
+        const send2 = async (command, label) => {
+          const { id, receipt } = await submit(baseUrl, command, { identity, timeoutMs, receiptTimeoutMs });
+          output.progress(`Receipt ${id}: ${receipt.status}`);
+          requireReceipt(receipt);
+          output.result({ ok: receipt.status === "applied", label, receipt, businessParty: receipt.businessParty ?? null },
+            (v) => `${label}: ${v.receipt.message ?? "applied"}`);
+          return EXIT.OK;
+        };
+        if (op === "create") {
+          const n = options.players ?? 1;
+          return send2({ cmd: "party", sub: "create", mockPlayers: n }, `Party session established (host + ${n} mock players)`);
+        }
+        if (op === "buy") {
+          if (!options.as || !options.item) throw usage("test party buy requires --as <playerId> --item <item ID> [--request-id <id>]");
+          const id = options.requestId ?? `party-${options.as}-${Date.now()}`;
+          return send2({ cmd: "party", sub: "buy", playerId: options.as, itemId: options.item, id },
+            `${options.as} purchase ${options.item} (requestId=${id})`);
+        }
+        if (op === "state") {
+          return send2({ cmd: "party", sub: "state", playerId: options.as ?? undefined },
+            `Party state${options.as ? ` (${options.as} view)` : " (full view)"}`);
+        }
+        if (op === "reset") return send2({ cmd: "party", sub: "reset" }, "Party session invalidated");
+        throw usage("test party create|buy|state|reset");
       }
       if (sub === "kill-all") {
         // killAll is acknowledged as queued; the native kill happens on a later frame.

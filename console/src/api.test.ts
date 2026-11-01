@@ -7,6 +7,14 @@ const receipt = (status = "applied", bridgeId = "current") => ({ bridgeId,
   last: { id: "request-1", status, message: "done" }, history: [] });
 const reply = (value: unknown, status = 200) => ({ ok: status >= 200 && status < 300,
   status, json: async () => value });
+
+it("waits for native effects to complete rather than releasing controls on queued", async () => {
+  fetchMock.mockResolvedValueOnce(reply(receipt("queued"))).mockResolvedValueOnce(reply(receipt("applied")));
+  const pending = waitForReceipt("request-1", "current", { effect: true });
+  await vi.advanceTimersByTimeAsync(250);
+  expect((await pending).status).toBe("applied");
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });

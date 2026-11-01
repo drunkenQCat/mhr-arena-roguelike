@@ -59,7 +59,7 @@ export async function doctor(baseUrl, { timeoutMs = 3000, sampleMs = 1600, expec
   const first = await getRaw(baseUrl, "/api/state", timeoutMs);
   if (first.status !== 200 || !first.body) {
     report.layers.business = { state: "unavailable", detail: first.body?.error ?? `HTTP ${first.status}` };
-    report.blockers.push("Lua 尚未发布业务状态：确认 autorun 已加载 mhw_rogue.lua 与探针");
+    report.blockers.push("Lua 尚未发布业务状态：确认 autorun 已加载 mhw_rogue.lua");
     return report;
   }
   const started = performance.now();
@@ -93,7 +93,7 @@ export async function doctor(baseUrl, { timeoutMs = 3000, sampleMs = 1600, expec
     report.blockers.push(`Lua 协议 ${after.protocol} 与 CLI 期望 ${expectProtocol} 不一致：部署新 bundle 并 Reset scripts`);
   }
   report.ok = report.layers.http.state === "up" && report.layers.dll.state === "up" &&
-    report.layers.lua.state === "pass" && report.layers.business.state === "live" &&
+    report.layers.business.state === "live" &&
     report.protocol.compatible === true && (after.protocol ?? null) === expectProtocol;
   return report;
 }

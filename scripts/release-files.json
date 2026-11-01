@@ -1,0 +1,12 @@
+[
+  {"root":"framework","source":"build/bin/MHRISE/dinput8.dll","destination":"dinput8.dll"},
+  {"root":"repo","source":"reframework/autorun/mhw_rogue.lua","destination":"reframework/autorun/mhw_rogue.lua"},
+  {"root":"repo","source":"data/rogue_config.json","destination":"reframework/data/mhw_rogue_config.json"},
+  {"root":"repo","source":"native/webconsole/webconsole.dll","destination":"reframework/plugins/webconsole.dll"},
+  {"root":"repo","source":"console/dist/index.html","destination":"reframework/plugins/console.html"},
+  {"root":"repo","source":"docs/player-guide.md","destination":"使用说明.txt"},
+  {"root":"repo","source":"docs/tester-guide.md","destination":"测试与反馈.txt"},
+  {"root":"repo","source":"docs/third-party-notices.txt","destination":"THIRD-PARTY-LICENSES/notices.txt"},
+  {"root":"repo","source":"native/webconsole/reframework/LICENSE","destination":"THIRD-PARTY-LICENSES/REFramework-plugin-api-MIT.txt"},
+  {"root":"framework","source":"LICENSE","destination":"THIRD-PARTY-LICENSES/REFramework-MIT.txt"}
+]

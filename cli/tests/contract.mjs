@@ -62,8 +62,10 @@ function createPlugin(behaviour = {}) {
         transport: "memory" });
       if (url.pathname === "/api/probe/report") {
         if (behaviour.noProbe) return json(503, { ok: false, error: "probe has not reported yet" });
+        if (state.scriptQueued && behaviour.staleProbeFirst && state.probeReads++ === 0)
+          return json(200, { script: state.scriptQueued.script, epoch: state.scriptQueued.epoch, verdict: "PASS", executionId: "old-execution" });
         if (state.scriptQueued) return json(200, { ok: true, kind: "run_script",
-          script: state.scriptQueued.script, epoch: state.scriptQueued.epoch,
+          script: state.scriptQueued.script, epoch: state.scriptQueued.epoch, executionId: state.scriptQueued.executionId,
           verdict: behaviour.probeVerdict ?? "PASS", steps: [], metrics: {}, error: null });
         return json(200, { schema: 1, ok: true, session: "s-1:lua-1", moduleVersion: "test",
           atIso: "2026-01-01T00:00:00Z", result: { checks: [], errors: [] }, history: [] });
@@ -117,8 +119,11 @@ function createPlugin(behaviour = {}) {
         if (behaviour.runReject) return json(behaviour.runReject, { ok: false, error: "file not found in game tree" });
         // Model the probe contract: the queued script publishes a report carrying
         // its name and the epoch that was current when the run was queued.
-        state.scriptQueued = { script: payload.name ?? payload.path?.split("/").pop(),
+        state.scriptQueued = {
+          script: JSON.parse(payload.content.match(/script=("[^"]+")/)[1]),
+          executionId: JSON.parse(payload.content.match(/local __mhr_execution_id=("[^"]+")/)[1]),
           epoch: behaviour.runEpoch ?? 9 };
+        state.probeReads = 0;
         json(200, { ok: true, queued: true, script: state.scriptQueued.script,
           epoch: state.scriptQueued.epoch, session: "s-1" });
       });
@@ -283,8 +288,15 @@ await withPlugin({}, async (baseUrl, plugin) => {
   check("run-script uploads local content and returns PASS", run.code === 0 &&
     runOut.ok === true && runOut.report?.verdict === "PASS", run.stderr || run.stdout.slice(0, 200));
   check("run-script posted the content form", plugin.received.some((r) => r.endpoint === "script/run" &&
-    r.payload?.name === "probe-sample.lua" && r.payload?.content?.includes("publish_probe")),
+    r.payload?.name?.startsWith("exec-") && r.payload?.content?.includes("publish_probe")),
     JSON.stringify(plugin.received));
+});
+await withPlugin({ staleProbeFirst: true }, async (baseUrl, plugin) => {
+ const sample = join(ROOT, "cli", "tests", "probe-sample.lua");
+ const result = await runCli(["game", "run-script", sample, "--json"], { baseUrl });
+ const body = JSON.parse(result.stdout);
+ check("same-name stale probe is ignored until this execution reports", result.code === 0 &&
+  body.report.executionId === plugin.state.scriptQueued.executionId && plugin.state.probeReads >= 2, result.stdout);
 });
 await withPlugin({ runReject: 404 }, async (baseUrl) => {
   const missing = await runCli(["game", "run-script", "reframework/autorun-probe/nope.lua", "--json"], { baseUrl });
@@ -301,6 +313,13 @@ async (baseUrl) => {
 await withPlugin({ scriptUnavailable: true }, async (baseUrl) => {
   const reset = await runCli(["game", "reset", "--json"], { baseUrl });
   check("script API unavailable exits 3", reset.code === 3, reset.stderr);
+});
+
+await withPlugin({ noProbe: true }, async (baseUrl) => {
+  const result = await runCli(["doctor", "--json", "--sample-ms", "30"], { baseUrl });
+  const body = JSON.parse(result.stdout);
+  check("player release is healthy without an automatic Lua probe", result.code === 0 && body.ok &&
+    body.layers.lua.state === "unreported" && body.layers.business.state === "live", result.stdout);
 });
 
 console.log(failures === 0 ? "\nALL CLI CONTRACT CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);

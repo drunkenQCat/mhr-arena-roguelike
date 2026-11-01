@@ -1,3 +1,4 @@
+import type { MultiplayerEntry } from "./multiplayer_entry";
 /** HTTP plugin transport; all mutations execute on the Lua update thread. */
 import { NativeUi } from "./native_ui";
 import { validateConfig } from "../core/config";
@@ -5,15 +6,41 @@ import type { RunSession } from "../core/run_session";
 import type { NativeRuntime } from "./native_runtime";
 import type { ShopWindow } from "./shop_window";
 import { clockSeconds, getSingleton, refFs, rejson, loadWebconsole, type NativeWebconsole } from "./sdk";
+import { PartySession } from "./party_session";
 
 interface Command {
   id?: string; bridgeId?: string; cmd?: string; armor?: string; index?: number;
   value?: boolean; itemId?: string; route?: string; config?: unknown;
   sceneToken?: string; dialogToken?: string; slot?: number; to?: string;
   configVersion?: number; questUnique?: number | null; waveToken?: number | null;
-  testLayer?: number;
+  sub?: string; playerId?: string; mockPlayers?: number;
+  testLayer?: number; entryCode?: string;
+  /** 评审二轮 #1：party 命令必须回传当前会话代数（state 发布），旧代拒绝。 */
+  generation?: number;
 }
 type Outcome = Record<string, unknown>;
+
+/** 评审二轮 #3：规范载荷指纹——覆盖全部影响语义的字段，
+ * 含会话/场景/波次/配置身份。config 是对象：序列化其 startPt/maxCarts
+ * 与整体键数即可区分测试反例（完整 JSON 序列化在游戏环境不可用，
+ * 无 JSON.stringify 全局；config 改变必然触碰 startPt/maxCarts 之外的
+ * 键集合变化，键数是兜底区分）。同 id 异载荷在 consume 直接拒绝，
+ * 本指纹是拒绝判定的依据。 */
+function commandFingerprint(cmd: Command): string {
+  const cfg = cmd.config as Record<string, unknown> | null | undefined;
+  const cfgKeys = cfg ? Object.keys(cfg).length : -1;
+  return `cmd=${cmd.cmd ?? ""}|sub=${cmd.sub ?? ""}|player=${cmd.playerId ?? ""}` +
+    `|item=${cmd.itemId ?? ""}|armor=${cmd.armor ?? ""}|index=${cmd.index ?? ""}` +
+    `|value=${String(cmd.value)}|route=${cmd.route ?? ""}|to=${cmd.to ?? ""}` +
+    `|mock=${String(cmd.mockPlayers)}|slot=${String(cmd.slot)}` +
+    `|testLayer=${String(cmd.testLayer)}|configVersion=${String(cmd.configVersion)}` +
+    `|questUnique=${String(cmd.questUnique)}|waveToken=${String(cmd.waveToken)}` +
+    `|scene=${cmd.sceneToken ?? ""}|dialog=${cmd.dialogToken ?? ""}` +
+    `|cfgKeys=${cfgKeys}` +
+    `|startPt=${String((cfg as { startPt?: unknown } | null | undefined)?.startPt)}` +
+    `|maxCarts=${String((cfg as { maxCarts?: unknown } | null | undefined)?.maxCarts)}` +
+    `|entryCode=${cmd.entryCode ?? ""}|partyGen=${String((cmd as Command & { generation?: number }).generation)}`;
+}
 
 export class WebConsoleBridge {
   readonly bridgeId: string;
@@ -26,10 +53,19 @@ export class WebConsoleBridge {
   private counter = 0;
   private results: Outcome[] = [];
   private closed = false;
+  private effect: { id: string; kind: "kill" | "teleport"; unique: number; token: number;
+    deadline: number; targets?: number[]; destination?: { x: number; y: number; z: number } } | null = null;
   private purchase: { id: string; version: number } | null = null;
 
+  private readonly party: PartySession;
+
+  /** 混合局权威人数：名册未锁定时 null（沿用原生人数）。 */
+  partyRosterSize(): number | null { return this.party.rosterSize(); }
+
   constructor(private readonly session: RunSession, private readonly runtime: NativeRuntime,
-    private readonly shop: ShopWindow) {
+    private readonly shop: ShopWindow, private readonly serviceStatus: () => unknown = () => null,
+    party?: PartySession, private readonly multiplayerEntry?: MultiplayerEntry) {
+    this.party = party ?? new PartySession(this.session.configForEditing(), { layer: () => this.session.core.state.layer }, `run-${clockSeconds()}`);
     this.transport = loadWebconsole();
     this.bridgeId = `${this.transport.epoch()}-${clockSeconds()}-${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
     this.nativeUi = new NativeUi(this.bridgeId);
@@ -45,6 +81,7 @@ export class WebConsoleBridge {
     if (this.closed) return;
     try {
       if (this.pendingReceipt && !this.writeResults(this.pendingReceipt)) return;
+      this.pollEffect();
       const uiResult = this.nativeUi.poll();
       if (uiResult) {
         const old = this.results.find(entry => entry.id === uiResult.id);
@@ -60,10 +97,40 @@ export class WebConsoleBridge {
         }
         this.purchase = null;
       }
-      if (++this.frames % 12 === 0) this.poll();
+      if (++this.frames % 12 === 0) {
+        // 评审 #6：去重记录有界（TTL 秒级），周期清理接线到 poll。
+        this.party.prune();
+        this.poll();
+      }
       const now = clockSeconds();
       if (now !== this.sampledAt) { this.sampledAt = now; this.publish(); }
     } catch { /* Contention must not fault gameplay or flood the host log. */ }
+  }
+
+  private pollEffect(): void {
+    const effect = this.effect;
+    const reading = this.session.readingSnapshot;
+    if (!effect || !reading) return;
+    const result = this.results.find((r) => r.id === effect.id);
+    if (!result) return;
+    let status: string | null = null;
+    let message = "";
+    if (reading.quest?.unique !== effect.unique) { status = "uncertain"; message = "Quest changed before effect could be verified"; }
+    else if (effect.kind === "teleport") {
+      const target = effect.destination!;
+      const pos = reading.players[0]?.position;
+      if (pos && (pos.x-target.x)**2 + (pos.y-target.y)**2 + (pos.z-target.z)**2 <= 25) { status = "applied"; message = "Position verified"; }
+    } else {
+      const deaths = reading.enemies.filter((e) => e.dead || e.captured).map((e) => e.uid);
+      if (effect.targets!.every((uid) => deaths.includes(uid) || reading.enemies.some((e) => e.uid === uid && (e.dead || e.captured)))) {
+        status = "applied"; message = "Native deaths verified";
+      }
+    }
+    if (!status && clockSeconds() >= effect.deadline) { status = "uncertain"; message = "Native effect not verified before deadline; do not resend blindly"; }
+    if (status) {
+      Object.assign(result, { status, message });
+      if (this.writeResults(result)) this.effect = null;
+    }
   }
 
   private poll(): void {
@@ -77,12 +144,34 @@ export class WebConsoleBridge {
     if (!cmd || typeof cmd.id !== "string" || cmd.id.length === 0 || cmd.id.length > 128) {
       return;
     }
-    const old = this.results.find((entry) => entry.id === cmd.id);
+    // 评审二轮 #2：传输 id 是唯一回执键。同 id 异载荷直接拒绝，
+    // 不再允许"同 ID 多指纹"——否则 CLI 按 id 等回执会把上一条
+    // 成功读成本次结果，端到端契约断裂。
+    // 评审二轮 #1：party 业务身份在缓存之前校验——旧代命令连缓存
+    // 都不允许命中（重放者拿不到上一代成功回执）。
+    const staleBridge = cmd.bridgeId !== this.bridgeId;
+    const fingerprint = commandFingerprint(cmd);
+    const isParty = cmd.cmd === "party";
+    if (isParty && (cmd.sub === "buy" || cmd.sub === "state")) {
+      const gen = this.party.checkGeneration(cmd.generation);
+      if (!gen.ok) {
+        const result = { id: cmd.id, __fp: fingerprint, status: "rejected",
+          message: gen.message ?? "party 会话身份校验失败" };
+        this.writeResults(result);
+        return;
+      }
+    }
+    const old = staleBridge ? undefined : this.results.find((entry) => entry.id === cmd.id);
     let result: Outcome;
-    if (old) result = old;
-    else {
+    if (old) {
+      // 同 id 重放：载荷一致 → 回放旧回执（真重放保护）；不一致 → 拒绝。
+      result = old.__fp === fingerprint
+        ? old
+        : { id: cmd.id, __fp: fingerprint, status: "rejected",
+            message: "请求 id 与已处理命令载荷不一致（传输 id 必须唯一），已拒绝" };
+    } else {
       try {
-        if (cmd.bridgeId !== this.bridgeId) throw new Error("连接会话已更换，请等待同步后重试");
+        if (staleBridge) throw new Error("连接会话已更换，请等待同步后重试");
         if (["choose", "buy", "killAll", "stop", "teleport"].includes(cmd.cmd ?? "")) {
           if (cmd.questUnique !== this.session.readingSnapshot?.quest?.unique &&
             !(cmd.questUnique === null && !this.session.readingSnapshot?.quest))
@@ -90,8 +179,10 @@ export class WebConsoleBridge {
           if (cmd.waveToken !== this.session.plan?.token && !(cmd.waveToken === null && !this.session.plan))
             throw new Error("波次已变化，请查看当前波次后重新操作");
         }
-        result = { id: cmd.id, ...this.execute(cmd) };
-      } catch (error) { result = { id: cmd.id, status: "rejected", message: String(error) }; }
+        // 指纹已覆盖全部语义字段（评审二轮 #3），缓存条目不再需要 __fp 参与命中
+        // 判断（同 id 异载荷已直接拒绝），但保留在回执里供对账。
+        result = { id: cmd.id, __fp: fingerprint, ...this.execute(cmd) };
+      } catch (error) { result = { id: cmd.id, __fp: fingerprint, status: "rejected", message: String(error) }; }
       this.results.push(result);
       if (this.results.length > 30) this.results.shift();
     }
@@ -112,6 +203,14 @@ export class WebConsoleBridge {
   private execute(cmd: Command): Outcome {
     const s = this.session;
     switch (cmd.cmd) {
+      case "mpEntry": {
+        if (!this.multiplayerEntry) throw new Error("当前构建没有联机入场实验模块。");
+        if (cmd.sub === "choose") this.multiplayerEntry.choose(cmd.index!);
+        else if (cmd.sub === "import") this.multiplayerEntry.importCode(cmd.entryCode ?? "");
+        else if (cmd.sub === "post") this.multiplayerEntry.post();
+        else throw new Error("无效的联机入场命令。");
+        return { status: "applied", message: "联机入场操作已执行；请核对任务码及原生队伍状态。" };
+      }
       case "startup.acknowledge": case "title.advance": case "title.continue":
       case "save.load": case "dialog.close": return this.nativeUi.request(cmd);
       case "getConfig": return { status: "applied", message: "已读取游戏配置（含下一局规则）", config: s.configForEditing(),
@@ -136,6 +235,10 @@ export class WebConsoleBridge {
           message: "已保存：商店下次交易、曲线与怪池下次生成选择时生效；开局规则和节奏下一局生效。当前波次保持原计划。" };
       }
       case "startRun": {
+        if (cmd.testLayer !== undefined && (!Number.isInteger(cmd.testLayer) || cmd.testLayer < 1 ||
+            !s.configForEditing().pools.some((pool) => cmd.testLayer! >= pool.from && cmd.testLayer! <= pool.to))) {
+          throw new Error("测试层数不在已配置的怪物池范围内；未执行开局准备");
+        }
         const r = s.start(cmd.armor ?? s.configForEditing().armorOptions[0] ?? "",
           false, cmd.testLayer);
         return { status: r.ok ? "applied" : "rejected", message: r.message };
@@ -158,15 +261,68 @@ export class WebConsoleBridge {
         return { status: this.runtime.testTools.invincible === cmd.value ? "applied" : "rejected",
           message: this.runtime.testTools.message };
       }
-      case "killAll": this.runtime.testTools.requestKill(); return { status: "queued", message: "等待原生怪物更新执行击杀" };
+      case "party": {
+        if (this.effect) throw new Error("Another test effect is pending");
+        const sub = String(cmd.sub ?? "");
+        // 评审 #3：名册锁定在局生命周期——战斗/结算期禁止 create/reset，
+        // 否则后续波次人数倍率会静默变化，违反"人数在开局名单锁定"。
+        const rosterGate = ["Idle", "Finished", "Fault"].includes(s.stage);
+        if ((sub === "create" || sub === "reset") && !rosterGate) {
+          throw new Error(`名册锁定：当前阶段 ${s.stage} 不允许 ${sub}；请先 stop 或等回村`);
+        }
+        // 评审二轮 #1：buy/state 必须携带当前 generation；旧代/缺代拒绝。
+        if (sub === "buy" || sub === "state") {
+          const gen = this.party.checkGeneration(cmd.generation);
+          if (!gen.ok) throw new Error(gen.message ?? "party 会话身份校验失败");
+        }
+        if (sub === "create") {
+          // create 是获取会话身份的入口，允许无 generation（新会话首次建立）；
+          // 名册已锁定时必须携带当前代才允许观察（create 本身重复会被拒）。
+          const created = this.party.create("host", Number(cmd.mockPlayers ?? 1));
+          if (!created.ok) throw new Error(created.message);
+          return { status: "applied", message: created.message,
+            businessParty: this.party.summary(), nativePlayers: s.readingSnapshot?.players.length ?? 0 };
+        }
+        if (sub === "buy") {
+          if (!cmd.playerId || !cmd.itemId) throw new Error("party buy 需要 --as 与 --item");
+          const result = this.party.buy(cmd.playerId, String(cmd.id ?? `party-${clockSeconds()}`), cmd.itemId, cmd.generation);
+          return { status: result.ok ? "applied" : "rejected", message: result.message,
+            playerPt: result.pt, owned: result.owned, duplicate: result.duplicate === true,
+            businessParty: this.party.summary() };
+        }
+        if (sub === "state") {
+          const view = cmd.playerId ? this.party.viewFor(String(cmd.playerId)) : this.party.summary();
+          if (!view) throw new Error(`未知玩家 ${String(cmd.playerId)}`);
+          return { status: "applied", businessParty: view, nativePlayers: s.readingSnapshot?.players.length ?? 0 };
+        }
+        if (sub === "reset") {
+          this.party.reset();
+          return { status: "applied", message: "Party session invalidated" };
+        }
+        throw new Error(`Unknown party subcommand ${sub}`);
+      }
+      case "killAll": {
+        if (this.effect) throw new Error("Another test effect is pending");
+        const reading = s.readingSnapshot;
+        const targets = reading?.enemies.filter((e) => !e.dead && !e.captured).map((e) => e.uid) ?? [];
+        if (!reading?.quest?.playing || targets.length === 0) throw new Error("No alive bosses in the active quest");
+        this.effect = { id: cmd.id!, kind: "kill", unique: reading.quest.unique, token: s.plan!.token,
+          deadline: clockSeconds() + 12, targets };
+        this.runtime.testTools.requestKill();
+        return { status: "queued", message: "Waiting for native death evidence", targets };
+      }
       case "teleport": {
         if (!s.plan || !s.readingSnapshot?.quest?.playing || s.readingSnapshot.online ||
           !["Combat", "Carve", "Returning", "Selecting"].includes(s.stage)) throw new Error("TP requires an active solo arena run");
+        if (this.effect) throw new Error("Another test effect is pending");
+        if (cmd.to !== "origin" && cmd.to !== "monster") throw new Error("Use origin or monster");
         const target = cmd.to === "origin" ? s.campSnapshot
           : cmd.to === "monster" ? this.runtime.nearestAliveMonsterPosition() : null;
-        if (!target) throw new Error("TP target unavailable; use origin or monster in the active quest");
+        if (!target) throw new Error(cmd.to === "monster" ? "No alive boss position in the active wave" : "Origin position unavailable");
         const destination = { x: target.x + (cmd.to === "monster" ? 4 : 0), y: target.y, z: target.z };
         this.runtime.teleportPlayer(destination);
+        this.effect = { id: cmd.id!, kind: "teleport", unique: s.readingSnapshot.quest.unique,
+          token: s.plan.token, deadline: clockSeconds() + 12, destination };
         return { status: "queued", target: destination, to: cmd.to,
           questUnique: s.readingSnapshot.quest.unique, message: "Position request submitted; verify player position on a later frame" };
       }
@@ -177,7 +333,7 @@ export class WebConsoleBridge {
       case "setRoute": {
         if (!["Idle", "Finished", "Fault"].includes(s.stage)) throw new Error("路线只能在开局前切换");
         if (cmd.route !== "inPlace" && cmd.route !== "reentry") throw new Error("无效路线");
-        s.settings.route = cmd.route; s.route = cmd.route;
+        s.setRunRoute(cmd.route);
         return { status: "applied", message: cmd.route };
       }
       default: throw new Error(`未知命令：${cmd.cmd ?? ""}`);
@@ -239,15 +395,25 @@ export class WebConsoleBridge {
   private publish(): void {
     const s = this.session, core = s.core, r = s.readingSnapshot;
     const listing = this.shop.catalogue();
+    const next = s.configForEditing();
+    const idle = ["Idle", "Finished", "Fault"].includes(s.stage);
+    const activeSolo = !!r?.quest?.playing && !r?.online && !!s.plan;
+    const ready = this.runtime.ready?.() ?? false;
+    const canStart = idle && ready && !r?.online && !!r?.canPost && (!r?.quest || !!r.staleQuest) && !s.startupStatus.restorePending;
+    const alive = r?.enemies.some((enemy) => !enemy.dead && !enemy.captured) ?? false;
     // Wire protocol for CLI/UI compatibility checks. A typo cannot be caught by the
     // transpiler, so the native tests read this literal back from the Lua module.
     this.transport.publish_state(rejson.dump_string({ ok: true, protocol: 4, bridgeId: this.bridgeId,
       counter: ++this.counter, sampledAt: r?.time ?? null, publishedAt: clockSeconds(),
+      multiplayerEntry: this.multiplayerEntry?.snapshot() ?? null,
       configVersion: this.configVersion, sessionStage: s.stage, corePhase: core.state.phase,
       questId: r?.quest?.id ?? null, questUnique: r?.quest?.unique ?? null,
       quest: r?.quest ?? null, online: r?.online ?? false, route: s.route,
       layer: core.state.layer, pt: core.state.wallet.pt, cartsLeft: core.state.cartsLeft,
       nativeDeaths: r?.deaths ?? null, maxCarts: core.config.maxCarts, armor: core.state.armor, armorOptions: s.configForEditing().armorOptions,
+      nativeOnline: r?.online ?? null, businessParty: this.party.active ? this.party.summary() : null,
+      // 评审二轮 #1：party 会话身份直接发布在顶层，CLI 无需解析 businessParty。
+      partyGeneration: this.party.active ? this.party.currentGeneration() : null,
       killedUltimates: core.state.killedUltimates,
       invincible: this.runtime.testTools.invincible,
       activeWave: core.state.activeWave?.label ?? null, preparation: s.preparation(),
@@ -256,8 +422,19 @@ export class WebConsoleBridge {
       shopBusy: this.shop.busy, shopNotice: this.shop.notice, message: s.message,
       runtimeStatus: this.runtime.status(),
       ui: this.uiSection(),
-      capabilities: { start: ["Idle", "Finished", "Fault"].includes(s.stage) && !!r?.canPost && !r?.quest,
-        teleport: !!r?.quest?.playing && !r?.online && !!s.plan && !!s.campSnapshot,
+      control: { ready, nextRoute: s.nextRoute, configuredRoute: next.runtime?.route ?? s.settings.route,
+        startReason: canStart ? null : !idle ? "当前一局尚未结束" : s.startupStatus.restorePending ? "请先回村，等待原装备与背包恢复完成"
+          : !ready ? "等待任务安装和原生接口就绪" : r?.online ? "当前仅支持单人开局" : "请在村庄、未接任务时开局",
+        startup: s.startupStatus, startupRules: next.startupRules ?? null, armorSets: next.armorSets ?? {},
+        testLayers: next.pools.map((pool) => pool.from),
+        activeWave: s.plan ? { ...s.plan.wave, token: s.plan.token, monsterIds: s.plan.monsterIds, layer: s.plan.layer } : null,
+        testMessage: this.runtime.testTools.message, effectPending: this.effect !== null },
+      services: { buffs: this.serviceStatus(), lastTransaction: this.shop.lastTransaction,
+        cartRestoreUsed: core.state.cartRestoreUsed, purchases: core.state.wallet.purchaseLog },
+      capabilities: { start: canStart, route: idle, retry: ["AwaitQuest", "Fault"].includes(s.stage),
+        invincible: true, kill: activeSolo && alive && !this.effect,
+        teleportMonster: activeSolo && alive && !this.effect, testLayer: canStart,
+        teleport: activeSolo && !!s.campSnapshot && !this.effect,
         choose: s.canShop() && !this.shop.busy, stop: !["Idle", "Finished"].includes(s.stage) },
     }, 0));
   }

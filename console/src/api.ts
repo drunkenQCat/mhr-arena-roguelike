@@ -1,19 +1,34 @@
 export interface ShopEntry { id: string; name: string; category: string; price: number; cap: number; owned: number; mode: string; desc?: string; canBuy: boolean; reason?: string; }
 export interface Choice { index: number; label: string; monsters: string[]; mode?: string; hpMul: number; dmgMul: number; rewardPt: number; }
 export interface ConsoleState {
+  multiplayerEntry?: { role: string; host: number | null; self: number | null; questId: number;
+    code: string | null; planMatchesLobby: boolean; transport: string; message: string;
+    activeQuest: number | null; playing: boolean; canPrepare: boolean; nativeQuestPlayerCount: number | null;
+    options: { index: number; mode: string; code: string; label: string }[] | null };
   testMode?: boolean;
   ok: boolean; protocol: 4; bridgeId: string; counter: number; publishedAt?: number;
   sampledAt?: number; configVersion: number; sessionStage: string; corePhase: string; questId: number | null;
   questUnique: number | null; layer: number; pt: number; cartsLeft: number; maxCarts: number;
   armor: string | null; armorOptions?: string[]; invincible: boolean; route?: string;
-  activeWave: string | null; message: string; runtimeStatus?: string;
+  killedUltimates?: string[] | null; activeWave: string | null; message: string; runtimeStatus?: string;
   choices: Choice[] | null; shop: Record<string, ShopEntry[]> | null;
   shopAvailable?: boolean; shopReason?: string; shopNotice?: string; shopBusy: boolean;
   preparation?: { waveToken: number | null; seen: number; resolved: number; expected: number;
     camp: { x: number; y: number; z: number } | null; radius: number; gathered: boolean;
     carveRemaining: number; dwellRemaining: number;
     players: { id: number; position: { x: number; y: number; z: number }; campDistance: number | null }[] | null };
-  capabilities?: { start: boolean; choose: boolean; stop: boolean };
+  capabilities?: { start: boolean; choose: boolean; stop: boolean; route?: boolean; retry?: boolean;
+    invincible?: boolean; kill?: boolean; teleport?: boolean; teleportMonster?: boolean; testLayer?: boolean };
+  online?: boolean;
+  control?: { ready: boolean; nextRoute: string; configuredRoute: string; startReason: string | null;
+    startup: { prepared: boolean; restorePending: boolean; message: string | null };
+    startupRules: { keepPlayerWeapon: boolean; stripTalismans: boolean; stripInsect: boolean; weaponId: number | null } | null;
+    armorSets: Record<string, { series: number; desc?: string }>;
+    testLayers: number[] | null; activeWave: (Choice & { token: number; layer: number; monsterIds: number[] }) | null;
+    testMessage: string; effectPending: boolean };
+  services?: { buffs: { pending: { atk: number; def: number; crit: number }; active: { atk: number; def: number; crit: number };
+    layer: number | null; critBonus: number } | null; lastTransaction: Pick<CommandResult, "status" | "message"> | null;
+    cartRestoreUsed: boolean; purchases: string[] | null };
   enemies?: { uid: number; typeId: number; dead: boolean; captured: boolean }[] | null;
 }
 /** GET /api/probe: DLL identity. Answering proves the native plugin is loaded, not that Lua runs. */
@@ -70,9 +85,9 @@ export async function postCommand(state: ConsoleState, cmd: string, extra: Recor
 }
 
 export async function waitForReceipt(id: string, bridge: string, options: {
-  purchase?: boolean; alive?: () => boolean; onPacket?: (packet: ReceiptPacket) => void;
+  purchase?: boolean; effect?: boolean; alive?: () => boolean; onPacket?: (packet: ReceiptPacket) => void;
 } = {}): Promise<CommandResult> {
-  const deadline = performance.now() + 12000;
+  const deadline = performance.now() + (options.effect ? 20000 : 12000);
   while ((options.alive?.() ?? true) && performance.now() < deadline) {
     let packet: ReceiptPacket | null = null;
     try { packet = await getJson<ReceiptPacket>("/api/results", AbortSignal.timeout(3000)); }
@@ -86,7 +101,7 @@ export async function waitForReceipt(id: string, bridge: string, options: {
       options.onPacket?.(packet);
       const result = packet.last?.id === id ? packet.last : packet.history?.find((r) => r.id === id);
       if (result && ["applied", "rejected", "uncertain", "queued"].includes(result.status) &&
-        !(options.purchase && result.status === "queued")) return result;
+        !((options.purchase || options.effect) && result.status === "queued")) return result;
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }

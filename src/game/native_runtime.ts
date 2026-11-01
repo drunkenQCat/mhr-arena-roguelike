@@ -5,7 +5,7 @@ import { DEFAULT_RUNTIME, type QuestPlan } from "../core/quest_plan";
 import type { DeathReading, EnemyReading, PlayerReading, RuntimeReading, SessionPort } from "../core/run_session";
 import { QuestInstaller } from "./quest_installer";
 import { QuestTransport } from "./quest_transport";
-import { equipStartupSet, restoreStartup, appendGrantedEntry, type EquipWearPort } from "./equip_wear";
+import { equipStartupSet, restoreStartup, reapplyStartup, type EquipWearPort } from "./equip_wear";
 import { beginPouchIsolation, endPouchIsolation } from "./pouch_backup";
 import { DEFAULT_STARTUP_RULES } from "../core/config";
 import { GachaService } from "./gacha";
@@ -32,7 +32,8 @@ export class NativeRuntime implements SessionPort {
   readonly testTools = new TestTools((event, detail) => this.report(event, detail));
   /** Test-only seam: lets the CLI verify the started-run flow without native menus. */
   readonly questTransport: QuestTransport;
-  private readonly inplace = new InplaceWaves((event, detail) => this.report(event, detail));
+  private readonly inplace = new InplaceWaves((event, detail) => this.report(event, detail),
+    (plan, slot, type, id) => this.installer.prepareInplaceSlot(plan, slot, type, id));
   private activePlan: QuestPlan | null = null;
   private holdClear = false;
   private hooks = false;
@@ -41,6 +42,8 @@ export class NativeRuntime implements SessionPort {
   private events: Diagnostic[] = [];
   private rateKeys: string[] = [];
   private rateEvidence: unknown[] = [];
+  /** 离线队友调研 §6C：混合局权威人数来源（PartySession.rosterSize）。 */
+  private partySizeSource: (() => number | null) | null = null;
 
   constructor(private readonly cfg: RogueConfig, readonly installer: QuestInstaller,
     private readonly gacha?: GachaService) {
@@ -48,6 +51,11 @@ export class NativeRuntime implements SessionPort {
       (cfg.runtime ?? DEFAULT_RUNTIME).postTimeoutSeconds);
     this.questTransport = this.transport;
   }
+
+  /** main.ts 在 PartySession 建立后接线；null=沿用原生人数。 */
+  setPartySizeSource(source: (() => number | null) | null): void { this.partySizeSource = source; }
+
+  partySizePort(): number | null { return this.partySize?.() ?? null; }
 
   tick(): void {
     this.installer.tick();
@@ -73,11 +81,18 @@ export class NativeRuntime implements SessionPort {
     this.activePlan = plan; this.holdClear = holdClear;
     if (!plan || !holdClear) this.inplace.cancel();
   }
-  post(questId: number): void { this.transport.request(questId); }
+  post(questId: number): void {
+    const ready = reapplyStartup();
+    if (!ready.ok) throw new Error(ready.reason);
+    this.transport.request(questId);
+  }
   cancelPost(): void { this.transport.cancel(); }
   retarget(questId: number): void { this.transport.retarget(questId); }
+  waitingForSpawnCapacity(): boolean { return this.inplace.waitingForCapacity; }
   postingError(): string | null { return this.transport.getError(); }
   takeDeaths(): DeathReading[] { const events = this.deaths; this.deaths = []; return events; }
+  /** SessionPort.partySize：返回混合局名单人数；未锁定时 null=沿用原生人数。 */
+  partySize(): number | null { return this.partySizeSource?.() ?? null; }
   /**
    * Test-only teleport request: drives the game's own warp flow (fade out, move,
    * fade in over a few seconds); the caller verifies the position on later frames.
@@ -237,12 +252,6 @@ export class NativeRuntime implements SessionPort {
     if (!this.gacha) return { ok: false, reason: "GachaService unavailable" };
     const rolled = this.gacha.roll("gacha_4");
     if (!rolled.ok) return { ok: false, reason: rolled.reason ?? "抽取失败" };
-    if (!rolled.reused && rolled.id !== undefined && rolled.boxIndex !== undefined) {
-      if (!appendGrantedEntry({ boxIndex: rolled.boxIndex, idVal: rolled.id,
-        idType: rolled.kind === "armor" ? 2 : 1 })) {
-        relog.warn(`[MhwRogue] 极强掉落发件追踪落盘失败：局末可能残留 ${rolled.name ?? rolled.id}`);
-      }
-    }
     relog.info(`[MhwRogue] 极强击杀掉落：抽取获得：${rolled.name ?? rolled.id}${rolled.reused ? "（已有，复用不清理）" : ""}`);
     return { ok: true, name: rolled.name, reused: rolled.reused };
   }

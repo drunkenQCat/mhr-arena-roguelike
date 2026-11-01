@@ -1,54 +1,22 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import ConfigEditor from "./ConfigEditor.vue";
-import { Freshness, SubmissionUncertain, downloadJson, getJson, postCommand, waitForReceipt, type ConsoleState, type CommandResult, type ProbeInfo } from "./api";
+import PlayWorkspace from "./PlayWorkspace.vue";
+import MultiplayerEntry from "./MultiplayerEntry.vue";
+import ConnectionHelp from "./ConnectionHelp.vue";
+import { Freshness, SubmissionUncertain, downloadJson, getJson, postCommand, waitForReceipt, type ConsoleState, type CommandResult } from "./api";
 
 const state = ref<ConsoleState | null>(null), stale = ref(true), busy = ref(false);
-const notice = ref("等待游戏状态"), lastSync = ref("—"), page = ref("play");
-const results = ref<CommandResult[]>([]), filter = ref(""), category = ref("");
+const notice = ref("等待游戏状态"), lastSync = ref("—"), page = ref("multiplayer");
+const results = ref<CommandResult[]>([]), filter = ref("");
 const config = ref<unknown>(null), loadedVersion = ref(0), configMessage = ref("");
 const configBridgeId = ref("");
 const heartbeat = new Freshness();
-// 模块探针：DLL 本体 + Lua require/往返结果（PASS/FAIL），连续 Reset 的会话历史。
-const probe = ref<ProbeInfo | null>(null);
-const probeState = ref<ProbeReport | null>(null);
-const probeError = ref("");
-let probeDllVersion = "";
-let probeReading = false;
-interface ProbeCheck { id: string; ok: boolean; message: string; elapsedMs?: number; bytes?: number; gcMs?: number; }
-interface ProbeSession {
-  ok: boolean; session: string; sessionSource?: string; sessionSeq?: number; dllSession?: string; luaEpoch?: number;
-  at?: number; atIso?: string; localTime?: string; moduleVersion?: string; versionSource?: string;
-  durationMs?: number; checks?: ProbeCheck[]; errors?: string[];
-  dll?: { pid?: number; moduleVersion?: string; uptimeMs?: number; sessions?: number; commands?: number; pings?: number };
-}
-interface ProbeReport { schema?: number; ok: boolean; session: string; moduleVersion?: string; history: ProbeSession[]; result?: ProbeSession }
-// A Lua generation has its own identity even while the native DLL stays loaded.
-const probeSessions = computed(() => {
-  const seen = new Set<string>();
-  return (probeState.value?.history ?? []).filter((entry) => {
-    if (!entry?.session || seen.has(entry.session)) return false;
-    seen.add(entry.session); return true;
-  }).reverse();
-});
-const probeLocal = computed(() => {
-  if (!probe.value) return "";
-  const readings = probeSessions.value.filter((entry) => entry.dllSession === probe.value?.session && entry.versionSource === "luaopen").length;
-  if (!readings) return "尚无 Lua 读取记录：模块初始化回调未执行，或探针脚本未部署到 reframework/autorun。";
-  if (readings === 1) return `Lua 已读取模块版本（${probe.value.moduleVersion}）。再按 Reset scripts 可验证连续重置的会话区分。`;
-  return `已记录 ${readings} 次加载（${readings - 1} 次 Reset）。`;
-});
+const developerMode = ref(false);
 let alive = true, timer: ReturnType<typeof setTimeout> | undefined, loadedBridge = "";
 const connected = computed(() => !stale.value && state.value?.protocol === 4);
-const categoryOrder = ["基础补给", "弹药", "战术道具", "调和素材", "高阶药品", "翻盘服务"];
-const categories = computed(() => Object.keys(state.value?.shop ?? {}).sort((a, b) =>
-  (categoryOrder.indexOf(a) < 0 ? 99 : categoryOrder.indexOf(a)) - (categoryOrder.indexOf(b) < 0 ? 99 : categoryOrder.indexOf(b))));
-const shopList = computed(() => state.value?.shop?.[category.value] ?? []);
 const recent = computed(() => [...results.value].reverse().filter((r) =>
   `${r.id} ${r.status} ${r.message ?? ''}`.toLowerCase().includes(filter.value.toLowerCase())).slice(0, 30));
-const prep = computed(() => state.value?.preparation);
-const stageNames: Record<string, string> = { Idle: "未开局", Selecting: "整备 / 选择波次", AwaitQuest: "等待进入任务", Combat: "战斗中", Carve: "剥取 / 返回集结点", Returning: "返回村庄", Finished: "本局结束", Fault: "流程异常" };
-watch(categories, (values) => { if (!values.includes(category.value)) category.value = values[0] ?? ""; });
 
 async function send(cmd: string, extra: Record<string, unknown> = {}): Promise<CommandResult | null> {
   if (!connected.value || busy.value || !state.value) return null;
@@ -61,9 +29,10 @@ async function send(cmd: string, extra: Record<string, unknown> = {}): Promise<C
       if (!(error instanceof SubmissionUncertain)) throw error;
       id = error.requestId; notice.value = error.message;
     }
-    const result = await waitForReceipt(id, bridge, { purchase: cmd === "buy", alive: () => alive,
+    const result = await waitForReceipt(id, bridge, { purchase: cmd === "buy", effect: cmd === "killAll" || cmd === "teleport", alive: () => alive,
       onPacket: (packet) => { results.value = packet.history ?? []; } });
-    notice.value = `${result.status === 'applied' ? '已执行' : result.status === 'queued' ? '游戏已排队，等待实际结果' : result.status === 'uncertain' ? '结果待核实，请勿重试' : '已拒绝'}：${result.message ?? cmd}`;
+    const labels: Record<string, string> = { startRun: '已开始本局', choose: '已选择波次', setRoute: '路线已更新', setInvincible: '无敌设置已更新', killAll: '目标状态已确认', teleport: '位置已确认', stop: '本局已结束', retryPost: '已提交出发请求', getConfig: '配置已读取', buy: '购买完成' };
+    notice.value = result.status === 'applied' ? (cmd === 'buy' ? '购买完成，结果显示在商店中' : labels[cmd] ?? result.message ?? '操作完成') : `${result.status === 'queued' ? '游戏已排队，等待实际结果' : result.status === 'uncertain' ? '结果待核实，请勿重试' : '已拒绝'}：${result.message ?? '请检查当前条件'}`;
     return result;
   } catch (e) { notice.value = String(e).replace("Error: ", ""); return null; }
   finally { busy.value = false; }
@@ -85,31 +54,8 @@ async function submitConfig(value: unknown, version: number) {
     config.value = value; loadedVersion.value = result.configVersion!;
   }
 }
-async function readProbe() {
-  if (probeReading) return;
-  probeReading = true;
-  try {
-    const info = await getJson<ProbeInfo>("/api/probe", AbortSignal.timeout(3000));
-    probe.value = info; probeError.value = "";
-    const identity = `${info.session}:${info.sessions}`;
-    if (identity !== probeDllVersion) {
-      probeDllVersion = identity;
-      probeState.value = null; // 换了 DLL：旧记录不再代表当前模块
-    }
-    {
-      const report = await getJson<ProbeReport>("/api/probe/report", AbortSignal.timeout(3000));
-      if (report?.result?.dllSession !== info.session || report?.result?.luaEpoch !== info.sessions)
-        throw new Error("探针报告不属于当前 Lua 代，请等待新报告");
-      probeState.value = report;
-    }
-  } catch (error) {
-    probeError.value = String(error).replace("Error: ", "");
-  } finally { probeReading = false; }
-}
-
 async function poll() {
   if (!alive) return;
-  void readProbe();
   const responses = await Promise.allSettled([
     getJson<ConsoleState>("/api/state", AbortSignal.timeout(3000)),
     getJson<{ history?: CommandResult[] | null }>("/api/results", AbortSignal.timeout(3000)),
@@ -135,84 +81,25 @@ async function poll() {
 }
 onMounted(() => void poll());
 onUnmounted(() => { alive = false; clearTimeout(timer); });
-const f = (value: number | null | undefined) => value == null ? "—" : value.toFixed(1);
+
 </script>
 
 <template>
   <main>
     <header class="app-header"><div><p class="eyebrow">MHR ARENA ROGUELIKE</p><h1>斗技场控制台</h1></div>
-      <div class="connection"><span :class="['badge', connected ? 'live' : 'warning']">{{ stale ? '游戏状态已过期 / 连接断开' : state?.protocol !== 4 ? '旧版脚本，等待重载' : '游戏状态同步中' }}</span>
+      <div class="connection"><span :class="['badge', connected ? 'live' : 'warning']">{{ stale ? '游戏状态已过期 / 连接断开' : state?.protocol !== 4 ? '旧版脚本，等待重载' : '已连接游戏' }}</span>
         <small>同步 {{ lastSync }} · 状态 #{{ state?.counter ?? '—' }} · 配置 v{{ state?.configVersion ?? '—' }}</small></div>
     </header>
-    <p v-if="state?.testMode" class="alert">隔离验证环境：Lua 与 HTTP 为真实构建，玩家、怪物和背包是测试数据，不会操作实际游戏。</p>
+    <p v-if="state?.testMode" class="alert">隔离验证环境：执行编译后的 Lua，玩家、怪物、背包与传输使用测试替身，不会操作实际游戏。</p>
     <p v-if="state && state.protocol !== 4" class="alert">当前 Lua 仍使用旧版协议，无法提供位置与商店资格。请在 REFramework → ScriptRunner 执行 Reset scripts；网页已禁止向旧脚本发送操作。</p>
-    <div class="toolbar topnav"><button :class="{ selected: page === 'play' }" @click="page = 'play'">游戏与商店</button><button :class="{ selected: page === 'design' }" @click="page = 'design'">策划工作台</button><button :class="{ selected: page === 'events' }" @click="page = 'events'">命令记录</button></div>
+    <div class="toolbar topnav"><button :class="{ selected: page === 'multiplayer' }" @click="page = 'multiplayer'">联机入场测试</button><button :class="{ selected: page === 'play' }" @click="page = 'play'">游戏与商店</button><button :class="{ selected: page === 'design' }" @click="page = 'design'">策划工作台</button><button :class="{ selected: page === 'events' }" @click="page = 'events'">命令记录</button><button :class="{ selected: page === 'help' }" @click="page = 'help'">安装与手机连接</button></div>
+    <p class="muted">单人测试版 · 当前不支持真实联机同步。多人 mock 仅供开发验证，不会生成队友。</p>
+    <ConnectionHelp v-if="page === 'help'" v-model:developer="developerMode" />
     <p class="notice" role="status">{{ notice }}</p>
-    <template v-if="page === 'play'">
-      <div v-if="state" class="dashboard">
-        <section class="panel"><div class="section-heading"><h2>{{ stageNames[state.sessionStage] ?? state.sessionStage }}</h2><span class="badge">第 {{ state.layer }} 层</span></div>
-          <div class="metrics"><div><small>可用 PT</small><strong class="gold">{{ state.pt }}</strong></div><div><small>猫车</small><strong>{{ state.cartsLeft }} / {{ state.maxCarts }}</strong></div><div><small>本波已解决</small><strong>{{ prep?.resolved ?? '—' }} / {{ prep?.expected ?? '—' }}</strong></div></div>
-          <p>{{ state.activeWave ?? '暂无进行中的波次' }}</p><p class="muted">{{ state.message }}</p>
-          <div class="meta">任务 {{ state.questId ?? '未进入' }} · 实例 {{ state.questUnique ?? '—' }} · 波次 #{{ prep?.waveToken ?? '—' }} · {{ state.route ?? '—' }}</div>
-          <details><summary>原生调度状态</summary><p class="mono">{{ state.runtimeStatus ?? '旧版脚本没有此信息' }}</p></details>
-        </section>
-        <section class="panel"><h2>玩家位置与集结</h2>
-          <p v-if="!prep" class="muted">等待新版脚本的位置采样。</p>
-          <div v-for="player in prep?.players ?? []" :key="player.id" class="player"><b>玩家 {{ player.id + 1 }}</b><span class="mono">X {{ f(player.position.x) }} / Y {{ f(player.position.y) }} / Z {{ f(player.position.z) }}</span><span>距集结点 {{ f(player.campDistance) }} / 半径 {{ prep?.radius }}</span></div>
-          <p v-if="prep && !prep.players?.length" class="muted">等待玩家对象就绪。</p>
-          <p v-if="prep?.camp" class="meta">集结点：{{ f(prep.camp.x) }}, {{ f(prep.camp.y) }}, {{ f(prep.camp.z) }}</p>
-          <p v-if="state.sessionStage === 'Carve'" class="notice">{{ (prep?.carveRemaining ?? 0) > 0 ? `剥取等待 ${prep?.carveRemaining} 秒` : prep?.gathered ? `集结中，还需停留 ${prep.dwellRemaining} 秒` : '剥取等待已结束，请返回集结点' }}</p>
-          <span :class="['badge', prep?.gathered ? 'live' : '']">{{ prep?.gathered ? '玩家已在集结范围' : '尚未集结 / 未进入任务' }}</span>
-        </section>
-        <section class="panel full"><h2>操作</h2><div class="toolbar">
-          <button v-for="armor in state.armorOptions ?? []" :key="armor" :disabled="!connected || busy || !state.capabilities?.start" @click="send('startRun', { armor })">开局 · {{ armor }}</button>
-          <button :disabled="!connected || busy" @click="send('setInvincible', { value: !state.invincible })">无敌 {{ state.invincible ? '已开启' : '已关闭' }}</button>
-          <button :disabled="!connected || busy || state.sessionStage !== 'Combat'" @click="send('killAll')">击杀已出场怪物</button>
-          <button :disabled="!connected || busy || !['AwaitQuest', 'Fault'].includes(state.sessionStage)" @click="send('retryPost')">重试接取</button>
-          <button class="danger" :disabled="!connected || busy || !state.capabilities?.stop" @click="send('stop')">停止本局</button>
-        </div></section>
-        <section class="panel full"><div class="section-heading"><h2>下一波选择</h2><span class="muted">仅完成清波与集结后可选</span></div>
-          <div v-if="state.sessionStage === 'Selecting'" class="choice-grid"><article v-for="c in state.choices ?? []" :key="c.index" class="subpanel"><span class="badge">{{ c.mode ?? '—' }}</span><h3>{{ c.label }}</h3><p>HP ×{{ c.hpMul }} · 伤害 ×{{ c.dmgMul }}</p><strong class="gold">{{ c.rewardPt }} PT</strong><button class="primary" :disabled="!connected || busy || !state.capabilities?.choose" @click="send('choose', { index: c.index })">选择此波次</button></article></div>
-          <p v-else class="muted">{{ state.sessionStage === 'Combat' ? '当前波次正在战斗，完成后进入剥取和集结。' : '当前阶段没有可选波次。' }}</p>
-        </section>
-        <section class="panel full"><div class="section-heading"><h2>补给商店</h2><span :class="['badge', state.shopAvailable && connected ? 'live' : 'warning']">{{ state.shopAvailable && connected ? '可以购买' : '暂不可购买' }}</span></div>
-          <p v-if="!state.shopAvailable" class="notice">{{ state.shopReason ?? '等待游戏更新购买资格' }}</p><p v-if="state.shopNotice" class="notice" role="status">{{ state.shopNotice }}</p>
-          <nav class="tabs" aria-label="商店分类"><button v-for="c in categories" :key="c" :class="{ selected: category === c }" :aria-pressed="category === c" @click="category = c">{{ c }}</button></nav>
-          <div class="table-scroll"><table><thead><tr><th>商品</th><th>价格</th><th>实际持有 / 上限</th><th>购买条件</th><th>操作</th></tr></thead><tbody><tr v-for="e in shopList" :key="e.id"><td>{{ e.name }}<small>{{ e.desc }}</small></td><td>{{ e.price }} PT</td><td>{{ e.mode === 'service' ? '—' : `${e.owned} / ${e.cap}` }}</td><td>{{ e.reason ?? '可购买' }}</td><td><button :disabled="!connected || busy || !state.shopAvailable || state.shopBusy || !e.canBuy" @click="send('buy', { itemId: e.id })">{{ e.mode === 'fill' ? '补满' : e.mode === 'service' ? '使用服务' : '购买 1 件' }}</button></td></tr></tbody></table></div>
-          <p class="muted">购买资格与游戏内商店共用校验；排队不代表交付成功，最终以背包读回和交易提示为准。</p>
-        </section>
-      </div>
-      <p v-else class="panel empty">等待游戏内服务发布状态。请确认 Rise 和 webconsole 插件已运行。</p>
-    </template>
-    <section class="panel full" id="module-probe">
-      <div class="section-heading"><h2>模块探针（DLL ↔ Lua）</h2>
-        <span :class="['badge', probeState?.ok ? 'live' : 'warning']">{{ probeState ? (probeState.ok ? 'PASS' : 'FAIL') : '等待 Lua' }}</span></div>
-      <p v-if="probeError" class="notice">探针同步尚未完成：{{ probeError }}</p>
-      <template v-else-if="probe">
-        <div class="meta">DLL {{ probe.moduleVersion }} · 会话 {{ probe.session }} · 进程 {{ probe.pid }} · 运行 {{ Math.floor(probe.uptimeMs / 1000) }} 秒 ·
-          已服务 Lua 会话 {{ probe.sessions }} · ping {{ probe.pings }} · 命令 {{ probe.commands }} · 导出 {{ probe.export }}</div>
-        <p v-if="probeState?.result" class="mono">
-          {{ probeState.ok ? 'PASS' : 'FAIL' }} · require("{{ probe.module }}"): 字符串往返与 GC 后往返 ·
-          本次 {{ Math.round(probeState.result.durationMs ?? 0) }} ms · {{ probeState.result.atIso }}
-        </p>
-        <p v-else class="muted">{{ probeLocal }}</p>
-        <div v-if="probeState?.result?.checks?.length" class="meta">
-          <span v-for="check in probeState.result.checks" :key="check.id" :class="['badge', check.ok ? 'live' : 'warning']">
-            {{ check.ok ? 'PASS' : 'FAIL' }} {{ check.id }} · {{ check.bytes }} 字节 · {{ (check.elapsedMs ?? 0).toFixed(2) }} ms</span>
-        </div>
-        <p v-for="error in probeState?.result?.errors ?? []" :key="error" class="notice">{{ error }}</p>
-        <details v-if="probeSessions.length"><summary>连续 Reset 记录（{{ probeSessions.length }} 次加载，最新在上）</summary>
-          <div class="table-scroll"><table><thead><tr><th>会话</th><th>来源</th><th>时间</th><th>结果</th><th>耗时</th><th>模块版本</th></tr></thead><tbody>
-            <tr v-for="entry in probeSessions" :key="entry.session">
-              <td class="mono">{{ entry.session }}</td><td>{{ entry.sessionSource ?? '—' }}</td>
-              <td>{{ entry.localTime ?? entry.atIso }}</td>
-              <td><span :class="['badge', entry.ok ? 'live' : 'warning']">{{ entry.ok ? 'PASS' : 'FAIL' }}</span></td>
-              <td>{{ Math.round(entry.durationMs ?? 0) }} ms</td><td>{{ entry.moduleVersion ?? '—' }}</td>
-            </tr></tbody></table></div></details>
-    </template>
-    </section>
+    <MultiplayerEntry v-if="page === 'multiplayer'" :entry="state?.multiplayerEntry" :busy="busy || !connected" @command="send" />
+    <PlayWorkspace v-if="page === 'play'" :state="state" :connected="connected" :busy="busy" :notice="notice" :developer-mode="developerMode" @command="send" />
     <ConfigEditor v-show="page === 'design'" :config="config" :version="loadedVersion" :server-version="state?.configVersion ?? loadedVersion" :session-changed="!!configBridgeId && configBridgeId !== state?.bridgeId" :busy="busy" :connected="connected" :message="configMessage" @load="loadConfig" @submit="submitConfig" />
-    <section v-if="page === 'events'" class="panel"><div class="section-heading"><h2>命令记录</h2><button @click="downloadJson('console-results.json', results)">导出记录</button></div><label>筛选记录 <input v-model="filter" placeholder="状态 / 请求 ID / 消息" /></label><p class="muted">applied 表示命令已执行；queued 仍需等待游戏结果；rejected 表示未执行。</p><article v-for="r in recent" :key="r.id" class="event"><span :class="['badge', r.status === 'rejected' ? 'warning' : 'live']">{{ r.status }}</span><span>{{ r.message ?? (r.config ? '已读取游戏配置' : '') }}</span><small class="mono">{{ r.id }}</small></article></section>
+    <section v-if="page === 'events'" class="panel"><div class="section-heading"><h2>命令记录</h2><button @click="downloadJson('console-results.json', results)">导出记录</button></div><label>筛选记录 <input v-model="filter" placeholder="状态 / 请求 ID / 消息" /></label><p class="muted">applied 表示命令已执行；queued 仍需等待游戏结果；rejected 表示未执行。</p><article v-for="r in recent" :key="r.id" class="event"><span :class="['badge', r.status === 'applied' ? 'live' : r.status === 'queued' ? 'pending' : 'warning']">{{ r.status }}</span><span>{{ r.message ?? (r.config ? '已读取游戏配置' : '') }}</span><small class="mono">{{ r.id }}</small></article></section>
   </main>
 </template>
 

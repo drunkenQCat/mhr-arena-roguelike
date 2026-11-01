@@ -1,3 +1,4 @@
+import { MultiplayerEntry } from "./multiplayer_entry";
 import { RunCore } from "../core/run_core";
 import { RunSession } from "../core/run_session";
 import { makeQuestPlan } from "../core/quest_plan";
@@ -41,14 +42,18 @@ try {
     hasGachaPool: (poolId: string) => gacha.hasPool(poolId),
   };
   const shopWindow = new ShopWindow(session.core, () => session.canShop(), () => session.shopQuest(), services);
+  const multiplayerEntry = new MultiplayerEntry(config, monsterCatalog, () =>
+    ["Idle", "Finished", "Fault"].includes(session.stage) && !session.startupStatus.restorePending);
   let webConsole: WebConsoleBridge | null = null;
-  try { webConsole = new WebConsoleBridge(session, runtime, shopWindow); }
+  try { webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry); }
   catch (error) { relog.warn(`[MhwRogue] webconsole unavailable: ${String(error)}`); }
+  // 离线队友调研 §6C：混合局的权威人数来自 PartySession 名单（bridge 自建或注入）。
+  runtime.setPartySizeSource(() => webConsole?.partyRosterSize() ?? null);
   let lastBuffState = "";
   let lastBuffPoll = -1;
   reframework.onFrame(() => {
     try {
-      runtime.tick(); shopWindow.tick(); session.tick();
+      runtime.tick(); shopWindow.tick(); session.tick(); multiplayerEntry.tick();
       buffs.tick(session.readingSnapshot, { stage: session.stage, layer: core.state.layer, questId: config.quest.id });
       const sampleTime = session.readingSnapshot?.time ?? -1;
       if (sampleTime !== lastBuffPoll) {
@@ -71,6 +76,7 @@ try {
     catch (error) { relog.error(`[MhwRogue] shop window: ${String(error)}`); }
   });
   reframework.onScriptReset(() => {
+    multiplayerEntry.shutdown();
     buffs.shutdown();
     runtime.shutdown();
     webConsole?.newScriptSession(); // Reset 后新桥会话：旧页面命令按 bridgeId 拒绝
