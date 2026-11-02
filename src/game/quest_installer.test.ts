@@ -149,3 +149,18 @@ it("keeps hub rank and enemy level for the independent multiplayer entry table",
   expect(copy.fields._TimeLimit).toBe(50);
   expect(f.dictionary.has(900102)).toBe(false);
 });
+
+it("overrides single-quest classification only for the installed entry quest", () => {
+  const f = fixture();
+  const cfg = { ...f.config, quest: { ...f.config.quest, id: 900103 } };
+  const installer = new QuestInstaller(cfg, { ...f.plan, questId: 900103 }, true);
+  installer.publish({ ...f.plan, questId: 900103 }, false);
+  const hook = mock.hook.mock.calls.find((args) => args[0].name === "isSingleQuest(System.Int32)")!;
+  hook[1]({ 2: 900103 }); expect(hook[2](1)).toBe(0);
+  for (const id of [101, 603, 900102]) {
+    hook[1]({ 2: id }); expect(hook[2](1)).toBe(1);
+  }
+  const first = installer.multiplayerDescriptor();
+  f.dictionary.get(900103)!.fields.enemy.fields._VitalTbl.elements[0]++;
+  expect(installer.multiplayerDescriptor()).not.toBe(first);
+});

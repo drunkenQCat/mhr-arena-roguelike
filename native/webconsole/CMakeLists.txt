@@ -28,12 +28,13 @@ add_library(webconsole SHARED
     src/plugin_main.cpp
     src/http_server.cpp
     src/lua_bridge.cpp
+    src/steam_lobby.cpp
 )
 target_include_directories(webconsole PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
-target_link_libraries(webconsole PRIVATE lua54 ws2_32.lib crypt32.lib iphlpapi.lib)
+target_link_libraries(webconsole PRIVATE lua54 ws2_32.lib crypt32.lib iphlpapi.lib shell32.lib)
 
 # ---- 独立测试 exe（游戏外复现全部端点行为；不含 REFramework 插件入口） ----
 add_executable(webconsole_test
@@ -49,8 +50,14 @@ target_link_libraries(webconsole_test PRIVATE lua54 ws2_32.lib crypt32.lib iphlp
 
 include(CTest)
 if(BUILD_TESTING)
-    add_executable(bridge_lifecycle_test tests/bridge_lifecycle.cpp src/lua_bridge.cpp src/http_server.cpp)
+    add_executable(bridge_lifecycle_test tests/bridge_lifecycle.cpp src/lua_bridge.cpp src/http_server.cpp src/steam_lobby.cpp)
     target_include_directories(bridge_lifecycle_test PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(bridge_lifecycle_test PRIVATE lua54 ws2_32.lib crypt32.lib iphlpapi.lib)
+    target_link_libraries(bridge_lifecycle_test PRIVATE lua54 ws2_32.lib crypt32.lib iphlpapi.lib shell32.lib)
     add_test(NAME bridge_lifecycle COMMAND bridge_lifecycle_test)
+    add_library(fake_steam SHARED tests/fake_steam.cpp)
+    set_target_properties(fake_steam PROPERTIES OUTPUT_NAME steam_api64)
+    add_executable(steam_lobby_test tests/steam_lobby_test.cpp src/steam_lobby.cpp)
+    target_include_directories(steam_lobby_test PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(steam_lobby_test PRIVATE advapi32.lib)
+    add_test(NAME steam_lobby COMMAND steam_lobby_test $<TARGET_FILE:fake_steam>)
 endif()

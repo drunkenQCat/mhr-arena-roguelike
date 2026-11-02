@@ -9,6 +9,7 @@
 #include <iphlpapi.h>
 #include <netioapi.h>
 #include <set>
+#include <shellapi.h>
 
 #include <filesystem>
 #include <sstream>
@@ -101,6 +102,29 @@ std::string connection_json()
     return out.str();
 }
 
+// Fixed allowlist and bounded reads; no client-supplied paths.
+std::string diagnostic_tail(const std::wstring& path)
+{
+    std::ifstream input(path.c_str(), std::ios::binary | std::ios::ate);
+    if (!input) return "[file unavailable]";
+    const auto size = input.tellg();
+    if (size < 0) return "[file unavailable]";
+    const auto count = static_cast<size_t>(std::min<std::streamoff>(size, 128 * 1024));
+    input.seekg(size - static_cast<std::streamoff>(count));
+    std::string bytes(count, '\0');
+    input.read(bytes.data(), static_cast<std::streamsize>(count));
+    bytes.resize(static_cast<size_t>(input.gcount()));
+    if (bytes.empty()) return bytes;
+    // A tail can start inside a UTF-8 character: replace malformed sequences.
+    const int n = MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), nullptr, 0);
+    std::wstring wide(n, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), wide.data(), n);
+    const int m = WideCharToMultiByte(CP_UTF8, 0, wide.data(), n, nullptr, 0, nullptr, nullptr);
+    std::string clean(m, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, wide.data(), n, clean.data(), m, nullptr, nullptr);
+    return (size > static_cast<std::streamoff>(count) ? "[tail truncated]\n" : "") + clean;
+}
+
 // Shared origin check for every POST endpoint: empty Origin (curl, CLI) passes;
 // browsers must name this interface or the dev server.
 bool origin_ok(const httplib::Request& req)
@@ -184,6 +208,28 @@ void run_server()
     svr.Get("/api/connection", [](const httplib::Request&, httplib::Response& res) {
         res.set_header("Cache-Control", "no-store");
         res.set_content(connection_json(), "application/json");
+    });
+
+    svr.Get("/api/diagnostics", [](const httplib::Request&, httplib::Response& res) {
+        std::ostringstream out;
+        out << "{\"schema\":1,\"probe\":" << probe_json()
+            << ",\"state\":\"" << json_escape(bridge().state_snapshot())
+            << "\",\"results\":\"" << json_escape(bridge().results_snapshot()) << "\",\"files\":{";
+        const std::pair<const char*, std::wstring> files[] = {
+            {"build-manifest.json", g_game_root + L"\\build-manifest.json"},
+            {"re2_framework_log.txt", g_game_root + L"\\re2_framework_log.txt"},
+            {"mhw_rogue_runtime_error.json", data_path(L"mhw_rogue_runtime_error.json")},
+            {"mhw_rogue_runtime.json", data_path(L"mhw_rogue_runtime.json")}
+        };
+        bool first = true;
+        for (const auto& [name, path] : files) {
+            if (!first) out << ',';
+            first = false;
+            out << '"' << name << "\":\"" << json_escape(diagnostic_tail(path)) << '"';
+        }
+        out << "}}";
+        res.set_header("Content-Disposition", "attachment; filename=\"MHR-support-log.json\"");
+        res.set_content(out.str(), "application/json; charset=utf-8");
     });
 
     // DLL identity endpoint: lets the probe/page separate "DLL up" from "Lua loaded".
@@ -397,7 +443,18 @@ void run_server()
         res.set_content(html, "text/html; charset=utf-8");
     });
 
-    if (!svr.listen("0.0.0.0", g_listen_port)) {
+    // Bind first; never open a browser when the port is already occupied.
+    if (!svr.bind_to_port("0.0.0.0", g_listen_port)) {
+        log_info("listen failed");
+        return;
+    }
+#ifndef WEBCONSOLE_STANDALONE
+    if (g_plugin_functions && std::filesystem::exists(g_module_dir + L"\\console.html")) {
+        const auto url = L"http://localhost:" + std::to_wstring(g_listen_port) + L"/console";
+        ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    }
+#endif
+    if (!svr.listen_after_bind()) {
         log_info("listen failed");
     }
 }

@@ -31,3 +31,14 @@ src/game/gen/
 *.log
 /*.zip
 /release-stage/
+
+# Local research journals and raw evidence. Existing tracked files stay tracked.
+# Search on demand: fd/rg --no-ignore-vcs, scoped to docs/.
+# Promote reviewed findings explicitly: git add -f <specific-file>.
+/docs/evidence/
+/docs/research-*.md
+/docs/review-*.md
+/docs/playtest-*.md
+/docs/fix-playtest-*.md
+/docs/runtime-*.md
+/docs/release-readiness-*.md

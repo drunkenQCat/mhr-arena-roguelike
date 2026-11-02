@@ -2,9 +2,12 @@ export interface ShopEntry { id: string; name: string; category: string; price: 
 export interface Choice { index: number; label: string; monsters: string[]; mode?: string; hpMul: number; dmgMul: number; rewardPt: number; }
 export interface ConsoleState {
   multiplayerEntry?: { role: string; host: number | null; self: number | null; questId: number;
-    code: string | null; planMatchesLobby: boolean; transport: string; posting: boolean; message: string;
+    mode: string | null; hash: string | null; revision: number | null;
+    transport: string; posting: boolean; canPost: boolean; message: string;
+    sync: { available: boolean; reason: string; lobby: string | null; applied: boolean;
+      members: { id: string; self: boolean; ready: boolean }[] | null };
     activeQuest: number | null; playing: boolean; canPrepare: boolean; nativeQuestPlayerCount: number | null;
-    options: { index: number; mode: string; code: string; label: string }[] | null };
+    options: { index: number; mode: string; label: string }[] | null };
   testMode?: boolean;
   ok: boolean; protocol: 4; bridgeId: string; counter: number; publishedAt?: number;
   sampledAt?: number; configVersion: number; sessionStage: string; corePhase: string; questId: number | null;

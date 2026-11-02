@@ -194,11 +194,38 @@ export class QuestInstaller {
     this.status = `In-place layer ${plan.layer}: slot ${slot}, monster ${type}`;
   }
 
+  /** Deterministic readback of both native tables, including template defaults.
+   * No pointers or object addresses may enter a cross-machine fingerprint. */
+  multiplayerDescriptor(): string {
+    if (!this.multiplayerEntry || !this.normal || !this.enemy) throw new Error("Multiplayer table not prepared");
+    const scalar = (value: unknown): string => {
+      if (value === null || value === undefined) return "null";
+      if (!["number", "string", "boolean"].includes(typeof value)) throw new Error("Unsupported native field in multiplayer fingerprint");
+      const text = String(value); return `${typeof value}:${text.length}:${text}`;
+    };
+    const parts: string[] = ["mhr-entry-native-v2"];
+    for (const object of [this.normal, this.enemy]) {
+      const fields = object.get_type_definition().get_fields().filter((f) => !f.is_static());
+      fields.sort((a, b) => a.get_name() < b.get_name() ? -1 : a.get_name() > b.get_name() ? 1 : 0);
+      for (const field of fields) {
+        const name = field.get_name(), value = object.get_field(name);
+        parts.push(name);
+        if (value !== null && value !== undefined && field.get_type().get_full_name().endsWith("[]")) {
+          const array = value as REManagedArray;
+          parts.push(`array:${array.get_size()}`);
+          for (let i = 0; i < array.get_size(); i++) parts.push(scalar(array.call("Get", i)));
+        } else parts.push(scalar(value));
+      }
+    }
+    return parts.join("|");
+  }
+
   private installHooks(): void {
     if (this.hooks) return;
     const text = findTypeDefinition("snow.quest.QuestData")?.get_method("getQuestTextCore");
     const list = findTypeDefinition("snow.QuestManager")?.get_method("makeQuestNoList");
-    if (!text || !list) throw new Error("Missing quest text/list methods");
+    const single = this.multiplayerEntry ? findTypeDefinition("snow.quest.QuestUtility")?.get_method("isSingleQuest(System.Int32)") : null;
+    if (!text || !list || (this.multiplayerEntry && !single)) throw new Error("Missing quest text/list/multiplayer classification methods");
     hookMethod(text, (args) => {
       const storage = reframework.getHookStorage();
       storage.mhw_rogue_text_v2 = null;
@@ -223,6 +250,12 @@ export class QuestInstaller {
       }
       return retval;
     });
+    if (this.multiplayerEntry) {
+      hookMethod(single!, (args) => {
+        reframework.getHookStorage().mhr_entry_single = !!this.quest && toInt64(args[2]) === this.cfg.quest.id;
+        return PRE_HOOK.CALL_ORIGINAL;
+      }, (retval) => reframework.getHookStorage().mhr_entry_single ? toPtr(0) : retval);
+    }
     this.hooks = true;
   }
 }

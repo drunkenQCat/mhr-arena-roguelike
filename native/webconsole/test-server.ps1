@@ -26,6 +26,9 @@ New-Item -ItemType Directory -Path (Join-Path $temporary 'testdata') -Force | Ou
 Copy-Item -LiteralPath $source -Destination (Join-Path $temporary $name)
 # Isolated fixtures: never read/write a user's game or checked-in testdata.
 [IO.File]::WriteAllText((Join-Path $temporary 'console.html'), '<!doctype html><title>Native smoke test</title>')
+[IO.File]::WriteAllText((Join-Path $temporary 'build-manifest.json'), '{"version":"diagnostic-fixture"}')
+[IO.File]::WriteAllText((Join-Path $temporary 're2_framework_log.txt'), ('X' * 200000) + "`nTAIL-MARKER 中文")
+[IO.File]::WriteAllText((Join-Path $temporary 'secret.txt'), 'MUST-NOT-EXPORT')
 foreach ($file in 'mhw_rogue_config.json') {
     [IO.File]::WriteAllText((Join-Path $temporary "testdata\$file"), '{"testMode":true}')
 }
@@ -57,6 +60,14 @@ try {
         }
         Write-Host 'PASS GET /api/connection (empty address list is valid on offline hosts)'
     if (-not $HealthOnly) {
+        $download = Request 'api/diagnostics?path=secret.txt'
+        $diagnostic = $download.Content | ConvertFrom-Json
+        if ($download.Headers['Content-Disposition'] -notmatch 'attachment') { throw 'Diagnostics must be a download.' }
+        if ($diagnostic.probe.module -ne 'webconsole' -or $diagnostic.schema -ne 1) { throw 'Missing diagnostic identity.' }
+        if ($diagnostic.files.'re2_framework_log.txt' -notmatch 'tail truncated' -or $diagnostic.files.'re2_framework_log.txt' -notmatch 'TAIL-MARKER 中文') { throw 'Diagnostic tail is not bounded/readable.' }
+        if ($diagnostic.files.'mhw_rogue_runtime_error.json' -ne '[file unavailable]') { throw 'Missing log not marked.' }
+        if ($download.Content -match 'MUST-NOT-EXPORT' -or $download.RawContentLength -gt 900000) { throw 'Diagnostic allowlist/size violated.' }
+        Write-Host 'PASS diagnostic download, tail bounds, missing files, and fixed path allowlist'
         $probe = (Request 'api/probe').Content | ConvertFrom-Json
         if ($probe.module -ne 'webconsole' -or $probe.export -ne 'luaopen_webconsole') { throw 'api/probe does not describe the webconsole module.' }
         if (-not $probe.session -or -not $probe.moduleVersion) { throw 'api/probe is missing the session id or module version.' }

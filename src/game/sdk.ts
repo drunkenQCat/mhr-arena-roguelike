@@ -184,6 +184,12 @@ export function clockSeconds(): number { return os.time(); }
 
 /** @noSelf */
 export interface NativeWebconsole {
+  steam_snapshot?(): { available: boolean; reason: string; lobbies: {
+    id: string; owner: string; self: string; plan: string;
+    members: { id: string; ack: string }[] }[] };
+  steam_plan?(lobby: string, value: string): boolean;
+  steam_ack?(lobby: string, value: string): boolean;
+  steam_digest?(value: string): string;
   ping(text: string): string;
   epoch(): number;
   take_commands(limit: number): string[];

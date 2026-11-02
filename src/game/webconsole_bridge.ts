@@ -206,10 +206,10 @@ export class WebConsoleBridge {
       case "mpEntry": {
         if (!this.multiplayerEntry) throw new Error("当前构建没有联机入场实验模块。");
         if (cmd.sub === "choose") this.multiplayerEntry.choose(cmd.index!);
-        else if (cmd.sub === "import") this.multiplayerEntry.importCode(cmd.entryCode ?? "");
+        else if (cmd.sub === "retrySync") this.multiplayerEntry.retrySync();
         else if (cmd.sub === "post") this.multiplayerEntry.post();
         else throw new Error("无效的联机入场命令。");
-        return { status: "applied", message: "联机入场操作已执行；请核对任务码及原生队伍状态。" };
+        return { status: "applied", message: "联机操作已提交；请查看全队同步和承接状态。" };
       }
       case "startup.acknowledge": case "title.advance": case "title.continue":
       case "save.load": case "dialog.close": return this.nativeUi.request(cmd);

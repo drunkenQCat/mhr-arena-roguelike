@@ -136,3 +136,12 @@ Windows 默认可能阻止其他设备连进电脑。不要关闭整个防火墙
 
 Windows 官方网络与 IPv4 查看说明：https://support.microsoft.com/en-gb/windows/experience/connectivity-networking/essential-network-settings-and-tasks-in-windows
 Windows 防火墙规则参数：https://learn.microsoft.com/en-us/powershell/module/netsecurity/new-netfirewallrule
+
+
+## 新版启动与一键反馈
+
+游戏启动后会自动用默认浏览器打开 http://localhost:11777/console，每次游戏进程只打开一次，Reset scripts 不会重复打开。未自动打开时可双击安装包的“打开电脑控制台.url”。尚未进入存档时，网页可能暂时显示等待状态。
+
+网页上方的“下载测试日志”会下载一个 JSON 文件；遇到问题，请双方各下载一份并私下发给组织者，附当前游戏截图。文件含版本、状态、操作和有限长度的最近错误，可能含玩家标识和电脑路径；不含存档或密码。游戏仍在运行时才能下载。
+
+电脑首页列出手机访问地址及防火墙排查；手机访问时隐藏这条提示。两人联机以“测试与反馈.txt”为准，新版不再手动复制任务码。

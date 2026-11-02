@@ -1,6 +1,8 @@
 name: Build and release MHR Arena Roguelike
 
 on:
+  schedule:
+    - cron: '0 20 * * *' # 04:00 Asia/Shanghai
   workflow_dispatch:
   push:
     tags:
@@ -9,6 +11,10 @@ on:
 permissions:
   contents: write
   actions: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-release:
@@ -71,6 +77,16 @@ jobs:
         shell: pwsh
         run: ./native/webconsole/build.ps1 -Target Plugin -Configuration Release
 
+      - name: Test native memory and Steam bridges
+        working-directory: mod
+        shell: pwsh
+        run: |
+          cmake --build native/webconsole/.build/Plugin-Release-x64 --config Release --target bridge_lifecycle_test fake_steam steam_lobby_test webconsole_test
+          if ($LASTEXITCODE -ne 0) { throw 'Native test build failed' }
+          ctest --test-dir native/webconsole/.build/Plugin-Release-x64 -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw 'Native tests failed' }
+          ./native/webconsole/test-server.ps1 -BinaryDirectory native/webconsole/.build/Plugin-Release-x64/Release
+
       - name: Reuse verified upstream CI framework binary
         if: steps.framework-cache.outputs.cache-hit != 'true'
         id: framework-prebuilt
@@ -103,7 +119,7 @@ jobs:
         working-directory: mod
         shell: pwsh
         run: |
-          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "dev-$env:GITHUB_RUN_NUMBER" }
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "nightly" }
           ./scripts/package-release.ps1 `
             -FrameworkDirectory "../reframework-src" `
             -StageDirectory "../release-stage" `
@@ -135,3 +151,29 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           overwrite_files: true
           files: MHR-Arena-Roguelike-*.zip
+
+      - name: Publish latest nightly (fixed download link)
+        if: github.ref == 'refs/heads/master' && github.ref_type != 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = @"
+          自动测试构建，来自提交 ${{ github.sha }}，运行 #${{ github.run_number }}。每天北京时间 04:00 和手动运行构建；测试通过后才替换此下载。
+
+          下载 Assets 中的 MHR-Arena-Roguelike-nightly.zip，不要下载 Source code。双方先退出游戏，再安装同一份 ZIP。包内“测试与反馈.txt”有详细步骤；网页首页可一键下载测试日志。
+
+          当前目标：房主选波、Steam 自动准备、真实队友通过原生任务板进入同一任务。双客户端尚待玩家验证，完整多人肉鸽尚未实现。Nightly 可能不稳定，请先备份存档。
+          "@
+          Set-Content -LiteralPath nightly-notes.md -Value $notes -Encoding utf8
+          gh release view nightly --repo '${{ github.repository }}' *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh api --method PATCH 'repos/${{ github.repository }}/git/refs/tags/nightly' -f 'sha=${{ github.sha }}' -F force=true
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot update nightly tag' }
+            gh release edit nightly --repo '${{ github.repository }}' --title 'Nightly — 最新联机入场实验版' --prerelease --notes-file nightly-notes.md
+          } else {
+            gh release create nightly --repo '${{ github.repository }}' --target '${{ github.sha }}' --title 'Nightly — 最新联机入场实验版' --prerelease --notes-file nightly-notes.md
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot publish nightly release' }
+          gh release upload nightly MHR-Arena-Roguelike-nightly.zip --repo '${{ github.repository }}' --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot upload nightly archive' }

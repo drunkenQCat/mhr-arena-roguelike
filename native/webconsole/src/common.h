@@ -26,7 +26,7 @@
 
 namespace webconsole {
 
-inline constexpr const char* PLUGIN_VERSION = "0.3.6";
+inline constexpr const char* PLUGIN_VERSION = "0.4.0";
 inline unsigned short g_listen_port = 11777;
 
 // REFramework plugin functions (request_script_reset / run_script / last_script_error).

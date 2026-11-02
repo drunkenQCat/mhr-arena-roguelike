@@ -25,6 +25,7 @@
 #include "common.h"
 #include "memory_bridge.h"
 #include "lua_bridge.h"
+#include "steam_lobby.h"
 
 #include <lua.hpp>
 
@@ -113,7 +114,53 @@ int lua_gc(lua_State* L)
     return 0;
 }
 
+int lua_steam_snapshot(lua_State* L) {
+    const auto snapshot = webconsole::steam_snapshot();
+    lua_newtable(L);
+    lua_pushboolean(L, snapshot.available); lua_setfield(L, -2, "available");
+    lua_pushlstring(L, snapshot.reason.data(), snapshot.reason.size()); lua_setfield(L, -2, "reason");
+    lua_newtable(L);
+    int index = 1;
+    for (const auto& lobby : snapshot.lobbies) {
+        lua_newtable(L);
+        for (const auto& pair : {std::pair{"id", &lobby.id}, {"owner", &lobby.owner}, {"self", &lobby.self}, {"plan", &lobby.plan}}) {
+            lua_pushlstring(L, pair.second->data(), pair.second->size()); lua_setfield(L, -2, pair.first);
+        }
+        lua_newtable(L); int member_index = 1;
+        for (const auto& member : lobby.members) {
+            lua_newtable(L);
+            lua_pushlstring(L, member.id.data(), member.id.size()); lua_setfield(L, -2, "id");
+            lua_pushlstring(L, member.ack.data(), member.ack.size()); lua_setfield(L, -2, "ack");
+            lua_rawseti(L, -2, member_index++);
+        }
+        lua_setfield(L, -2, "members"); lua_rawseti(L, -2, index++);
+    }
+    lua_setfield(L, -2, "lobbies"); return 1;
+}
+int lua_steam_write(lua_State* L, bool plan) {
+    size_t id_len = 0, value_len = 0;
+    const auto* id = luaL_checklstring(L, 1, &id_len);
+    const auto* value = luaL_checklstring(L, 2, &value_len);
+    luaL_argcheck(L, id_len > 0 && id_len <= 20, 1, "invalid lobby ID");
+    luaL_argcheck(L, value_len <= 2048, 2, "lobby payload exceeds 2048 bytes");
+    const bool ok = plan ? webconsole::steam_write_plan(std::string(id, id_len), std::string(value, value_len))
+        : webconsole::steam_write_ack(std::string(id, id_len), std::string(value, value_len));
+    lua_pushboolean(L, ok); return 1;
+}
+int lua_steam_plan(lua_State* L) { return lua_steam_write(L, true); }
+int lua_steam_ack(lua_State* L) { return lua_steam_write(L, false); }
+int lua_steam_digest(lua_State* L) {
+    size_t length = 0; const auto* value = luaL_checklstring(L, 1, &length);
+    luaL_argcheck(L, length <= 262144, 1, "descriptor too large");
+    const auto hash = webconsole::steam_digest(std::string(value, length));
+    lua_pushlstring(L, hash.data(), hash.size()); return 1;
+}
+
 const luaL_Reg MODULE_FUNCS[] = {
+    { "steam_snapshot", lua_steam_snapshot },
+    { "steam_plan", lua_steam_plan },
+    { "steam_ack", lua_steam_ack },
+    { "steam_digest", lua_steam_digest },
     { "ping", lua_ping },
     { "version", lua_version },
     { "session_id", lua_session_id },

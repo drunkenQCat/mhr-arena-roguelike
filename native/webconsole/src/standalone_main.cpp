@@ -14,6 +14,7 @@ int main(int argc, char** argv)
     const auto slash = full.find_last_of(L"\\");
     webconsole::g_module_dir = slash == std::wstring::npos ? full : full.substr(0, slash);
     webconsole::g_data_dir = webconsole::g_module_dir + L"\\testdata";
+    webconsole::g_game_root = webconsole::g_module_dir;
     _wmkdir(webconsole::g_data_dir.c_str());
     webconsole::init_session_id();
     webconsole::log_info("standalone webconsole (test mode)");
