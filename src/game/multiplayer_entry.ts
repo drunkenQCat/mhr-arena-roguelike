@@ -203,7 +203,7 @@ export class MultiplayerEntry {
     const ready = !!lobby && !!this.plan && lobby.plan === this.wire && this.acknowledged(lobby, this.plan);
     return { ...identity, questId: ENTRY_QUEST_ID, mode: this.plan ? modes[this.plan.index] : null,
       hash: this.plan?.hash ?? null, revision: this.plan?.revision ?? null,
-      transport: this.transport?.getStatus() ?? "Idle", posting: this.pendingPost || !!this.transport?.isActive(),
+      transport: this.transport?.getStatus() ?? "Idle", nativePost: this.transport?.getDiagnostics() ?? null, posting: this.pendingPost || !!this.transport?.isActive(),
       canPost: ready && identity.role === "host" && !this.pendingPost && !this.transport?.isActive(),
       sync: { available: this.steam.available, reason: this.steam.reason, lobby: lobby?.id ?? null,
         applied: !!this.plan && this.applied === key(this.plan),

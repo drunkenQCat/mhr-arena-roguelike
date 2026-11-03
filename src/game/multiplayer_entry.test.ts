@@ -26,6 +26,7 @@ vi.mock("./quest_transport", () => ({ QuestTransport: class {
   request = mock.request; cancel = mock.cancel;
   isActive() { return mock.running; }
   getStatus() { return "Idle"; }
+  getDiagnostics() { return {}; }
   tick() {}
   getError() { return null; }
 } }));

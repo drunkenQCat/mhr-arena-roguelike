@@ -157,8 +157,20 @@ it("overrides single-quest classification only for the installed entry quest", (
   installer.publish({ ...f.plan, questId: 900103 }, false);
   const hook = mock.hook.mock.calls.find((args) => args[0].name === "isSingleQuest(System.Int32)")!;
   hook[1]({ 2: 900103 }); expect(hook[2](1)).toBe(0);
+  const active = mock.hook.mock.calls.find((args) => args[0].name === "isSingleQuest")!;
+  let activeId = 900103;
+  const manager = { get_field: () => ({ get_field: () => activeId }) };
+  active[1]({ 2: manager }); expect(active[2](1)).toBe(0);
+  activeId = 10107;
+  active[1]({ 2: manager }); expect(active[2](1)).toBe(1);
   for (const id of [101, 603, 900102]) {
     hook[1]({ 2: id }); expect(hook[2](1)).toBe(1);
+  }
+  const hall = mock.hook.mock.calls.find((args) => args[0].name === "isHallCounterQuest(System.Int32)")!;
+  hall[1]({ 2: 900103 }); expect(hall[2](0)).toBe(1);
+  for (const id of [101, 603, 900102]) {
+    hall[1]({ 2: id }); expect(hall[2](0)).toBe(0);
+    hall[1]({ 2: id }); expect(hall[2](1)).toBe(1);
   }
   const first = installer.multiplayerDescriptor();
   f.dictionary.get(900103)!.fields.enemy.fields._VitalTbl.elements[0]++;

@@ -8,7 +8,7 @@ import { snow_gui_GuiManager_YNInfoResult } from "./gen/enums/snow_gui_GuiManage
 import { snow_gui_SnowGuiCommonUtility_BaseBranchValue } from "./gen/enums/snow_gui_SnowGuiCommonUtility_BaseBranchValue";
 import {
   clockSeconds, createInstance, findTypeDefinition, getSingleton, hookMethod, PRE_HOOK,
-  questManager, retain, toManagedObject, toPtr, type REManagedObject,
+  questManager, relog, retain, toManagedObject, toPtr, type REManagedObject,
 } from "./sdk";
 
 function callNative(object: REManagedObject, name: string, ...args: unknown[]): unknown {
@@ -29,6 +29,25 @@ export class QuestTransport {
   private error: string | null = null;
   private lastSelection: unknown = null;
   private hall = false;
+  private counterType: number | null = null;
+  private history: { at: number; stage: PostStage; questId: number; hall: boolean }[] = [];
+
+  private setStage(stage: PostStage): void {
+    if (stage === this.stage) return;
+    this.stage = stage;
+    this.history.push({ at: clockSeconds(), stage, questId: this.target, hall: this.hall });
+    if (this.history.length > 20) this.history.shift();
+    // Only transitions, never a per-frame snapshot or disk export.
+    relog.info(`[MhwRogue] quest-post stage=${stage} quest=${this.target} hall=${this.hall} counter=${this.counterType}`);
+  }
+  getDiagnostics(): Record<string, unknown> {
+    const qm = questManager();
+    const read = (name: string): unknown => { try { return qm?.call(name) ?? null; } catch { return null; } };
+    return { stage: this.stage, target: this.target, hall: this.hall, counterType: this.counterType,
+      active: read("isActiveQuest"), activeQuest: read("get_ActiveQuestNo"),
+      nativeHallQuest: read("isHallCounterQuest"), nativeSingleQuest: read("isSingleQuest"),
+      error: this.error, history: this.history.slice() };
+  }
 
   constructor(private readonly currentQuest: () => REManagedObject | null, private readonly timeout: number) {}
   isActive(): boolean { return this.stage !== "Idle"; }
@@ -43,6 +62,30 @@ export class QuestTransport {
   }
   getError(): string | null { return this.error; }
   getStatus(): string { return this.error ?? this.stage; }
+
+  private registerHallQuest(qm: REManagedObject): boolean {
+    const lobby = getSingleton("snow.LobbyManager");
+    if (!lobby || callNative(lobby, "isInInternetQuestSession") !== true) return false;
+    const member = callNative(lobby, "get_MyLobbyHunterInfo") as REManagedObject | null;
+    const identifier = qm.get_field("_QuestIdentifier") as REManagedObject | null;
+    if (!member || !identifier || identifier.get_field("_QuestNo") !== this.target) {
+      throw new Error("Native hall quest identity missing");
+    }
+    const status = member.get_field("_hallStatus");
+    if (status === 1) {
+      // A quest session alone leaves the lobby member in Hall, invisible to the
+      // native board. createRoom registers the identifier and broadcasts it.
+      callNative(lobby, "createRoom", identifier);
+    } else if (status !== 2) {
+      throw new Error("Native hall member is not available to publish a quest");
+    }
+    const posted = member.get_field("_questIdentifier") as REManagedObject | null;
+    if (member.get_field("_hallStatus") !== 2 || member.get_field("_questHost") !== true ||
+        posted?.get_field("_QuestNo") !== this.target || !posted.get_field("_sessionID")) {
+      throw new Error("Native hall quest registration was not confirmed");
+    }
+    return true;
+  }
 
   request(id: number, hall = false): void {
     if (this.isActive()) throw new Error("Quest post already running");
@@ -59,12 +102,13 @@ export class QuestTransport {
     this.target = id;
     this.lastSelection = null;
     this.deadline = clockSeconds() + this.timeout;
-    this.stage = getSingleton(COUNTER) ? "WaitCounter" : "Open";
+    this.counterType = null;
+    this.setStage(getSingleton(COUNTER) ? "WaitCounter" : "Open");
   }
 
   cancel(closeWindows = true): void {
     const owned = this.isActive();
-    this.stage = "Idle"; // release every global hook predicate BEFORE closing UI
+    this.setStage("Idle"); // release every global hook predicate BEFORE closing UI
     this.error = null;
     if (owned && closeWindows) {
       const gui = getSingleton("snow.gui.GuiManager");
@@ -102,12 +146,22 @@ export class QuestTransport {
       if (this.stage === "Open") {
         callNative(gui, "set_IsActivateQuestCounterFromQuestBoard", false);
         callNative(facility, "activateOnly", snow_LobbyFacilityUIManager_SceneId.QuestCounter);
-        this.stage = "WaitCounter";
+        this.setStage("WaitCounter");
         return;
       }
       const counter = getSingleton(COUNTER);
       if (this.stage === "WaitCounter") {
         if (!counter) return;
+        // The counter may already exist, in which case awake never runs for this
+        // request. Set and read back the context immediately before native start.
+        const expected = this.hall
+          ? snow_gui_fsm_questcounter_GuiQuestCounterFsmManager_QuestCounterAccessType.HallCounter
+          : snow_gui_fsm_questcounter_GuiQuestCounterFsmManager_QuestCounterAccessType.VillageCounter;
+        callNative(counter, "set_QuestCounterType", expected);
+        this.counterType = callNative(counter, "get_QuestCounterType") as number;
+        if (this.counterType !== expected) {
+          throw new Error("Native quest counter context did not match the requested mode");
+        }
         const action = createInstance("snow.gui.fsm.questcounter.GuiQuestCounterFsmCreateQuestSessionAction", true);
         const arg = createInstance("via.behaviortree.ActionArg", true);
         if (!action || !arg) throw new Error("Cannot create native quest session action");
@@ -118,7 +172,7 @@ export class QuestTransport {
         if (!tree) throw new Error("Quest counter behavior tree missing");
         callNative(arg, "setOwnerComponentPtr", tree.get_address());
         callNative(this.action, "start", arg);
-        this.stage = "Confirm";
+        this.setStage("Confirm");
       }
       if (this.stage === "Confirm") {
         // Explicit native cursor/results; no screen coordinates or simulated keys.
@@ -148,21 +202,25 @@ export class QuestTransport {
         const branch = counter?.call("get_BaseBranchValue");
         if (branch === snow_gui_SnowGuiCommonUtility_BaseBranchValue.FAILED ||
             branch === snow_gui_SnowGuiCommonUtility_BaseBranchValue.CANCELED) throw new Error("Native quest selection failed/canceled");
-        if (callNative(qm, "isActiveQuest") && callNative(qm, "get_ActiveQuestNo") === this.target) {
+        // Native registration happens before asynchronous hall-session creation.
+        // Closing at isActiveQuest aborts that action while it is still in flight.
+        const completed = !this.hall || branch === snow_gui_SnowGuiCommonUtility_BaseBranchValue.SUCCESS;
+        if (completed && callNative(qm, "isActiveQuest") && callNative(qm, "get_ActiveQuestNo") === this.target) {
+          if (this.hall && !this.registerHallQuest(qm)) return;
           callNative(facility, "deactivateOnly", snow_LobbyFacilityUIManager_SceneId.QuestCounter);
-          this.stage = "Close";
+          this.setStage("Close");
         }
       } else if (this.stage === "Close") {
         if (!counter) {
           // Hub entry deliberately waits for native teammate joining/readiness and manual departure.
           if (this.hall) this.cancel(false);
-          else this.stage = "Depart";
+          else this.setStage("Depart");
         }
       } else if (this.stage === "Depart") {
         const flow = callNative(gui, "get_refQuestStartFlowHandler") as REManagedObject;
         if (!flow) throw new Error("Native quest departure flow missing");
         callNative(flow, "requestGoQuest", true);
-        this.stage = "AwaitEntry";
+        this.setStage("AwaitEntry");
       }
     } catch (error) {
       const message = String(error);

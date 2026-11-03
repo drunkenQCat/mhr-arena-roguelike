@@ -225,7 +225,9 @@ export class QuestInstaller {
     const text = findTypeDefinition("snow.quest.QuestData")?.get_method("getQuestTextCore");
     const list = findTypeDefinition("snow.QuestManager")?.get_method("makeQuestNoList");
     const single = this.multiplayerEntry ? findTypeDefinition("snow.quest.QuestUtility")?.get_method("isSingleQuest(System.Int32)") : null;
-    if (!text || !list || (this.multiplayerEntry && !single)) throw new Error("Missing quest text/list/multiplayer classification methods");
+    const hall = this.multiplayerEntry ? findTypeDefinition("snow.quest.QuestUtility")?.get_method("isHallCounterQuest(System.Int32)") : null;
+    const activeSingle = this.multiplayerEntry ? findTypeDefinition("snow.QuestManager")?.get_method("isSingleQuest") : null;
+    if (!text || !list || (this.multiplayerEntry && (!single || !hall || !activeSingle))) throw new Error("Missing quest text/list/multiplayer classification methods");
     hookMethod(text, (args) => {
       const storage = reframework.getHookStorage();
       storage.mhw_rogue_text_v2 = null;
@@ -251,10 +253,23 @@ export class QuestInstaller {
       return retval;
     });
     if (this.multiplayerEntry) {
+      // QuestManager has its own native classification implementation; changing
+      // QuestUtility alone does not cover the active quest's single-player check.
+      hookMethod(activeSingle!, (args) => {
+        const identifier = toManagedObject(args[2]).get_field("_QuestIdentifier") as REManagedObject | null;
+        reframework.getHookStorage().mhr_entry_active_single = !!this.quest && identifier?.get_field("_QuestNo") === this.cfg.quest.id;
+        return PRE_HOOK.CALL_ORIGINAL;
+      }, (retval) => reframework.getHookStorage().mhr_entry_active_single ? toPtr(0) : retval);
       hookMethod(single!, (args) => {
         reframework.getHookStorage().mhr_entry_single = !!this.quest && toInt64(args[2]) === this.cfg.quest.id;
         return PRE_HOOK.CALL_ORIGINAL;
       }, (retval) => reframework.getHookStorage().mhr_entry_single ? toPtr(0) : retval);
+      // Native hall membership is an independent quest-number classification.
+      // Returning false from isSingleQuest alone does not make 900103 a hall quest.
+      hookMethod(hall!, (args) => {
+        reframework.getHookStorage().mhr_entry_hall = !!this.quest && toInt64(args[2]) === this.cfg.quest.id;
+        return PRE_HOOK.CALL_ORIGINAL;
+      }, (retval) => reframework.getHookStorage().mhr_entry_hall ? toPtr(1) : retval);
     }
     this.hooks = true;
   }
