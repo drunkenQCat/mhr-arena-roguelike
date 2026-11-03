@@ -1,5 +1,6 @@
 import { InplaceWaves } from "./inplace_waves";
 import { TestTools } from "./test_tools";
+import { entryHostTestScope } from "./entry_host_scope";
 import type { RogueConfig } from "../core/config";
 import { DEFAULT_RUNTIME, type QuestPlan } from "../core/quest_plan";
 import type { DeathReading, EnemyReading, PlayerReading, RuntimeReading, SessionPort } from "../core/run_session";
@@ -29,11 +30,11 @@ interface Diagnostic { time: number; event: string; detail: unknown }
 
 export class NativeRuntime implements SessionPort {
   readonly transport: QuestTransport;
-  readonly testTools = new TestTools((event, detail) => this.report(event, detail));
+  readonly testTools = new TestTools((event, detail) => this.report(event, detail), () => this.entryHostTest && entryHostTestScope());
   /** Test-only seam: lets the CLI verify the started-run flow without native menus. */
   readonly questTransport: QuestTransport;
   private readonly inplace = new InplaceWaves((event, detail) => this.report(event, detail),
-    (plan, slot, type, id) => this.installer.prepareInplaceSlot(plan, slot, type, id));
+    (plan, slot, type, id) => this.installer.prepareInplaceSlot(plan, slot, type, id), () => this.entryHostTest && entryHostTestScope());
   private activePlan: QuestPlan | null = null;
   private holdClear = false;
   private hooks = false;
@@ -46,7 +47,7 @@ export class NativeRuntime implements SessionPort {
   private partySizeSource: (() => number | null) | null = null;
 
   constructor(private readonly cfg: RogueConfig, readonly installer: QuestInstaller,
-    private readonly gacha?: GachaService) {
+    private readonly gacha?: GachaService, private readonly entryHostTest = false) {
     this.transport = new QuestTransport(() => installer.getQuest(),
       (cfg.runtime ?? DEFAULT_RUNTIME).postTimeoutSeconds);
     this.questTransport = this.transport;
@@ -93,6 +94,9 @@ export class NativeRuntime implements SessionPort {
   takeDeaths(): DeathReading[] { const events = this.deaths; this.deaths = []; return events; }
   /** SessionPort.partySize：返回混合局名单人数；未锁定时 null=沿用原生人数。 */
   partySize(): number | null { return this.partySizeSource?.() ?? null; }
+  allowEntryHostTest(reading: RuntimeReading): boolean {
+    return this.entryHostTest && reading.quest?.id === 900103 && reading.players.length <= 1 && entryHostTestScope();
+  }
   /**
    * Test-only teleport request: drives the game's own warp flow (fade out, move,
    * fade in over a few seconds); the caller verifies the position on later frames.
@@ -117,7 +121,7 @@ export class NativeRuntime implements SessionPort {
   private requireTeleportScope(): void {
     const q = questManager();
     const stage = getSingleton("snow.stage.StageManager");
-    if (!q || !stage || stage.call("get_IsQuestOnline") !== false ||
+    if (!q || !stage || (this.entryHostTest && !entryHostTestScope()) || (stage.call("get_IsQuestOnline") !== false && !(this.entryHostTest && entryHostTestScope())) ||
       q.call("isPlayQuest") !== true || q.call("get_ActiveQuestNo") !== this.cfg.quest.id) {
       throw new Error("teleport: requires the active solo custom arena quest");
     }
@@ -293,7 +297,8 @@ export class NativeRuntime implements SessionPort {
     try {
       const qm = questManager();
       const stage = getSingleton("snow.stage.StageManager");
-      return !!qm && !stage?.call("get_IsQuestOnline") && !!callNative(qm, "isActiveQuest") &&
+      const hostTest = this.entryHostTest && entryHostTestScope();
+      return !!qm && (!this.entryHostTest || hostTest) && (!stage?.call("get_IsQuestOnline") || hostTest) && !!callNative(qm, "isActiveQuest") &&
         callNative(qm, "get_ActiveQuestNo") === this.activePlan.questId;
     } catch { return false; }
   }
@@ -355,22 +360,22 @@ export class NativeRuntime implements SessionPort {
     });
     hookMethod(vital, (args) => {
       const storage = reframework.getHookStorage();
-      storage.mhw_rogue_hp_mul = this.matches(args[2]) &&
+      storage[`mhw_rogue_hp_mul_${this.cfg.quest.id}`] = this.matches(args[2]) &&
         toInt64(args[3]) === snow_enemy_EnemyDef_VitalCategory.Hp &&
         toInt64(args[4]) === snow_enemy_EnemyDef_NandoGetType.All ? this.activePlan!.wave.hpMul : 1;
       return PRE_HOOK.CALL_ORIGINAL;
     }, (retval) => {
-      const mul = reframework.getHookStorage().mhw_rogue_hp_mul as number;
+      const mul = reframework.getHookStorage()[`mhw_rogue_hp_mul_${this.cfg.quest.id}`] as number;
       return mul !== 1 ? floatToPtr(this.rate("hp", toFloat(retval), mul)) : retval;
     });
     hookMethod(attack, (args) => {
-      reframework.getHookStorage().mhw_rogue_dmg_mul = this.matches(args[2]) ? this.activePlan!.wave.dmgMul : 1;
+      reframework.getHookStorage()[`mhw_rogue_dmg_mul_${this.cfg.quest.id}`] = this.matches(args[2]) ? this.activePlan!.wave.dmgMul : 1;
       return PRE_HOOK.CALL_ORIGINAL;
     }, (retval) => {
-      const mul = reframework.getHookStorage().mhw_rogue_dmg_mul as number;
+      const mul = reframework.getHookStorage()[`mhw_rogue_dmg_mul_${this.cfg.quest.id}`] as number;
       return mul !== 1 ? floatToPtr(this.rate("attack", toFloat(retval), mul)) : retval;
     });
     this.hooks = true;
-    this.report("runtime-hooks-installed", { scope: this.cfg.quest.id, online: "disabled" });
+    this.report("runtime-hooks-installed", { scope: this.cfg.quest.id, online: this.entryHostTest ? "one-host-test" : "disabled" });
   }
 }

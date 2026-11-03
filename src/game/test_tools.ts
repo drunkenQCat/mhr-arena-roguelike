@@ -58,13 +58,17 @@ export class TestTools {
     });
     this.observer = true;
   }
-  constructor(private readonly report: (event: string, detail: unknown) => void) {}
+  constructor(private readonly report: (event: string, detail: unknown) => void,
+    private readonly entryHostTest: () => boolean = () => false) {}
 
   private scoped(): boolean {
     const qm = questManager();
     const stage = getSingleton("snow.stage.StageManager");
-    if (!qm || !stage || callNative(stage, "get_IsQuestOnline")) return false;
-    return !!callNative(qm, "isPlayQuest") && [900101, 900102].includes(callNative(qm, "get_ActiveQuestNo") as number);
+    if (!qm || !stage) return false;
+    const id = callNative(qm, "get_ActiveQuestNo") as number;
+    const entry = id === 900103 && this.entryHostTest();
+    if (callNative(stage, "get_IsQuestOnline") && !entry) return false;
+    return !!callNative(qm, "isPlayQuest") && (entry || [900101, 900102].includes(id));
   }
 
   toggleGod(): void {

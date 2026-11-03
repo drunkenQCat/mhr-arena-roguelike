@@ -3,9 +3,9 @@ import { RunCore } from "../core/run_core";
 import { validateConfig } from "../core/config";
 import { defaultConfig } from "./default_config";
 const mock = vi.hoisted(() => ({ click: false, selecting: true, village: true, count: 2,
-  grant: vi.fn(), dumps: vi.fn(), begin: vi.fn(), end: vi.fn(), text: vi.fn() }));
+  grant: vi.fn(), receive: true, dumps: vi.fn(), begin: vi.fn(), end: vi.fn(), text: vi.fn() }));
 vi.mock("./item_grant", () => ({ canTrade: () => mock.village,
-  pouchCount: () => mock.count, grantItem: mock.grant }));
+  pouchCount: () => mock.count, pouchCanReceive: () => mock.receive, grantItem: mock.grant }));
 vi.mock("./sdk", () => ({ clockSeconds: () => 0, rejson: { dump_file: mock.dumps }, imguiApi: {
   begin_window: mock.begin, end_window: mock.end,
   set_next_window_pos: () => {}, set_next_window_size: () => {},
@@ -23,7 +23,7 @@ function fixture() {
   return { core, shop, click: () => { mock.click = true; shop.draw(); } };
 }
 beforeEach(() => {
-  mock.click = false; mock.selecting = true; mock.village = true; mock.count = 2;
+  mock.click = false; mock.selecting = true; mock.village = true; mock.count = 2; mock.receive = true;
   mock.grant.mockReset(); mock.dumps.mockReset();
   mock.begin.mockReset().mockReturnValue(true); mock.end.mockReset(); mock.text.mockReset();
 });
@@ -161,4 +161,14 @@ describe("M3.6 service delivery", () => {
     expect(shop.lastTransaction?.status).toBe("rejected");
     expect(core.state.wallet.pt).toBe(core.config.startPt);
   });
+});
+it("blocks native-refused stock before debiting PT", () => {
+  const { core, shop } = fixture();
+  mock.receive = false;
+  const before = core.state.wallet.pt;
+  expect(shop.catalogue().categories.Items![0]!.canBuy).toBe(false);
+  expect(shop.requestPurchase("potion").ok).toBe(false);
+  shop.tick();
+  expect(mock.grant).not.toHaveBeenCalled();
+  expect(core.state.wallet.pt).toBe(before);
 });

@@ -198,6 +198,11 @@ export class MultiplayerEntry {
     }
   }
   shutdown(): void { this.transport?.cancel(false); }
+  hostTestEntry(): { installer: QuestInstaller; plan: import("../core/quest_plan").QuestPlan } | null {
+    const plan = this.installer?.getPlan();
+    return readLobbyIdentity().role === "host" && questManager()?.call("get_ActiveQuestNo") === ENTRY_QUEST_ID && plan && this.installer
+      ? { installer: this.installer, plan } : null;
+  }
   snapshot(): Record<string, unknown> {
     const identity = readLobbyIdentity(), qm = questManager(), lobby = this.lobby;
     const ready = !!lobby && !!this.plan && lobby.plan === this.wire && this.acknowledged(lobby, this.plan);

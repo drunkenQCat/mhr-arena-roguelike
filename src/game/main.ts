@@ -17,17 +17,18 @@ import { DEFAULT_BUFF_AMOUNTS, type BuffAmounts } from "../core/config";
 import type { ServiceEffects } from "./shop_window";
 import type { BuffKind } from "./buff_service";
 import { clockSeconds, reframework, rejson, relog } from "./sdk";
+import { entryHostTestScope } from "./entry_host_scope";
 
 try {
   const config = loadConfig();
-  const core = new RunCore(config);
+  let core = new RunCore(config);
   const spike: WaveOption = { index: 0, typeTag: "M2a", label: "Great Izuchi -> Great Baggi",
     monsters: ["Great Izuchi", "Great Baggi"], tier: "weak", hpMul: 1, dmgMul: 1, rewardMul: 0, rewardPt: 0 };
   const initial = makeQuestPlan(config, monsterCatalog, spike, 1, 0, true);
   const installer = new QuestInstaller(config, initial);
   const gacha = new GachaService(config.gachaPools ?? {}, { rollIndex: (w) => core.rollWeighted(w) });
-  const runtime = new NativeRuntime(config, installer, gacha);
-  const session = new RunSession(core, monsterCatalog, runtime);
+  let runtime = new NativeRuntime(config, installer, gacha);
+  let session = new RunSession(core, monsterCatalog, runtime);
   // 上局中断留下的未恢复状态（重载/崩溃）：回到村庄后由 session tick 自动恢复。
   if (loadStartupState()) {
     session.armStartupRestore();
@@ -41,7 +42,7 @@ try {
     gachaBuy: (poolId: string) => gacha.roll(poolId),
     hasGachaPool: (poolId: string) => gacha.hasPool(poolId),
   };
-  const shopWindow = new ShopWindow(session.core, () => session.canShop(), () => session.shopQuest(), services);
+  let shopWindow = new ShopWindow(session.core, () => session.canShop(), () => session.shopQuest(), services);
   const multiplayerEntry = new MultiplayerEntry(config, monsterCatalog, () =>
     ["Idle", "Finished", "Fault"].includes(session.stage) && !session.startupStatus.restorePending);
   let webConsole: WebConsoleBridge | null = null;
@@ -51,10 +52,30 @@ try {
   runtime.setPartySizeSource(() => webConsole?.partyRosterSize() ?? null);
   let lastBuffState = "";
   let lastBuffPoll = -1;
+  let entryAttached = false;
   reframework.onFrame(() => {
     try {
+      // Explicit debug-only one-host slice. Never adopts guests, real teams, or
+      // unrelated quests, and does not redo equipment/pouch startup in a posted quest.
+      if (!entryAttached && config.runtime?.debugMode && !session.startupStatus.restorePending &&
+          ["Idle", "Finished"].includes(session.stage) && !shopWindow.busy && entryHostTestScope()) {
+        const entry = multiplayerEntry.hostTestEntry();
+        if (entry) {
+          entryAttached = true;
+          runtime.shutdown(); webConsole?.newScriptSession();
+          const entryConfig = { ...config, quest: { ...config.quest, id: entry.plan.questId } };
+          core = new RunCore(entryConfig);
+          runtime = new NativeRuntime(entryConfig, entry.installer, gacha, true);
+          runtime.tick();
+          session = new RunSession(core, monsterCatalog, runtime);
+          const adopted = session.adoptPostedEntry(entry.plan);
+          if (!adopted.ok) throw new Error(adopted.message ?? "Cannot adopt entry quest");
+          shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
+          webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry);
+        }
+      }
       runtime.tick(); shopWindow.tick(); session.tick(); multiplayerEntry.tick();
-      buffs.tick(session.readingSnapshot, { stage: session.stage, layer: core.state.layer, questId: config.quest.id });
+      buffs.tick(session.readingSnapshot, { stage: session.stage, layer: core.state.layer, questId: core.config.quest.id });
       const sampleTime = session.readingSnapshot?.time ?? -1;
       if (sampleTime !== lastBuffPoll) {
         lastBuffPoll = sampleTime;

@@ -1,7 +1,7 @@
 /** M3 商店窗口：单件 + 补满 + 猫车恢复；读回验证、事务日志、失败恢复。 */
 import type { RunCore, ShopEntry } from "../core/run_core";
 import { replaceOrAdd } from "../core/run_state";
-import { canTrade, grantFill, grantItem, pouchCount, type TradeQuest } from "./item_grant";
+import { canTrade, grantFill, grantItem, pouchCount, pouchCanReceive, type TradeQuest } from "./item_grant";
 import { restoreNativeCart } from "./native_cart";
 import type { GachaRollResult } from "./gacha";
 import type { BuffKind } from "./buff_service";
@@ -72,6 +72,9 @@ export class ShopWindow
         (item.id.startsWith("gacha_") && this.services !== null && this.services.hasGachaPool(item.id));
       if (item.mode === "service" && !serviceOpen) { item.canBuy = false; item.reason = "游戏效果接线完成前暂不开放"; continue; }
       if (unreadable.includes(item.id)) { item.canBuy = false; item.reason = "道具映射或背包尚未就绪"; }
+      if (available && item.canBuy && item.mode !== "service" && !pouchCanReceive(item.id)) {
+        item.canBuy = false; item.reason = "原生背包当前不接受此物品：可能已满、不可携带或格位不足";
+      }
       if (!available) { item.canBuy = false; item.reason = reason; }
     }
     this.catalogueAt = now; this.catalogueKey = key; this.catalogueConfig = this.core.config;

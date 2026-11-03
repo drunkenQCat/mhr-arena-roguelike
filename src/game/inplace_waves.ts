@@ -15,7 +15,8 @@ export class InplaceWaves {
   waitingForCapacity = false;
   status = "inPlace inactive";
   constructor(private readonly report: (event: string, detail: unknown) => void,
-    private readonly configureSlot: (plan: QuestPlan, slot: number, type: number, id: number) => void = () => {}) {}
+    private readonly configureSlot: (plan: QuestPlan, slot: number, type: number, id: number) => void = () => {},
+    private readonly allowEntryHostTest: () => boolean = () => false) {}
 
   prepare(plan: QuestPlan): void {
     const q = this.scope(plan);
@@ -110,7 +111,8 @@ export class InplaceWaves {
   private scope(plan: QuestPlan): REManagedObject {
     const q = questManager();
     const stage = getSingleton("snow.stage.StageManager");
-    if (!q || !stage || stage.call("get_IsQuestOnline") === true || q.call("isPlayQuest") !== true || q.call("get_ActiveQuestNo") !== plan.questId) throw new Error("inPlace requires the owned solo arena quest");
+    if (plan.questId === 900103 && !this.allowEntryHostTest()) throw new Error("Entry host test scope ended");
+    if (!q || !stage || (stage.call("get_IsQuestOnline") === true && !this.allowEntryHostTest()) || q.call("isPlayQuest") !== true || q.call("get_ActiveQuestNo") !== plan.questId) throw new Error("inPlace requires the owned solo arena quest");
     return q;
   }
 }

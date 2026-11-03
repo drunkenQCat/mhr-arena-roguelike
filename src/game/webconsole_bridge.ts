@@ -312,7 +312,7 @@ export class WebConsoleBridge {
         return { status: "queued", message: "Waiting for native death evidence", targets };
       }
       case "teleport": {
-        if (!s.plan || !s.readingSnapshot?.quest?.playing || s.readingSnapshot.online ||
+        if (!s.plan || !s.readingSnapshot?.quest?.playing || (s.readingSnapshot.online && !this.runtime.allowEntryHostTest?.(s.readingSnapshot)) ||
           !["Combat", "Carve", "Returning", "Selecting"].includes(s.stage)) throw new Error("TP requires an active solo arena run");
         if (this.effect) throw new Error("Another test effect is pending");
         if (cmd.to !== "origin" && cmd.to !== "monster") throw new Error("Use origin or monster");
@@ -397,7 +397,8 @@ export class WebConsoleBridge {
     const listing = this.shop.catalogue();
     const next = s.configForEditing();
     const idle = ["Idle", "Finished", "Fault"].includes(s.stage);
-    const activeSolo = !!r?.quest?.playing && !r?.online && !!s.plan;
+    const entryHostTest = !!r && !!this.runtime.allowEntryHostTest?.(r);
+    const activeSolo = !!r?.quest?.playing && (!r?.online || entryHostTest) && !!s.plan;
     const ready = this.runtime.ready?.() ?? false;
     const canStart = idle && ready && !r?.online && !!r?.canPost && (!r?.quest || !!r.staleQuest) && !s.startupStatus.restorePending;
     const alive = r?.enemies.some((enemy) => !enemy.dead && !enemy.captured) ?? false;
@@ -412,6 +413,7 @@ export class WebConsoleBridge {
       layer: core.state.layer, pt: core.state.wallet.pt, cartsLeft: core.state.cartsLeft,
       nativeDeaths: r?.deaths ?? null, maxCarts: core.config.maxCarts, armor: core.state.armor, armorOptions: s.configForEditing().armorOptions,
       nativeOnline: r?.online ?? null, businessParty: this.party.active ? this.party.summary() : null,
+      entryHostTest,
       // 评审二轮 #1：party 会话身份直接发布在顶层，CLI 无需解析 businessParty。
       partyGeneration: this.party.active ? this.party.currentGeneration() : null,
       killedUltimates: core.state.killedUltimates,

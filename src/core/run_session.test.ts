@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { validateConfig } from "./config";
 import { RunCore } from "./run_core";
 import { RunSession, type DeathReading, type RuntimeReading, type SessionPort } from "./run_session";
-import type { MonsterCatalog, QuestPlan } from "./quest_plan";
+import { makeQuestPlan, type MonsterCatalog, type QuestPlan } from "./quest_plan";
 
 const catalog: MonsterCatalog = JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8"));
 class FakeGame implements SessionPort {
@@ -59,6 +59,37 @@ function setup(route: "reentry" | "inPlace" = "reentry") {
   };
   return { config, core, game, session, tick, start, enter, clear, village };
 }
+
+it("adopts a posted entry without startup isolation, clears and shops in place, then releases on lost authorization", () => {
+  const { config, core, game, session, tick } = setup("inPlace");
+  config.quest.id = 900103;
+  let authorized = true;
+  Object.assign(game, { allowEntryHostTest: () => authorized });
+  game.reading.online = true;
+  game.reading.canPost = false;
+  game.reading.quest = { id: 900103, unique: 44, playing: false, status: "ready" };
+  const wave = { index: 0, typeTag: "entry", label: "host", mode: "single" as const,
+    monsters: ["Great Izuchi"], tier: "weak" as const, hpMul: 1, dmgMul: 1, rewardMul: 1, rewardPt: 80 };
+  const plan = makeQuestPlan(config, catalog, wave, 1, 1, false);
+  expect(session.adoptPostedEntry(plan).ok).toBe(true);
+  expect(session.stage).toBe("AwaitQuest");
+  expect(game.posts).toEqual([]);
+  expect(session.startupStatus.restorePending).toBe(false);
+  game.reading.quest.playing = true; game.reading.quest.status = "play";
+  tick(); expect(session.stage).toBe("Combat");
+  game.reading.enemies = [{ uid: 100, typeId: plan.monsterIds[0]!, dead: true, captured: false }];
+  tick(); expect(session.stage).toBe("Carve");
+  tick(3); tick(2);
+  expect(session.stage).toBe("Selecting");
+  expect(session.canShop()).toBe(true);
+  expect(session.shopQuest()).toEqual({ questId: 900103, questUnique: 44, entryHostTest: true });
+  expect(core.state.wallet.pt).toBe(config.startPt + 80);
+  expect(session.choose(0).ok).toBe(true);
+  expect(game.publications.at(-1)?.inPlace).toBe(true);
+  authorized = false; tick();
+  expect(session.stage).toBe("Fault");
+  expect(game.policies.at(-1)?.hold).toBe(false);
+});
 
 describe("real-event session", () => {
   it("samples idle position changes with the same clock gate used for progression", () => {

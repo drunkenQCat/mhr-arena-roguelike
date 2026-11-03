@@ -172,6 +172,12 @@ it("overrides single-quest classification only for the installed entry quest", (
     hall[1]({ 2: id }); expect(hall[2](0)).toBe(0);
     hall[1]({ 2: id }); expect(hall[2](1)).toBe(1);
   }
+  const village = mock.hook.mock.calls.find((args) => args[0].name === "isVillageCounterQuest(System.Int32)")!;
+  village[1]({ 2: 900103 }); expect(village[2](1)).toBe(0);
+  for (const id of [101, 603, 10107, 900102]) {
+    village[1]({ 2: id }); expect(village[2](1)).toBe(1);
+    village[1]({ 2: id }); expect(village[2](0)).toBe(0);
+  }
   const first = installer.multiplayerDescriptor();
   f.dictionary.get(900103)!.fields.enemy.fields._VitalTbl.elements[0]++;
   expect(installer.multiplayerDescriptor()).not.toBe(first);

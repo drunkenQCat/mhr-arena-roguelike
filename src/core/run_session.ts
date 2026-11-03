@@ -47,6 +47,7 @@ export interface SessionPort {
   ultimateDrop?(): { ok: boolean; name?: string; reused?: boolean; reason?: string };
   /** 离线队友调研 §6C：权威参战人数（混合实机 mock 名单）。null=沿用原生人数。 */
   partySize?(): number | null;
+  allowEntryHostTest?(reading: RuntimeReading): boolean;
 }
 
 export type SessionStage = "Idle" | "Selecting" | "AwaitQuest" | "Combat" | "Carve" | "Returning" | "Finished" | "Fault";
@@ -142,7 +143,7 @@ export class RunSession {
   canShop(): boolean {
     if (this.stage !== "Selecting") return false;
     const r = this.readingSnapshot;
-    if (!r || r.online) return false;
+    if (!r || (r.online && !this.port.allowEntryHostTest?.(r))) return false;
     if (!r.quest) return r.canPost;
     return r.quest.playing && r.quest.unique === this.questUnique &&
       r.quest.id === this.plan?.questId && this.preparation().gathered;
@@ -157,20 +158,42 @@ export class RunSession {
   private chainKillAt: number | null = null;
   private nextSpawnReported = false;
   private seenSpawnReported = false;
+  private entryHostRun = false;
 
   constructor(readonly core: RunCore, private readonly catalog: MonsterCatalog, private readonly port: SessionPort) {
     this.settings = { ...(core.config.runtime ?? DEFAULT_RUNTIME) };
     this.route = this.settings.route;
   }
 
-  shopQuest(): { questId: number; questUnique: number } | undefined {
+  shopQuest(): { questId: number; questUnique: number; entryHostTest?: boolean } | undefined {
     if (this.stage === "Selecting" && this.route === "inPlace" && this.plan && this.questUnique !== null) {
-      return { questId: this.plan.questId, questUnique: this.questUnique };
+      return { questId: this.plan.questId, questUnique: this.questUnique,
+        ...(this.readingSnapshot && this.port.allowEntryHostTest?.(this.readingSnapshot) ? { entryHostTest: true } : {}) };
     }
     return undefined;
   }
 
   private announce(event: string, detail: unknown): void { this.port.report(event, detail); }
+
+  adoptPostedEntry(plan: QuestPlan): Result {
+    const reading = this.port.read();
+    if (this.stage !== "Idle" || plan.questId !== 900103 || this.core.config.quest.id !== 900103 ||
+        reading.quest?.id !== plan.questId || !this.port.allowEntryHostTest?.(reading)) return fail("Entry host test scope unavailable");
+    const started = this.core.startRun(this.core.config.armorOptions[0]!);
+    if (!started.ok) return started;
+    this.core.generateChoices(1);
+    this.core.state.currentChoices = [plan.wave];
+    const picked = this.core.pickChoice(plan.wave.index);
+    if (!picked.ok) return picked;
+    this.plan = plan; this.token = plan.token; this.route = "inPlace";
+    this.entryHostRun = true;
+    this.testOnly = false; this.resetTracking(reading, false);
+    this.port.policy(plan, true);
+    this.stage = "AwaitQuest";
+    this.message = "房主本机接线测试：保留现有装备和背包，等待手动出发；真实队友加入后停止测试";
+    this.announce("entry-host-adopted", { plan, scope: "one-native-host-only", startupIsolation: false });
+    return ok();
+  }
 
   start(armor: string, spike = false, testLayer?: number): Result {
     try {
@@ -257,7 +280,7 @@ export class RunSession {
     try {
       if (this.stage !== "Selecting") return fail("当前不在选波次阶段");
       const reading = this.port.read();
-      if (reading.online) return fail("M2 不支持联机");
+      if (reading.online && !this.port.allowEntryHostTest?.(reading)) return fail("M2 不支持联机");
       const inPlace = !!reading.quest?.playing;
       if (inPlace && (!this.plan || reading.quest!.id !== this.plan.questId || this.route !== "inPlace")) {
         return fail("发布本波前请先回村");
@@ -324,7 +347,7 @@ export class RunSession {
     this.port.policy(null, false);
     this.core.abortRun("Run stopped");
     if (this.plan && reading.quest?.id === this.plan.questId && reading.quest.playing) this.port.finish(true);
-    if (this.port.startupPrepare) this.startupRestorePending = true;
+    if (this.startupPrepared) this.startupRestorePending = true;
     this.stage = "Finished";
     this.message = "已终止；回村后自动恢复原装备";
   }
@@ -353,7 +376,10 @@ export class RunSession {
         }
       }
       if (["Idle", "Finished", "Fault"].includes(this.stage)) return;
-      if (reading.online) { this.fault("Online session detected; native hooks released"); return; }
+      if (this.entryHostRun && !this.port.allowEntryHostTest?.(reading)) {
+        this.fault("Entry host test identity changed or a real teammate joined"); return;
+      }
+      if (reading.online && !this.port.allowEntryHostTest?.(reading)) { this.fault("Online session detected; native hooks released"); return; }
       const postError = this.port.postingError();
       if (postError) { this.fault(postError); return; }
       if (reading.quest && this.plan && reading.quest.id !== this.plan.questId) {
@@ -442,6 +468,7 @@ export class RunSession {
         } else if (reading.time - this.progressAt > (this.port.waitingForSpawnCapacity?.() ? Math.max(180, this.settings.spawnTimeoutSeconds) : this.settings.spawnTimeoutSeconds) &&
           !reading.enemies.some((enemy) => !enemy.dead && !enemy.captured && this.plan!.monsterIds.includes(enemy.typeId) && !this.excludedUids.includes(enemy.uid))) {
           if (this.route === "inPlace") {
+            if (this.entryHostRun) { this.fault("Entry host inPlace spawn timed out; automatic reentry is unsupported"); return; }
             this.route = "reentry";
             this.retryWave = true;
             this.port.policy(this.plan, false);

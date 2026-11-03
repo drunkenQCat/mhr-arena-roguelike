@@ -8,6 +8,7 @@
  */
 
 import { itemIds } from "./default_config";
+import { entryHostTestScope } from "./entry_host_scope";
 import { getSingleton, relog, type REManagedObject } from "./sdk";
 
 // Bare-name dispatch may select the other overload and reject two arguments without throwing.
@@ -53,7 +54,15 @@ export function pouchCount(shopItemId: string): number {
   return count;
 }
 
-export interface TradeQuest { questId: number; questUnique: number }
+/** Native carry eligibility, including items that have a mapping but no pouch slot. */
+export function pouchCanReceive(shopItemId: string): boolean {
+  try {
+    const id = gameIdOf(shopItemId), pouch = itemPouch();
+    return id !== null && !!pouch && pouch.call("canAddItem", id) === true;
+  } catch { return false; }
+}
+
+export interface TradeQuest { questId: number; questUnique: number; entryHostTest?: boolean }
 
 /** An arena context is supplied only by the session's between-wave Selecting stage. */
 export function canTrade(context?: TradeQuest): boolean {
@@ -61,9 +70,10 @@ export function canTrade(context?: TradeQuest): boolean {
     const qm = getSingleton("snow.QuestManager");
     const stage = getSingleton("snow.stage.StageManager");
     const gui = getSingleton("snow.gui.GuiManager");
-    if (!qm || !stage || !gui || stage.call("get_IsQuestOnline") || gui.call("isOpenYNInfo") || gui.call("isOpenSelectInfo")) return false;
+    const entry = context?.entryHostTest === true && context.questId === 900103 && entryHostTestScope();
+    if (!qm || !stage || !gui || (stage.call("get_IsQuestOnline") && !entry) || gui.call("isOpenYNInfo") || gui.call("isOpenSelectInfo")) return false;
     if (!qm.call("isActiveQuest")) return !!gui.call("IsCanInvokeQuestBoard");
-    if (!context || context.questId !== 900102 || qm.call("get_ActiveQuestNo") !== context.questId ||
+    if (!context || (context.questId !== 900102 && !entry) || qm.call("get_ActiveQuestNo") !== context.questId ||
         qm.call("getActiveQuestUniqueNo") !== context.questUnique || qm.call("isPlayQuest") !== true) return false;
     const em = getSingleton("snow.enemy.EnemyManager");
     if (!em) return false;

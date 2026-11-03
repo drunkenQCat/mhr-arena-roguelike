@@ -17,7 +17,7 @@ vi.mock("./sdk", () => ({ loadWebconsole: () => ({
     write: (path: string, text: string) => { if (path !== host.failWrite) host.files[path] = JSON.parse(text); } },
   rejson: { dump_string: (body: unknown) => JSON.stringify(body), load_string: (s: string) => { try { return JSON.parse(s); } catch { return null; } },
     dump_file: (path: string, body: unknown) => { if (path === host.failWrite) return false; host.files[path] = JSON.parse(JSON.stringify(body)); return true; } }, imguiApi: {} }));
-vi.mock("./item_grant", () => ({ canTrade: () => true, pouchCount: () => host.count,
+vi.mock("./item_grant", () => ({ canTrade: () => true, pouchCanReceive: () => true, pouchCount: () => host.count,
   grantItem: () => ({ granted: true, before: host.count++, after: host.count }), grantFill: vi.fn() }));
 vi.mock("./native_cart", () => ({ restoreNativeCart: vi.fn() }));
 import { WebConsoleBridge } from "./webconsole_bridge";

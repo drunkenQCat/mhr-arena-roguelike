@@ -226,8 +226,9 @@ export class QuestInstaller {
     const list = findTypeDefinition("snow.QuestManager")?.get_method("makeQuestNoList");
     const single = this.multiplayerEntry ? findTypeDefinition("snow.quest.QuestUtility")?.get_method("isSingleQuest(System.Int32)") : null;
     const hall = this.multiplayerEntry ? findTypeDefinition("snow.quest.QuestUtility")?.get_method("isHallCounterQuest(System.Int32)") : null;
+    const village = this.multiplayerEntry ? findTypeDefinition("snow.quest.QuestUtility")?.get_method("isVillageCounterQuest(System.Int32)") : null;
     const activeSingle = this.multiplayerEntry ? findTypeDefinition("snow.QuestManager")?.get_method("isSingleQuest") : null;
-    if (!text || !list || (this.multiplayerEntry && (!single || !hall || !activeSingle))) throw new Error("Missing quest text/list/multiplayer classification methods");
+    if (!text || !list || (this.multiplayerEntry && (!single || !hall || !village || !activeSingle))) throw new Error("Missing quest text/list/multiplayer classification methods");
     hookMethod(text, (args) => {
       const storage = reframework.getHookStorage();
       storage.mhw_rogue_text_v2 = null;
@@ -253,6 +254,12 @@ export class QuestInstaller {
       return retval;
     });
     if (this.multiplayerEntry) {
+      // getMaxJoinNum checks village classification independently of the hall and
+      // single-player checks. Let the native capacity calculation return four.
+      hookMethod(village!, (args) => {
+        reframework.getHookStorage().mhr_entry_village = !!this.quest && toInt64(args[2]) === this.cfg.quest.id;
+        return PRE_HOOK.CALL_ORIGINAL;
+      }, (retval) => reframework.getHookStorage().mhr_entry_village ? toPtr(0) : retval);
       // QuestManager has its own native classification implementation; changing
       // QuestUtility alone does not cover the active quest's single-player check.
       hookMethod(activeSingle!, (args) => {
