@@ -64,6 +64,10 @@ jobs:
           npm run typecheck
           npm test
           npm run check
+          python -m pip install lupa==2.8
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot install Lua runtime test dependency' }
+          npm run check:runtime
+          if ($LASTEXITCODE -ne 0) { throw 'Compiled Lua runtime checks failed' }
           npm run test:cli
 
       - name: Build web console HTML
@@ -163,16 +167,16 @@ jobs:
 
           下载 Assets 中的 MHR-Arena-Roguelike-nightly.zip，不要下载 Source code。双方先退出游戏，再安装同一份 ZIP。包内“测试与反馈.txt”有详细步骤；网页首页可一键下载测试日志。
 
-          当前目标：房主选波、Steam 自动准备、真实队友通过原生任务板进入同一任务。双客户端尚待玩家验证，完整多人肉鸽尚未实现。Nightly 可能不稳定，请先备份存档。
+          当前版本已接入：Steam 自动准备、原生任务板入队、局内房主选波、全端原生出怪记录确认、个人 PT 与购物。默认启用，无需 DebugMode。真实双客户端战斗同步仍需玩家验证，不能把模拟测试视为联机验收。请按包内说明测试单怪、顺序双怪、同时双怪，并下载双方日志反馈。
           "@
           Set-Content -LiteralPath nightly-notes.md -Value $notes -Encoding utf8
           gh release view nightly --repo '${{ github.repository }}' *> $null
           if ($LASTEXITCODE -eq 0) {
             gh api --method PATCH 'repos/${{ github.repository }}/git/refs/tags/nightly' -f 'sha=${{ github.sha }}' -F force=true
             if ($LASTEXITCODE -ne 0) { throw 'Cannot update nightly tag' }
-            gh release edit nightly --repo '${{ github.repository }}' --title 'Nightly — 最新联机入场实验版' --prerelease --notes-file nightly-notes.md
+            gh release edit nightly --repo '${{ github.repository }}' --title 'Nightly — 联机多波次实验版' --prerelease --notes-file nightly-notes.md
           } else {
-            gh release create nightly --repo '${{ github.repository }}' --target '${{ github.sha }}' --title 'Nightly — 最新联机入场实验版' --prerelease --notes-file nightly-notes.md
+            gh release create nightly --repo '${{ github.repository }}' --target '${{ github.sha }}' --title 'Nightly — 联机多波次实验版' --prerelease --notes-file nightly-notes.md
           }
           if ($LASTEXITCODE -ne 0) { throw 'Cannot publish nightly release' }
           gh release upload nightly MHR-Arena-Roguelike-nightly.zip --repo '${{ github.repository }}' --clobber

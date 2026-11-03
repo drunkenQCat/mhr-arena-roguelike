@@ -5,7 +5,19 @@ import { createInstance, getSingleton, questManager, type REManagedArray, type R
 /** Experimental backend: fresh identities, native loader, reusable task/order slots.
  * A wave uses free slots without changing a corpse or calling the creator directly.
  */
+export interface SpawnTicket { token: number; ordinal: number; type: number; slot: number; id: number; uid: number }
+export interface SpawnSync {
+  role: "host" | "guest";
+  valid(): boolean;
+  expected(): SpawnTicket | null;
+  canStage?(): boolean;
+  staged(ticket: SpawnTicket): void;
+  activate(ticket: SpawnTicket): boolean;
+}
 export class InplaceWaves {
+  private sync: SpawnSync | null = null;
+  private staged: SpawnTicket | null = null;
+  setSync(sync: SpawnSync): void { this.sync = sync; }
   private plan: QuestPlan | null = null;
   private unique = 0;
   private pending: number[] = [];
@@ -35,17 +47,27 @@ export class InplaceWaves {
     this.plan = plan;
     this.unique = q.call("getActiveQuestUniqueNo") as number;
     this.pending = [...plan.monsterIds]; this.issued = []; this.ended = []; this.nextPoll = 0;
-    this.waitingForCapacity = false;
+    this.waitingForCapacity = false; this.staged = null;
     this.status = "inPlace waiting for reusable native slots";
   }
-  cancel(): void { this.waitingForCapacity = false; this.plan = null; this.pending = []; this.issued = []; this.ended = []; this.status = "inPlace inactive"; }
+  cancel(): void { this.staged = null; this.waitingForCapacity = false; this.plan = null; this.pending = []; this.issued = []; this.ended = []; this.status = "inPlace inactive"; }
   death(uid: number): void { if (this.issued.includes(uid) && !this.ended.includes(uid)) this.ended.push(uid); }
 
   tick(now: number): void {
-    if (!this.plan || this.pending.length === 0 || now < this.nextPoll) return;
+    if (!this.plan || (this.pending.length === 0 && !this.staged) || now < this.nextPoll) return;
     this.nextPoll = now + 1;
     const q = this.scope(this.plan);
     if (q.call("getActiveQuestUniqueNo") !== this.unique) throw new Error("inPlace quest identity changed");
+    if (this.staged) {
+      if (!this.sync?.valid()) throw new Error("Multiplayer spawn session ended");
+      if (!this.sync.activate(this.staged)) { this.status = "inPlace waiting all peers to stage native record"; return; }
+      q.set_field("_BossSetCount", 2); q.set_field("_ExtraEmRno", 5);
+      this.report("in-place-synchronized-activate", this.staged);
+      this.staged = null; return;
+    }
+    if (this.sync?.role === "host" && this.sync.canStage?.() === false) { this.status = "inPlace waiting peers to activate previous spawn"; return; }
+    const expected = this.sync?.role === "guest" ? this.sync.expected() : null;
+    if (this.sync?.role === "guest" && (!expected || expected.token !== this.plan.token || expected.ordinal !== this.issued.length)) return;
     if (this.plan.sequential && this.issued.some((uid) => !this.ended.includes(uid))) {
       this.status = `inPlace waiting death: issued=${this.issued.join(",")} ended=${this.ended.join(",")}`;
       return;
@@ -69,6 +91,11 @@ export class InplaceWaves {
     // Native CheckNext stops on DEFAULT. Kick RequestLoad once per actor;
     // simultaneous groups allow already-issued living actors to remain.
     const ids = this.pending.slice(0, 1);
+    if (expected) {
+      if (expected.type !== ids[0]) throw new Error("Host spawn type differs from accepted wave");
+      if (!freeSlots.includes(expected.slot)) { this.status = "inPlace waiting host slot to become free"; return; }
+      freeSlots.splice(0, freeSlots.length, expected.slot);
+    }
     if (freeSlots.length < ids.length) { this.status = "inPlace waiting free task slots"; return; }
     const source = (em.call("getEnemySetInfo(System.Int32)", 0) as REManagedObject).call("get_EnemySetParam") as REManagedObject;
     if (!source) throw new Error("Original native spawn parameters missing");
@@ -85,7 +112,9 @@ export class InplaceWaves {
         param.set_field("_TypeValue", type);
         const record = em.call("createEnemySetInfo(snow.quest.EnemySetParam)", param) as REManagedObject;
         if (!record || record.call("get_SetStatus") !== 0) throw new Error("Native registration failed");
-        fresh.push({ id: record.call("get_EmSetId") as number, uid: record.call("get_UniqueId") as number, type });
+        const entry = { id: record.call("get_EmSetId") as number, uid: record.call("get_UniqueId") as number, type };
+        if (expected && (entry.id !== expected.id || entry.uid !== expected.uid)) throw new Error("Native enemy identity differs across peers; stopping before activation");
+        fresh.push(entry);
       }
     }
     // Publish the complete group before restarting the native scheduler.
@@ -103,7 +132,11 @@ export class InplaceWaves {
       this.issued.push(entry.uid);
     });
     this.pending.splice(0, ids.length);
-    q.set_field("_BossSetCount", 2); q.set_field("_ExtraEmRno", 5);
+    if (this.sync) {
+      this.staged = { token: this.plan.token, ordinal: this.issued.length - 1, type: fresh[0]!.type,
+        slot: freeSlots[0]!, id: fresh[0]!.id, uid: fresh[0]!.uid };
+      this.sync.staged(this.staged);
+    } else { q.set_field("_BossSetCount", 2); q.set_field("_ExtraEmRno", 5); }
     this.status = `inPlace native load: ${fresh.map((e) => `${e.type}/${e.uid}`).join(", ")}`;
     this.report("in-place-native-load", { token: this.plan.token, unique: this.unique, fresh, taskSlots: freeSlots.slice(0, ids.length), remaining: this.pending.length });
   }
@@ -111,8 +144,9 @@ export class InplaceWaves {
   private scope(plan: QuestPlan): REManagedObject {
     const q = questManager();
     const stage = getSingleton("snow.stage.StageManager");
-    if (plan.questId === 900103 && !this.allowEntryHostTest()) throw new Error("Entry host test scope ended");
-    if (!q || !stage || (stage.call("get_IsQuestOnline") === true && !this.allowEntryHostTest()) || q.call("isPlayQuest") !== true || q.call("get_ActiveQuestNo") !== plan.questId) throw new Error("inPlace requires the owned solo arena quest");
+    const multiplayer = this.sync?.valid() === true;
+    if (plan.questId === 900103 && !this.allowEntryHostTest() && !multiplayer) throw new Error("Entry host test scope ended");
+    if (!q || !stage || (stage.call("get_IsQuestOnline") === true && !this.allowEntryHostTest() && !multiplayer) || q.call("isPlayQuest") !== true || q.call("get_ActiveQuestNo") !== plan.questId) throw new Error("inPlace requires the owned solo arena quest");
     return q;
   }
 }

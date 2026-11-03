@@ -5,7 +5,7 @@ import type { RuntimeReading, SessionStage } from "../core/run_session";
 import type { BuffAmounts } from "../core/config";
 export type BuffKind = "buff_atk" | "buff_def" | "buff_crit";
 export interface BuffPending { atk: number; def: number; crit: number }
-export interface BuffScope { stage: SessionStage; layer: number; questId: number }
+export interface BuffScope { stage: SessionStage; layer: number; questId: number; multiplayer?: boolean }
 const empty = (): BuffPending => ({ atk: 0, def: 0, crit: 0 });
 function masterPlayerData(): REManagedObject | null {
   const pm = getSingleton("snow.player.PlayerManager");
@@ -53,7 +53,7 @@ export class BuffService {
   }
   shutdown(): void { this.restoreFields(); this.pending = empty(); this.active = empty(); this.layer = null; }
   tick(reading: RuntimeReading | null, scope: BuffScope): void {
-    if (["Idle", "Finished", "Fault"].includes(scope.stage) || reading?.online) { this.shutdown(); return; }
+    if (["Idle", "Finished", "Fault"].includes(scope.stage) || (reading?.online && !scope.multiplayer)) { this.shutdown(); return; }
     if (scope.stage === "Carve" || (this.layer !== null && this.layer !== scope.layer)) {
       this.restoreFields(); this.active = empty(); this.layer = null;
     }

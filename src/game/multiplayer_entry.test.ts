@@ -136,3 +136,9 @@ it("requires the updated DLL rather than silently falling back to manual codes",
   const e = new MultiplayerEntry(validateConfig(defaultConfig), monsterCatalog, () => true, p);
   expect(() => e.choose(0)).toThrow("0.4.0");
 });
+
+it("checks the complete business configuration before guest table mutation",()=>{
+ const f=fixture();f.as(0,()=>f.host.choose(0));const packet=JSON.parse(f.server.plan);
+ packet.rules="a".repeat(64);f.server.plan=JSON.stringify(packet);mock.publish.mockClear();f.tick(1,f.guest);
+ expect(mock.publish).not.toHaveBeenCalled();expect(f.server.acks["200"]).toBe("error");
+});

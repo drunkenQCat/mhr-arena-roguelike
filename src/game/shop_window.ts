@@ -1,6 +1,7 @@
 /** M3 商店窗口：单件 + 补满 + 猫车恢复；读回验证、事务日志、失败恢复。 */
 import type { RunCore, ShopEntry } from "../core/run_core";
 import { replaceOrAdd } from "../core/run_state";
+import { readLobbyIdentity } from "./multiplayer_entry";
 import { canTrade, grantFill, grantItem, pouchCount, pouchCanReceive, type TradeQuest } from "./item_grant";
 import { restoreNativeCart } from "./native_cart";
 import type { GachaRollResult } from "./gacha";
@@ -68,6 +69,12 @@ export class ShopWindow
     const categories = this.core.getShop();
     for (const category of Object.keys(categories)) for (const item of categories[category]!) {
       // service 开放范围：猫车恢复（已接线）、单轮增益（buff 服务）、抽取（有奖池配置才开）
+      if (item.id === "cart_restore" && this.questContext()?.multiplayer && readLobbyIdentity().role !== "host") {
+        item.canBuy = false; item.reason = "共享猫车次数由房主购买恢复"; continue;
+      }
+      if (item.id === "buff_crit" && this.questContext()?.multiplayer) {
+        item.canBuy = false; item.reason = "联机暴击服务尚未实现个人武器作用域，暂不售卖"; continue;
+      }
       const serviceOpen = item.id === "cart_restore" || item.id.startsWith("buff_") ||
         (item.id.startsWith("gacha_") && this.services !== null && this.services.hasGachaPool(item.id));
       if (item.mode === "service" && !serviceOpen) { item.canBuy = false; item.reason = "游戏效果接线完成前暂不开放"; continue; }
@@ -125,6 +132,7 @@ export class ShopWindow
     let debited = false;
     try {
       const context = this.questContext();
+      if (req.kind === "cartRestore" && context?.multiplayer && readLobbyIdentity().role !== "host") throw new Error("共享猫车恢复仅允许房主购买");
       if (!this.selecting() || !canTrade(context)) throw new Error("需要在村庄整备或清波后的斗技场波次间购买");
       const item = this.core.config.shop.find((entry) => entry.id ===
         (req.kind === "cartRestore" ? "cart_restore" : req.id));

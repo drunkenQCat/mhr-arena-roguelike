@@ -8,6 +8,10 @@ export interface ConsoleState {
       members: { id: string; self: boolean; ready: boolean }[] | null };
     activeQuest: number | null; playing: boolean; canPrepare: boolean; nativeQuestPlayerCount: number | null;
     options: { index: number; mode: string; label: string }[] | null };
+  multiplayerRun?: { role: "host" | "guest"; live: boolean; message: string; lobby: string; session: string;
+    members: { id: string; self: boolean; ready: boolean }[] | null; token: number | null;
+    staged: { token: number; ordinal: number; type: number; slot: number; id: number; uid: number } | null;
+    commit: boolean; verifiedTwoClients: boolean } | null;
   testMode?: boolean;
   ok: boolean; protocol: 4; bridgeId: string; counter: number; publishedAt?: number;
   sampledAt?: number; configVersion: number; sessionStage: string; corePhase: string; questId: number | null;

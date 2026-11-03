@@ -66,3 +66,9 @@ it("canceled preparation drops pending purchases and unrelated/online quests get
   expect(h.values._AtkUpAlive).toBe(7);
   b.addPending("buff_atk"); b.tick({...reading(),online:true},scope()); expect(b.snapshot().atk).toBe(0);
 });
+
+it("applies personal attack/defense in an authorized multiplayer scope and restores on exit",()=>{
+ const b=service(); b.addPending("buff_atk");const r={...reading(),online:true};
+ b.tick(r,{...scope(),multiplayer:true});expect(b.diagnostic().active.atk).toBeGreaterThan(0);
+ b.tick(r,{...scope("Fault"),multiplayer:true});expect(b.diagnostic().active.atk).toBe(0);
+});

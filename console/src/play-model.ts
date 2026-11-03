@@ -40,7 +40,7 @@ export function nextStep(s: ConsoleState | null, connected: boolean): string {
   if (['Idle', 'Finished', 'Fault'].includes(s.sessionStage) && s.control?.startup.restorePending)
     return '请回村，等待原装备与背包恢复完成后再开局。';
   switch (s.sessionStage) {
-    case 'Selecting': return '先购买补给或服务，再选择下一波。选定后自动开始战斗流程。';
+    case 'Selecting': if (s.multiplayerRun?.role === 'guest') return '可在本机购买补给，等待房主选择下一波；请留在起点集结。'; return '先购买补给或服务，再选择下一波。选定后自动开始战斗流程。';
     case 'AwaitQuest': return '等待任务接取与出发；失败时查看提示，再使用重试出发。';
     case 'Combat': return '讨伐本波全部目标；两只怪之间的空场不会结算。';
     case 'Carve': {

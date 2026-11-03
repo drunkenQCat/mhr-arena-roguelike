@@ -48,6 +48,9 @@ export interface SessionPort {
   /** 离线队友调研 §6C：权威参战人数（混合实机 mock 名单）。null=沿用原生人数。 */
   partySize?(): number | null;
   allowEntryHostTest?(reading: RuntimeReading): boolean;
+  multiplayerRole?(): "host" | "guest" | null;
+  multiplayerValid?(): boolean;
+  multiplayerCanChoose?(): boolean;
 }
 
 export type SessionStage = "Idle" | "Selecting" | "AwaitQuest" | "Combat" | "Carve" | "Returning" | "Finished" | "Fault";
@@ -143,7 +146,7 @@ export class RunSession {
   canShop(): boolean {
     if (this.stage !== "Selecting") return false;
     const r = this.readingSnapshot;
-    if (!r || (r.online && !this.port.allowEntryHostTest?.(r))) return false;
+    if (!r || (r.online && !this.onlineAllowed(r))) return false;
     if (!r.quest) return r.canPost;
     return r.quest.playing && r.quest.unique === this.questUnique &&
       r.quest.id === this.plan?.questId && this.preparation().gathered;
@@ -159,16 +162,50 @@ export class RunSession {
   private nextSpawnReported = false;
   private seenSpawnReported = false;
   private entryHostRun = false;
+  earnedPt = 0;
+  private mirroredReward = 0;
+  get multiplayerRole(): "host" | "guest" | null { return this.port.multiplayerRole?.() ?? null; }
+  canChoose(): boolean { return this.multiplayerRole !== "guest" && this.canShop() && (!this.multiplayerRole || this.port.multiplayerCanChoose?.() === true); }
+  failMultiplayer(reason: string): void { this.fault(reason); }
+  adoptMultiplayerEntry(plan: QuestPlan): Result {
+    if (!this.multiplayerRole || !this.port.multiplayerValid?.()) return fail("Multiplayer identity unavailable");
+    return this.adoptPostedEntry(plan);
+  }
+  /** Guest has its own wallet. Apply cumulative host rewards once, never copy host spending. */
+  mirrorMultiplayer(frame: { stage: SessionStage; phase: import("./run_state").RunPhase; layer: number;
+    plan: QuestPlan; choices: WaveOption[]; earned: number; carts: number; camp: Position | null;
+    cartUsed: boolean; killed: string[] }): void {
+    if (this.multiplayerRole !== "guest" || !this.port.multiplayerValid?.()) throw new Error("Guest mirror scope ended");
+    if (frame.earned < this.mirroredReward) throw new Error("Multiplayer reward total went backwards");
+    const newReward = frame.earned > this.mirroredReward;
+    this.core.state.wallet.pt += frame.earned - this.mirroredReward;
+    this.mirroredReward = frame.earned; this.earnedPt = frame.earned;
+    if (newReward && frame.plan.wave.tier === "ultimate") this.grantUltimateDrop();
+    this.stage = frame.stage; this.core.state.phase = frame.phase; this.core.state.layer = frame.layer;
+    this.core.state.cartsLeft = frame.carts; this.core.state.cartRestoreUsed = frame.cartUsed;
+    this.core.state.killedUltimates = [...frame.killed];
+    this.core.state.currentChoices = frame.choices; this.core.state.activeWave = frame.phase === "Combat" || frame.phase === "Carve" ? frame.plan.wave : null;
+    this.plan = frame.plan; this.token = frame.plan.token; this.camp = frame.camp;
+    this.roster = this.readingSnapshot?.players.map(p => p.id) ?? [];
+    const q = this.readingSnapshot?.quest;
+    if (q?.playing) this.questUnique = q.unique;
+    this.message = "联机同步：由房主选波，个人 PT 和购物独立结算";
+    this.port.policy(frame.plan, !["Finished", "Fault"].includes(frame.stage));
+  }
 
   constructor(readonly core: RunCore, private readonly catalog: MonsterCatalog, private readonly port: SessionPort) {
     this.settings = { ...(core.config.runtime ?? DEFAULT_RUNTIME) };
     this.route = this.settings.route;
   }
 
-  shopQuest(): { questId: number; questUnique: number; entryHostTest?: boolean } | undefined {
+  private onlineAllowed(reading: RuntimeReading): boolean {
+    return this.port.allowEntryHostTest?.(reading) === true || (!!this.multiplayerRole && this.port.multiplayerValid?.() === true);
+  }
+  shopQuest(): { questId: number; questUnique: number; entryHostTest?: boolean; multiplayer?: boolean } | undefined {
     if (this.stage === "Selecting" && this.route === "inPlace" && this.plan && this.questUnique !== null) {
       return { questId: this.plan.questId, questUnique: this.questUnique,
-        ...(this.readingSnapshot && this.port.allowEntryHostTest?.(this.readingSnapshot) ? { entryHostTest: true } : {}) };
+        ...(this.readingSnapshot && this.port.allowEntryHostTest?.(this.readingSnapshot) ? { entryHostTest: true } : {}),
+        ...(this.multiplayerRole && this.port.multiplayerValid?.() ? { multiplayer: true } : {}) };
     }
     return undefined;
   }
@@ -178,7 +215,7 @@ export class RunSession {
   adoptPostedEntry(plan: QuestPlan): Result {
     const reading = this.port.read();
     if (this.stage !== "Idle" || plan.questId !== 900103 || this.core.config.quest.id !== 900103 ||
-        reading.quest?.id !== plan.questId || !this.port.allowEntryHostTest?.(reading)) return fail("Entry host test scope unavailable");
+        reading.quest?.id !== plan.questId || !this.onlineAllowed(reading)) return fail("Entry host test scope unavailable");
     const started = this.core.startRun(this.core.config.armorOptions[0]!);
     if (!started.ok) return started;
     this.core.generateChoices(1);
@@ -186,12 +223,12 @@ export class RunSession {
     const picked = this.core.pickChoice(plan.wave.index);
     if (!picked.ok) return picked;
     this.plan = plan; this.token = plan.token; this.route = "inPlace";
-    this.entryHostRun = true;
+    this.entryHostRun = !this.multiplayerRole;
     this.testOnly = false; this.resetTracking(reading, false);
     this.port.policy(plan, true);
     this.stage = "AwaitQuest";
-    this.message = "房主本机接线测试：保留现有装备和背包，等待手动出发；真实队友加入后停止测试";
-    this.announce("entry-host-adopted", { plan, scope: "one-native-host-only", startupIsolation: false });
+    this.message = this.multiplayerRole ? "联机局已接入：保留现有装备和背包，由房主出发与选波" : "房主本机接线测试：保留现有装备和背包，等待手动出发；真实队友加入后停止测试";
+    this.announce(this.multiplayerRole ? "multiplayer-adopted" : "entry-host-adopted", { plan, scope: this.multiplayerRole ?? "one-native-host-only", startupIsolation: false });
     return ok();
   }
 
@@ -278,9 +315,10 @@ export class RunSession {
 
   choose(index: number): Result {
     try {
+      if (this.multiplayerRole && !this.canChoose()) return fail("仅房主在全队同步就绪后选择波次");
       if (this.stage !== "Selecting") return fail("当前不在选波次阶段");
       const reading = this.port.read();
-      if (reading.online && !this.port.allowEntryHostTest?.(reading)) return fail("M2 不支持联机");
+      if (reading.online && !this.onlineAllowed(reading)) return fail("M2 不支持联机");
       const inPlace = !!reading.quest?.playing;
       if (inPlace && (!this.plan || reading.quest!.id !== this.plan.questId || this.route !== "inPlace")) {
         return fail("发布本波前请先回村");
@@ -346,7 +384,7 @@ export class RunSession {
     this.port.cancelPost();
     this.port.policy(null, false);
     this.core.abortRun("Run stopped");
-    if (this.plan && reading.quest?.id === this.plan.questId && reading.quest.playing) this.port.finish(true);
+    if (this.multiplayerRole !== "guest" && this.plan && reading.quest?.id === this.plan.questId && reading.quest.playing) this.port.finish(true);
     if (this.startupPrepared) this.startupRestorePending = true;
     this.stage = "Finished";
     this.message = "已终止；回村后自动恢复原装备";
@@ -364,7 +402,7 @@ export class RunSession {
       // 不能在活跃局内触发——inPlace 首波前 Selecting 与 reentry 波间 Selecting 都在村庄。
       if (this.startupRestorePending && this.port.startupRestore &&
         ["Idle", "Finished", "Fault"].includes(this.stage)) {
-        const backInVillage = reading.canPost && !reading.online && (!reading.quest || reading.staleQuest === true);
+        const backInVillage = reading.canPost && (!reading.online || !!this.multiplayerRole) && (!reading.quest || reading.staleQuest === true);
         if (backInVillage) {
           const restore = this.port.startupRestore();
           if (restore.ok) {
@@ -379,7 +417,10 @@ export class RunSession {
       if (this.entryHostRun && !this.port.allowEntryHostTest?.(reading)) {
         this.fault("Entry host test identity changed or a real teammate joined"); return;
       }
-      if (reading.online && !this.port.allowEntryHostTest?.(reading)) { this.fault("Online session detected; native hooks released"); return; }
+      if (reading.online && !this.onlineAllowed(reading)) { this.fault("Online session detected; native hooks released"); return; }
+      if (this.multiplayerRole && !this.port.multiplayerValid?.()) { this.fault("联机房间、房主或固定队伍已改变"); return; }
+      // The guest reads native facts but never runs the host progression or awards itself kills.
+      if (this.multiplayerRole === "guest") return;
       const postError = this.port.postingError();
       if (postError) { this.fault(postError); return; }
       if (reading.quest && this.plan && reading.quest.id !== this.plan.questId) {
@@ -456,9 +497,10 @@ export class RunSession {
         this.observe(reading);
         if (this.resolved.length === this.plan!.monsterIds.length) {
           this.core.killWave();
+          this.earnedPt += this.plan!.wave.rewardPt;
           // V1.3 §2.3：极强波清波掉落一次顶级抽取（"古龙临时毕业装备"）
           if (this.plan!.wave.tier === "ultimate" && this.port.ultimateDrop) {
-            this.announce("ultimate-drop", this.port.ultimateDrop());
+            this.grantUltimateDrop();
           }
           this.stage = "Carve";
           this.clearAt = reading.time;
@@ -468,7 +510,7 @@ export class RunSession {
         } else if (reading.time - this.progressAt > (this.port.waitingForSpawnCapacity?.() ? Math.max(180, this.settings.spawnTimeoutSeconds) : this.settings.spawnTimeoutSeconds) &&
           !reading.enemies.some((enemy) => !enemy.dead && !enemy.captured && this.plan!.monsterIds.includes(enemy.typeId) && !this.excludedUids.includes(enemy.uid))) {
           if (this.route === "inPlace") {
-            if (this.entryHostRun) { this.fault("Entry host inPlace spawn timed out; automatic reentry is unsupported"); return; }
+            if (this.entryHostRun || this.multiplayerRole) { this.fault("Entry host inPlace spawn timed out; automatic reentry is unsupported"); return; }
             this.route = "reentry";
             this.retryWave = true;
             this.port.policy(this.plan, false);
@@ -548,6 +590,13 @@ export class RunSession {
       this.stage = "Returning";
       this.message = "Returning through the native quest flow; PT and carts remain in this run";
     }
+  }
+
+  private grantUltimateDrop(): void {
+    if (!this.port.ultimateDrop) return;
+    const drop = this.port.ultimateDrop();
+    if (drop.ok && this.port.startupRestore) this.startupRestorePending = true;
+    this.announce("ultimate-drop", drop);
   }
 
   private fault(error: unknown): Result {

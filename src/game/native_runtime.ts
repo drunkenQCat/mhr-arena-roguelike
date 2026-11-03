@@ -1,4 +1,4 @@
-import { InplaceWaves } from "./inplace_waves";
+import { InplaceWaves, type SpawnSync } from "./inplace_waves";
 import { TestTools } from "./test_tools";
 import { entryHostTestScope } from "./entry_host_scope";
 import type { RogueConfig } from "../core/config";
@@ -30,7 +30,7 @@ interface Diagnostic { time: number; event: string; detail: unknown }
 
 export class NativeRuntime implements SessionPort {
   readonly transport: QuestTransport;
-  readonly testTools = new TestTools((event, detail) => this.report(event, detail), () => this.entryHostTest && entryHostTestScope());
+  readonly testTools = new TestTools((event, detail) => this.report(event, detail), () => (this.entryHostTest && entryHostTestScope()) || this.multiplayerValid());
   /** Test-only seam: lets the CLI verify the started-run flow without native menus. */
   readonly questTransport: QuestTransport;
   private readonly inplace = new InplaceWaves((event, detail) => this.report(event, detail),
@@ -44,6 +44,19 @@ export class NativeRuntime implements SessionPort {
   private rateKeys: string[] = [];
   private rateEvidence: unknown[] = [];
   /** 离线队友调研 §6C：混合局权威人数来源（PartySession.rosterSize）。 */
+  private multiplayer: (SpawnSync & { canChoose(): boolean; snapshot(): Record<string, unknown> }) | null = null;
+  setMultiplayer(sync: SpawnSync & { canChoose(): boolean; snapshot(): Record<string, unknown> }): void { this.multiplayer = sync; this.inplace.setSync(sync); }
+  multiplayerState(): Record<string, unknown> | null { return this.multiplayer?.snapshot() ?? null; }
+  mirrorCartRestore(deaths: number): void {
+    if (this.multiplayerRole() !== "guest" || !this.multiplayerValid() || !Number.isInteger(deaths) || deaths < 0) throw new Error("Cart restore mirror scope unavailable");
+    const qm = questManager();
+    if (!qm || !qm.call("isPlayQuest")) throw new Error("Cart restore requires active quest");
+    qm.call("setDeathNum", deaths);
+    if (qm.call("getDeathNum") !== deaths) throw new Error("Shared cart restore readback mismatch");
+  }
+  multiplayerRole(): "host" | "guest" | null { return this.multiplayer?.role ?? null; }
+  multiplayerValid(): boolean { return this.multiplayer?.valid() === true; }
+  multiplayerCanChoose(): boolean { return this.multiplayer?.canChoose() ?? false; }
   private partySizeSource: (() => number | null) | null = null;
 
   constructor(private readonly cfg: RogueConfig, readonly installer: QuestInstaller,
@@ -272,6 +285,7 @@ export class NativeRuntime implements SessionPort {
     if (!qm || callNative(qm, "get_ActiveQuestNo") !== this.cfg.quest.id || !callNative(qm, "isActiveQuest")) {
       throw new Error("Refusing to finish an unrelated quest");
     }
+    if (this.multiplayerRole() === "guest") throw new Error("Only the quest host may finish a multiplayer run");
     this.holdClear = false;
     if (failed) callNative(qm, "setQuestFail", snow_quest_FailReason.Normal);
     else callNative(qm, "setQuestClear");
@@ -297,7 +311,7 @@ export class NativeRuntime implements SessionPort {
     try {
       const qm = questManager();
       const stage = getSingleton("snow.stage.StageManager");
-      const hostTest = this.entryHostTest && entryHostTestScope();
+      const hostTest = (this.entryHostTest && entryHostTestScope()) || this.multiplayerValid();
       return !!qm && (!this.entryHostTest || hostTest) && (!stage?.call("get_IsQuestOnline") || hostTest) && !!callNative(qm, "isActiveQuest") &&
         callNative(qm, "get_ActiveQuestNo") === this.activePlan.questId;
     } catch { return false; }
@@ -376,6 +390,6 @@ export class NativeRuntime implements SessionPort {
       return mul !== 1 ? floatToPtr(this.rate("attack", toFloat(retval), mul)) : retval;
     });
     this.hooks = true;
-    this.report("runtime-hooks-installed", { scope: this.cfg.quest.id, online: this.entryHostTest ? "one-host-test" : "disabled" });
+    this.report("runtime-hooks-installed", { scope: this.cfg.quest.id, online: this.multiplayer ? this.multiplayer.role : this.entryHostTest ? "one-host-test" : "disabled" });
   }
 }

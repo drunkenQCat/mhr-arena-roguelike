@@ -98,7 +98,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); });
     <SupportBar />
     <ConnectionHelp v-if="page === 'help'" v-model:developer="developerMode" />
     <p class="notice" role="status">{{ notice }}</p>
-    <MultiplayerEntry v-if="page === 'multiplayer'" :entry="state?.multiplayerEntry" :busy="busy || !connected" @command="send" />
+    <MultiplayerEntry v-if="page === 'multiplayer'" :entry="state?.multiplayerEntry" :run="state?.multiplayerRun" :busy="busy || !connected" @command="send" />
     <PlayWorkspace v-if="page === 'play'" :state="state" :connected="connected" :busy="busy" :notice="notice" :developer-mode="developerMode" @command="send" />
     <ConfigEditor v-show="page === 'design'" :config="config" :version="loadedVersion" :server-version="state?.configVersion ?? loadedVersion" :session-changed="!!configBridgeId && configBridgeId !== state?.bridgeId" :busy="busy" :connected="connected" :message="configMessage" @load="loadConfig" @submit="submitConfig" />
     <section v-if="page === 'events'" class="panel"><div class="section-heading"><h2>命令记录</h2><button @click="downloadJson('console-results.json', results)">导出记录</button></div><label>筛选记录 <input v-model="filter" placeholder="状态 / 请求 ID / 消息" /></label><p class="muted">applied 表示命令已执行；queued 仍需等待游戏结果；rejected 表示未执行。</p><article v-for="r in recent" :key="r.id" class="event"><span :class="['badge', r.status === 'applied' ? 'live' : r.status === 'queued' ? 'pending' : 'warning']">{{ r.status }}</span><span>{{ r.message ?? (r.config ? '已读取游戏配置' : '') }}</span><small class="mono">{{ r.id }}</small></article></section>

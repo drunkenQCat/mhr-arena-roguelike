@@ -1,4 +1,5 @@
 /** Native battle networking stays with Rise; Steam lobby metadata carries only entry plans. */
+import { canonical } from "./wire_canonical";
 import type { RogueConfig } from "../core/config";
 import { makeQuestPlan, type MonsterCatalog } from "../core/quest_plan";
 import type { WaveOption } from "../core/run_state";
@@ -12,7 +13,7 @@ const modes = ["single", "sequential", "simultaneous"] as const;
 type SteamSnapshot = NonNullable<ReturnType<NonNullable<NativeWebconsole["steam_snapshot"]>>>;
 type Lobby = SteamSnapshot["lobbies"][number];
 interface Plan { schema: 2; session: string; revision: number; owner: string; lobby: string;
-  index: number; hash: string; intent: "prepare" | "post"; }
+  index: number; hash: string; rules: string; intent: "prepare" | "post"; }
 function nullableIndex(lobby: REManagedObject, method: string): number | null {
   const value = lobby.call(method) as REManagedObject | null;
   if (!value || value.get_field("_HasValue") !== true) return null;
@@ -28,7 +29,7 @@ export function readLobbyIdentity(): { host: number | null; self: number | null;
   } catch { return { host: null, self: null, role: "unavailable" }; }
 }
 function key(plan: Plan): string {
-  return `${plan.schema}|${plan.lobby}|${plan.owner}|${plan.session}|${plan.revision}|${plan.index}|${plan.hash}|${plan.intent}`;
+  return `${plan.schema}|${plan.lobby}|${plan.owner}|${plan.session}|${plan.revision}|${plan.index}|${plan.hash}|${plan.rules}|${plan.intent}`;
 }
 function decode(text: string, lobby: Lobby): Plan | null {
   if (!text || text.length > 2048) return null;
@@ -37,7 +38,7 @@ function decode(text: string, lobby: Lobby): Plan | null {
     return p?.schema === 2 && p.owner === lobby.owner && p.lobby === lobby.id &&
       typeof p.session === "string" && p.session.length > 0 && p.session.length < 128 &&
       Number.isInteger(p.revision) && p.revision > 0 && Number.isInteger(p.index) && p.index >= 0 && p.index < 3 &&
-      typeof p.hash === "string" && p.hash.length === 64 && (p.intent === "prepare" || p.intent === "post") ? p : null;
+      typeof p.hash === "string" && p.hash.length === 64 && typeof p.rules === "string" && p.rules.length === 64 && (p.intent === "prepare" || p.intent === "post") ? p : null;
   } catch { return null; }
 }
 function bridge(): NativeWebconsole | null { try { return loadWebconsole(); } catch { return null; } }
@@ -78,6 +79,11 @@ export class MultiplayerEntry {
     if (!this.installer) this.installer = new QuestInstaller(cfg, plan, true);
     this.installer.publish(plan, false);
     return this.digest();
+  }
+  private rulesDigest(): string {
+    const hash = this.network?.steam_digest?.(canonical(this.config)) ?? "";
+    if (hash.length !== 64) throw new Error("Cannot hash multiplayer rules");
+    return hash;
   }
   private digest(): string {
     const hash = this.network?.steam_digest?.(this.installer!.multiplayerDescriptor()) ?? "";
@@ -134,7 +140,7 @@ export class MultiplayerEntry {
     this.plan = null; this.applied = "";
     const hash = this.prepare(index);
     this.publish({ schema: 2, session: this.session, revision: ++this.revision,
-      owner: this.lobby.owner, lobby: this.lobby.id, index, hash, intent: "prepare" });
+      owner: this.lobby.owner, lobby: this.lobby.id, index, hash, rules: this.rulesDigest(), intent: "prepare" });
     this.message = "已通过 Steam 发布波次，等待所有队友自动准备并确认相同任务表。";
   }
   post(): void {
@@ -174,6 +180,7 @@ export class MultiplayerEntry {
           this.message = "已收到房主波次；请先取消任务、结束单人局并恢复装备，再重试同步。"; return;
         }
         this.network!.steam_ack!(lobby.id, "preparing"); this.applied = "";
+        if (this.rulesDigest() !== plan.rules) throw new Error("房主与本机配置不一致，请全队同步配置后重试");
         const hash = this.prepare(plan.index);
         if (hash !== plan.hash) throw new Error("两端原生任务表哈希不一致，请确认游戏及模组版本相同。");
         if (!this.network!.steam_ack!(lobby.id, identity)) throw new Error("Steam 准备回执提交失败。");
@@ -202,6 +209,16 @@ export class MultiplayerEntry {
     const plan = this.installer?.getPlan();
     return readLobbyIdentity().role === "host" && questManager()?.call("get_ActiveQuestNo") === ENTRY_QUEST_ID && plan && this.installer
       ? { installer: this.installer, plan } : null;
+  }
+  runEntry(): { installer: QuestInstaller; plan: import("../core/quest_plan").QuestPlan;
+    lobby: string; owner: string; self: string; session: string; members: string[] } | null {
+    const p = this.installer?.getPlan(), l = this.lobby;
+    if (!p || !this.installer || !this.plan || this.plan.intent !== "post" || !l ||
+        this.applied !== key(this.plan) || questManager()?.call("get_ActiveQuestNo") !== ENTRY_QUEST_ID) return null;
+    const role = readLobbyIdentity().role;
+    if (role !== "host" && role !== "guest") return null;
+    return { installer: this.installer, plan: p, lobby: l.id, owner: l.owner, self: l.self,
+      session: this.plan.session, members: l.members.map(m => m.id).sort() };
   }
   snapshot(): Record<string, unknown> {
     const identity = readLobbyIdentity(), qm = questManager(), lobby = this.lobby;

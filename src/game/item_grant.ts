@@ -8,6 +8,7 @@
  */
 
 import { itemIds } from "./default_config";
+import { multiplayerScope } from "./multiplayer_scope";
 import { entryHostTestScope } from "./entry_host_scope";
 import { getSingleton, relog, type REManagedObject } from "./sdk";
 
@@ -62,7 +63,7 @@ export function pouchCanReceive(shopItemId: string): boolean {
   } catch { return false; }
 }
 
-export interface TradeQuest { questId: number; questUnique: number; entryHostTest?: boolean }
+export interface TradeQuest { questId: number; questUnique: number; entryHostTest?: boolean; multiplayer?: boolean }
 
 /** An arena context is supplied only by the session's between-wave Selecting stage. */
 export function canTrade(context?: TradeQuest): boolean {
@@ -70,7 +71,8 @@ export function canTrade(context?: TradeQuest): boolean {
     const qm = getSingleton("snow.QuestManager");
     const stage = getSingleton("snow.stage.StageManager");
     const gui = getSingleton("snow.gui.GuiManager");
-    const entry = context?.entryHostTest === true && context.questId === 900103 && entryHostTestScope();
+    const entry = context?.questId === 900103 && ((context.entryHostTest === true && entryHostTestScope()) ||
+      (context.multiplayer === true && multiplayerScope()));
     if (!qm || !stage || !gui || (stage.call("get_IsQuestOnline") && !entry) || gui.call("isOpenYNInfo") || gui.call("isOpenSelectInfo")) return false;
     if (!qm.call("isActiveQuest")) return !!gui.call("IsCanInvokeQuestBoard");
     if (!context || (context.questId !== 900102 && !entry) || qm.call("get_ActiveQuestNo") !== context.questId ||

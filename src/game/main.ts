@@ -1,3 +1,4 @@
+import { MultiplayerRun } from "./multiplayer_run";
 import { MultiplayerEntry } from "./multiplayer_entry";
 import { RunCore } from "../core/run_core";
 import { RunSession } from "../core/run_session";
@@ -38,8 +39,13 @@ try {
   const amounts: BuffAmounts = config.buffAmounts ?? DEFAULT_BUFF_AMOUNTS;
   const buffs = new BuffService(amounts);
   const services: ServiceEffects = {
-    buffBuy: (kind: BuffKind) => buffs.addPending(kind),
-    gachaBuy: (poolId: string) => gacha.roll(poolId),
+    buffBuy: (kind: BuffKind) => kind === "buff_crit" && session.multiplayerRole
+      ? { ok:false, total:0 } : buffs.addPending(kind),
+    gachaBuy: (poolId: string) => {
+      const result = gacha.roll(poolId);
+      if (result.ok && !result.reused) session.armStartupRestore();
+      return result;
+    },
     hasGachaPool: (poolId: string) => gacha.hasPool(poolId),
   };
   let shopWindow = new ShopWindow(session.core, () => session.canShop(), () => session.shopQuest(), services);
@@ -53,8 +59,30 @@ try {
   let lastBuffState = "";
   let lastBuffPoll = -1;
   let entryAttached = false;
+  let multiplayerRun: MultiplayerRun | null = null;
   reframework.onFrame(() => {
     try {
+      // Production multiplayer: adopt the already ACKed and posted entry on every peer.
+      // Only the host owns progression; guests mirror business state and stage native slots.
+      if (!entryAttached && !session.startupStatus.restorePending &&
+          ["Idle", "Finished"].includes(session.stage) && !shopWindow.busy) {
+        const entry = multiplayerEntry.runEntry();
+        if (entry) {
+          entryAttached = true;
+          runtime.shutdown(); webConsole?.newScriptSession();
+          const entryConfig = { ...config, quest: { ...config.quest, id: entry.plan.questId } };
+          core = new RunCore(entryConfig);
+          runtime = new NativeRuntime(entryConfig, entry.installer, gacha);
+          session = new RunSession(core, monsterCatalog, runtime);
+          multiplayerRun = new MultiplayerRun(entry, entryConfig, monsterCatalog, session, runtime, () => shopWindow.busy);
+          runtime.setMultiplayer(multiplayerRun);
+          runtime.tick();
+          const adopted = session.adoptMultiplayerEntry(entry.plan);
+          if (!adopted.ok) throw new Error(adopted.message ?? "Cannot adopt multiplayer entry");
+          shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
+          webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry);
+        }
+      }
       // Explicit debug-only one-host slice. Never adopts guests, real teams, or
       // unrelated quests, and does not redo equipment/pouch startup in a posted quest.
       if (!entryAttached && config.runtime?.debugMode && !session.startupStatus.restorePending &&
@@ -74,8 +102,9 @@ try {
           webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry);
         }
       }
-      runtime.tick(); shopWindow.tick(); session.tick(); multiplayerEntry.tick();
-      buffs.tick(session.readingSnapshot, { stage: session.stage, layer: core.state.layer, questId: core.config.quest.id });
+      runtime.tick(); shopWindow.tick(); session.tick();
+      if (multiplayerRun) multiplayerRun.tick(); else multiplayerEntry.tick();
+      buffs.tick(session.readingSnapshot, { stage: session.stage, layer: core.state.layer, questId: core.config.quest.id, multiplayer: runtime.multiplayerValid() });
       const sampleTime = session.readingSnapshot?.time ?? -1;
       if (sampleTime !== lastBuffPoll) {
         lastBuffPoll = sampleTime;

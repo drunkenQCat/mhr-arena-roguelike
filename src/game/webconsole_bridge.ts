@@ -217,6 +217,7 @@ export class WebConsoleBridge {
         activeRules: { startPt: s.core.config.startPt, maxCarts: s.core.config.maxCarts,
           runtime: s.settings }, configVersion: this.configVersion };
       case "submitConfig": {
+        if (s.multiplayerRole) throw new Error("联机局中不支持单机修改配置；请停局后全队同步配置再开局");
         if (this.shop.busy) throw new Error("请等待商店交易完成后提交配置");
         if (cmd.configVersion !== this.configVersion) throw new Error("配置已被其他页面修改，请重新载入并合并");
         const cfg = validateConfig(cmd.config);
@@ -244,7 +245,7 @@ export class WebConsoleBridge {
         return { status: r.ok ? "applied" : "rejected", message: r.message };
       }
       case "choose": {
-        if (this.shop.busy || !s.canShop()) throw new Error("请完成集结和未决交易，再选择波次");
+        if (this.shop.busy || !s.canChoose()) throw new Error("请完成集结和未决交易，再选择波次");
         if (!Number.isInteger(cmd.index)) throw new Error("请选择有效波次");
         const r = s.choose(cmd.index!);
         return { status: r.ok ? "applied" : "rejected", message: r.message };
@@ -407,6 +408,7 @@ export class WebConsoleBridge {
     this.transport.publish_state(rejson.dump_string({ ok: true, protocol: 4, bridgeId: this.bridgeId,
       counter: ++this.counter, sampledAt: r?.time ?? null, publishedAt: clockSeconds(),
       multiplayerEntry: this.multiplayerEntry?.snapshot() ?? null,
+      multiplayerRun: this.runtime.multiplayerState?.() ?? null,
       configVersion: this.configVersion, sessionStage: s.stage, corePhase: core.state.phase,
       questId: r?.quest?.id ?? null, questUnique: r?.quest?.unique ?? null,
       quest: r?.quest ?? null, online: r?.online ?? false, route: s.route,
@@ -437,7 +439,7 @@ export class WebConsoleBridge {
         invincible: true, kill: activeSolo && alive && !this.effect,
         teleportMonster: activeSolo && alive && !this.effect, testLayer: canStart,
         teleport: activeSolo && !!s.campSnapshot && !this.effect,
-        choose: s.canShop() && !this.shop.busy, stop: !["Idle", "Finished"].includes(s.stage) },
+        choose: s.canChoose() && !this.shop.busy, stop: !["Idle", "Finished"].includes(s.stage) },
     }, 0));
   }
 }

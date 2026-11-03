@@ -209,3 +209,100 @@ for expected in (1, 2):
     assert report.granted and report.before == expected - 1 and report.after == expected
 assert host.globals().item_writes == 2
 print("PASS Lua 5.4: explicit native grant overload, first stack and stacking, void return readback")
+
+
+# The emitted multiplayer modules must run without JS globals (JSON/Date/Array).
+# Two isolated business peers share only the same bounded Steam-value test bus.
+import hashlib
+multi = LuaRuntime(unpack_returned_tuples=True)
+def wire_value(value):
+    if hasattr(value, "items"):
+        entries = list(value.items())
+        if entries and all(isinstance(k, int) for k, _ in entries):
+            return [wire_value(value[i]) for i in range(1, len(entries) + 1)]
+        return {str(k): wire_value(v) for k, v in entries}
+    return value
+multi.globals().wire_dump = lambda value, *_: json.dumps(wire_value(value), ensure_ascii=False, separators=(",", ":"))
+multi.globals().wire_load = lambda text: multi.table_from(json.loads(text), recursive=True)
+multi.globals().wire_hash = lambda text: hashlib.sha256(text.encode("utf-8")).hexdigest()
+multi.execute('''
+  clock=100; os.time=function() return clock end
+  log={info=function() end,warn=function() end,error=function() end}
+  json={dump_string=wire_dump,load_string=wire_load}
+  thread={get_hook_storage=function() return {} end}
+  sdk={PreHookResult={CALL_ORIGINAL=0,SKIP_ORIGINAL=1}}
+  re={}; fs={}; imgui={}
+''')
+mpmods = multi.execute(original_bundle.replace(entry, """
+____moduleCache["src.game.multiplayer_scope"] = {value={multiplayerScope=function() return true end}}
+return {RunCore=require("src.core.run_core").RunCore,
+ RunSession=require("src.core.run_session").RunSession,
+ MultiplayerRun=require("src.game.multiplayer_run").MultiplayerRun,
+ canonical=require("src.game.wire_canonical").canonical,
+ makeQuestPlan=require("src.core.quest_plan").makeQuestPlan,
+ validateConfig=require("src.core.config").validateConfig,
+ catalog=require("src.game.default_config").monsterCatalog}
+"""))
+multi.globals().mpmods = mpmods
+multi.globals().raw_config = multi.table_from(raw, recursive=True)
+multi.execute('''
+  assert(JSON==nil and Date==nil and Array==nil)
+  local m=mpmods
+  local function new(C,...) local o=setmetatable({},C.prototype);o:____constructor(...);return o end
+  bus={plan="",acks={}}
+  local function peer(self)
+    local cfg=m.validateConfig(nil,raw_config);cfg.quest.id=900103
+    cfg.runtime.carveSeconds=1;cfg.runtime.campDwellSeconds=0
+    local core=new(m.RunCore,cfg,42)
+    local p={reading={time=clock,quest={id=900103,unique=7,playing=true,status="play"},
+      online=true,canPost=false,deaths=0,enemies={},players={
+      {id=0,position={x=10,y=20,z=30}},{id=1,position={x=10,y=20,z=30}}}}}
+    function p:now() return clock end
+    function p:ready() return true end
+    function p:read() self.reading.time=clock;return self.reading end
+    function p:publish(plan) self.published=plan end
+    function p:policy() end
+    function p:cancelPost() end
+    function p:postingError() return nil end
+    function p:takeDeaths() return {} end
+    function p:report() end
+    function p:finish() error("unexpected native finish") end
+    function p:multiplayerRole() return self.run and self.run.role end
+    function p:multiplayerValid() return self.run and self.run:valid() end
+    function p:multiplayerCanChoose() return self.run and self.run:canChoose() end
+    local s=new(m.RunSession,core,m.catalog,p)
+    local net={steam_digest=wire_hash,steam_plan=function(_,text) assert(#text<=2048);bus.plan=text;return true end,
+      steam_ack=function(_,text) bus.acks[self]=text;return true end,
+      steam_snapshot=function() return {lobbies={{id="l",owner="h",self=self,plan=bus.plan,
+        members={{id="h",ack=bus.acks.h or ""},{id="g",ack=bus.acks.g or ""}}}}} end}
+    local runtime={publish=function(_,plan) p.published=plan end,report=function() end}
+    local run=new(m.MultiplayerRun,{lobby="l",owner="h",self=self,session="s",members={"h","g"}},cfg,m.catalog,s,runtime,function() return false end,net)
+    p.run=run
+    local w={index=0,mode="single",typeTag="A",label="entry",monsters={"Great Izuchi"},tier="weak",hpMul=1,dmgMul=1,rewardMul=0,rewardPt=0}
+    assert(s:adoptMultiplayerEntry(m.makeQuestPlan(nil,cfg,m.catalog,w,1,1,false)).ok)
+    s:tick()
+    return {s=s,run=run,core=core,p=p}
+  end
+  local h,g=peer("h"),peer("g")
+  local function tick() clock=clock+1;h.s:tick();h.run:tick();g.s:tick();g.run:tick() end
+  local function clear()
+    h.p.reading.enemies={}
+    for i,id in ipairs(h.s.plan.monsterIds) do h.p.reading.enemies[i]={uid=h.core.state.layer*100+i,typeId=id,dead=true,captured=false} end
+    tick();tick();tick();tick()
+  end
+  tick();clear()
+  assert(h.s.stage=="Selecting" and g.s.stage=="Selecting",g.s.message)
+  assert(h.s:canChoose() and not g.s:canChoose())
+  assert(h.s:choose(1).ok);h.p.reading.enemies={};tick();tick()
+  assert(g.p.published.token==h.s.plan.token)
+  local ticket={token=h.s.plan.token,ordinal=0,type=h.s.plan.monsterIds[1],slot=2,id=3,uid=300}
+  h.run:staged(ticket);assert(not h.run:activate(ticket));tick()
+  g.run:staged(ticket);tick();tick();assert(h.run:activate(ticket))
+  assert(not h.run:canStage());tick();assert(g.run:activate(ticket));tick();tick();assert(h.run:canStage())
+  g.core.state.wallet.pt=g.core.state.wallet.pt-15
+  clear();local expected=150-15+h.s.plan.wave.rewardPt
+  assert(g.core.state.wallet.pt==expected,g.s.message)
+  tick();assert(g.core.state.wallet.pt==expected)
+  assert(g.core.state.layer==3)
+''')
+print("PASS Lua 5.4: two-peer multiplayer choice/staging/commit/activation/reward and personal-wallet isolation")

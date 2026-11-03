@@ -1,12 +1,20 @@
 <script setup lang="ts">
 import type { ConsoleState } from "./api";
-defineProps<{ entry: ConsoleState["multiplayerEntry"]; busy: boolean }>();
+defineProps<{ entry: ConsoleState["multiplayerEntry"]; run?: ConsoleState["multiplayerRun"]; busy: boolean }>();
 const emit = defineEmits<{ command: [cmd: string, extra: Record<string, unknown>] }>();
 </script>
 <template>
   <section class="panel">
+    <div v-if="run" class="notice">
+      <h2>局内联机 · {{ run.role === 'host' ? '房主' : '队友' }}</h2>
+      <p>{{ run.message }}</p>
+      <p>选波由房主操作；每人使用自己电脑上的控制台购物，个人 PT 和背包独立。猫车恢复由房主购买。</p>
+      <ul><li v-for="member in run.members ?? []" :key="member.id">{{ member.self ? '本机' : member.id }}：{{ member.ready ? '状态已确认' : '等待同步' }}</li></ul>
+      <p v-if="run.staged">出怪确认：UID {{ run.staged.uid }} / 槽位 {{ run.staged.slot }}</p>
+      <p class="alert">双客户端仍需实测；有玩家离队、房主迁移或状态校验失败时，本局会停止并显示原因，请下载双方日志。</p>
+    </div>
     <h2>真实队友 · Steam 自动同步入场</h2>
-    <p>房主选择波次，队友自动准备相同任务表。保留自己的装备与背包，不发 PT，不自动续波。</p>
+    <p>房主选择入场波次，队友自动准备相同任务表；进入斗技场后自动接入局内循环。保留自己的装备与背包，后续清波 PT 每人独立结算。</p>
     <p class="alert">双客户端共同入场仍待验收。所有人安装同一个新版包，只在约好的私人大厅测试。</p>
     <ol>
       <li>各自启动游戏并打开自己电脑的控制台，通过游戏信使创建／加入同一个在线大厅。</li>

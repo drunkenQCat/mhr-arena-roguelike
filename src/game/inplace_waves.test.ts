@@ -91,3 +91,26 @@ it("queues old corpses only after every previous actor has been verified ended",
  expect(f.cleanup).toEqual([]);
  f.setBosses([dead]);f.backend.prepare(f.plan);expect(f.cleanup).toEqual([dead]);
 });
+
+it("stages records without starting native load until every peer acknowledges",()=>{
+ const f=fixture(); const staged=vi.fn(); let commit=false;
+ f.backend.setSync({role:"host",valid:()=>true,expected:()=>null,staged,activate:()=>commit});
+ f.backend.prepare(f.plan);f.backend.tick(1);
+ expect(staged).toHaveBeenCalledWith({token:2,ordinal:0,type:60,slot:2,id:119,uid:11900});
+ expect(f.fields._ExtraEmRno).toBe(10);f.backend.tick(2);expect(f.fields._ExtraEmRno).toBe(10);
+ commit=true;f.backend.tick(3);expect(f.fields._ExtraEmRno).toBe(5);expect(f.registrations).toEqual([60]);
+});
+it("guests never allocate without a host ticket and stop before loading mismatched identities",()=>{
+ const f=fixture();let ticket:any=null;
+ f.backend.setSync({role:"guest",valid:()=>true,expected:()=>ticket,staged:vi.fn(),activate:()=>false});
+ f.backend.prepare(f.plan);f.backend.tick(1);expect(f.registrations).toEqual([]);
+ ticket={token:2,ordinal:0,type:60,slot:3,id:99,uid:9900};
+ expect(()=>f.backend.tick(2)).toThrow("identity differs");expect(f.fields._ExtraEmRno).toBe(10);
+});
+it("guests stage the exact requested slot and activate each ticket once",()=>{
+ const f=fixture();const ticket={token:2,ordinal:0,type:60,slot:3,id:119,uid:11900};let commit=false;
+ f.backend.setSync({role:"guest",valid:()=>true,expected:()=>ticket,staged:vi.fn(),activate:()=>commit});
+ f.backend.prepare(f.plan);f.backend.tick(1);expect(f.fields._BossSetNoTbl.call("Get",2)).toBe(3);
+ f.backend.tick(2);expect(f.fields._ExtraEmRno).toBe(10);commit=true;f.backend.tick(3);f.backend.tick(4);
+ expect(f.registrations).toEqual([60]);expect(f.fields._ExtraEmRno).toBe(5);
+});
