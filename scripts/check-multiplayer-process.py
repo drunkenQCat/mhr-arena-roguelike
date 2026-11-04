@@ -223,7 +223,9 @@ def orchestrate(report):
                   'workers': identities, 'transport': base, 'checks': checks, 'host': host, 'guestBeforeFreeze': guest}
         if report:
             Path(report).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        # JSON escapes keep console output valid on Windows cp1252/GBK pipes.
+        # The optional report remains UTF-8 and preserves readable Chinese.
+        print(json.dumps(result, ensure_ascii=True, indent=2))
     finally:
         for process in peers.values():
             if process.poll() is None:
