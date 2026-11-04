@@ -28,6 +28,7 @@ namespace webconsole {
 
 inline constexpr const char* PLUGIN_VERSION = "0.4.0";
 inline unsigned short g_listen_port = 11777;
+inline bool g_open_browser = true;
 
 // REFramework plugin functions (request_script_reset / run_script / last_script_error).
 // Set once by reframework_plugin_initialize before the HTTP thread starts; null in
@@ -68,6 +69,32 @@ inline std::wstring g_data_dir;
 inline std::wstring g_module_dir;
 inline std::wstring g_game_root;
 inline std::wstring data_path(const wchar_t* name) { return g_data_dir + L"\\" + name; }
+
+// Per-instance configuration. Environment overrides the INI next to the plugin.
+// Never silently wrap an invalid port into another service's port.
+inline bool configure_instance() {
+    const auto ini = g_module_dir + L"\\webconsole.ini";
+    wchar_t port[32] = {};
+    const auto size = GetEnvironmentVariableW(L"MHR_WEBCONSOLE_PORT", port, 32);
+    if (size >= 32) { log_info("invalid MHR_WEBCONSOLE_PORT"); return false; }
+    if (!size) GetPrivateProfileStringW(L"webconsole", L"port", L"11777", port, 32, ini.c_str());
+    unsigned long parsed = 0;
+    if (!port[0]) return false;
+    for (const wchar_t* ch = port; *ch; ++ch) {
+        if (*ch < L'0' || *ch > L'9') return false;
+        parsed = parsed * 10 + (*ch - L'0');
+        if (parsed > 65535) return false;
+    }
+    if (!parsed) return false;
+    wchar_t browser[8] = {};
+    const auto browser_size = GetEnvironmentVariableW(L"MHR_WEBCONSOLE_OPEN_BROWSER", browser, 8);
+    if (browser_size >= 8) return false;
+    if (!browser_size) GetPrivateProfileStringW(L"webconsole", L"openBrowser", L"1", browser, 8, ini.c_str());
+    if (std::wstring(browser) != L"0" && std::wstring(browser) != L"1") return false;
+    g_listen_port = static_cast<unsigned short>(parsed);
+    g_open_browser = browser[0] == L'1';
+    return true;
+}
 
 inline std::string read_text(const std::wstring& path) {
     std::ifstream f(path.c_str(), std::ios::binary);

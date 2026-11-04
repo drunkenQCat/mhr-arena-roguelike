@@ -78,7 +78,7 @@ it("stops every writer on roster change, and never makes guest finish the native
 });
 it("rejects config drift before the guest ACKs a frame",()=>{
  const f=fixture();f.host.run.tick();const frame=JSON.parse(f.bus.plan);frame.h="a".repeat(64);f.bus.plan=JSON.stringify(frame);
- f.guest.run.tick();expect(f.guest.session.stage).toBe("Fault");expect(f.bus.acks.g).toContain("R3ERR|");
+ f.guest.run.tick();expect(f.guest.session.stage).toBe("Fault");expect(f.bus.acks.g).toContain("R4ERR|");
 });
 it("ignores duplicate sequence numbers and does not replay an old reward",()=>{
  const f=fixture();f.tick();f.clear();f.tick();const old=f.bus.plan;
@@ -119,4 +119,22 @@ it("follows host stop without a guest issuing native failure",()=>{
 it("does not let stale one-host-test text appear as production multiplayer semantics",()=>{
  const f=fixture();expect(f.host.session.message).not.toContain("真实队友加入后停止");
  expect(f.guest.session.message).not.toContain("真实队友加入后停止");
+});
+
+it("expires cached guest ACKs while Selecting and eventually faults the silent peer",()=>{
+ const f=fixture();f.tick();f.clear();f.tick();expect(f.host.session.canChoose()).toBe(true);
+ const frozen=f.bus.acks.g;mock.now+=16;f.host.session.tick();f.host.run.tick();
+ expect(f.host.session.canChoose()).toBe(false);expect(f.host.run.valid()).toBe(true);
+ mock.now+=121;f.host.session.tick();f.host.run.tick();
+ expect(f.bus.acks.g).toBe(frozen);expect(f.host.run.valid()).toBe(false);expect(f.host.session.stage).toBe("Fault");
+});
+it("does not refresh liveness from a delayed old ACK or an unpublished future sequence",()=>{
+ const f=fixture();f.tick();f.clear();f.tick();const frozen=f.bus.acks.g;
+ mock.now+=16;f.host.session.tick();f.host.run.tick();expect(f.host.session.canChoose()).toBe(false);
+ f.bus.acks.g=frozen.slice(0,frozen.lastIndexOf("|")+1)+"9999999";
+ mock.now++;f.host.run.tick();expect(f.host.session.canChoose()).toBe(false);
+});
+it("keeps a responsive guest ready while state stays unchanged for over 120 seconds",()=>{
+ const f=fixture();f.tick();f.clear();for(let i=0;i<140;i++)f.tick();
+ expect(f.host.run.valid()).toBe(true);expect(f.host.session.canChoose()).toBe(true);
 });

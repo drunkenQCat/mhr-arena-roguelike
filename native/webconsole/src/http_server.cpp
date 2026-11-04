@@ -449,7 +449,7 @@ void run_server()
         return;
     }
 #ifndef WEBCONSOLE_STANDALONE
-    if (g_plugin_functions && std::filesystem::exists(g_module_dir + L"\\console.html")) {
+    if (g_open_browser && g_plugin_functions && std::filesystem::exists(g_module_dir + L"\\console.html")) {
         const auto url = L"http://localhost:" + std::to_wstring(g_listen_port) + L"/console";
         ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
     }

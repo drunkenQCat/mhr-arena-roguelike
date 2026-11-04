@@ -54,6 +54,7 @@ extern "C" __declspec(dllexport) bool reframework_plugin_initialize(const REFram
     webconsole::g_data_dir = webconsole::g_game_root + L"\\reframework\\data";
     std::filesystem::create_directories(webconsole::g_data_dir);
 
+    if (!webconsole::configure_instance()) { webconsole::log_info("invalid webconsole instance configuration"); return false; }
     webconsole::start_http_server();
     webconsole::log_info("initialized; http thread starting");
     return true;

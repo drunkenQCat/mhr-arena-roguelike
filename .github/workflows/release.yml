@@ -68,6 +68,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Cannot install Lua runtime test dependency' }
           npm run check:runtime
           if ($LASTEXITCODE -ne 0) { throw 'Compiled Lua runtime checks failed' }
+          python scripts/check-multiplayer-process.py
+          if ($LASTEXITCODE -ne 0) { throw 'Cross-process Lua multiplayer protocol checks failed' }
           npm run test:cli
 
       - name: Build web console HTML
@@ -85,7 +87,7 @@ jobs:
         working-directory: mod
         shell: pwsh
         run: |
-          cmake --build native/webconsole/.build/Plugin-Release-x64 --config Release --target bridge_lifecycle_test fake_steam steam_lobby_test webconsole_test
+          cmake --build native/webconsole/.build/Plugin-Release-x64 --config Release --target bridge_lifecycle_test fake_steam steam_lobby_test instance_config_test webconsole_test
           if ($LASTEXITCODE -ne 0) { throw 'Native test build failed' }
           ctest --test-dir native/webconsole/.build/Plugin-Release-x64 -C Release --output-on-failure
           if ($LASTEXITCODE -ne 0) { throw 'Native tests failed' }

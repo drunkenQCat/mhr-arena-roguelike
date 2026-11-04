@@ -14,7 +14,7 @@ import { clockSeconds, loadWebconsole, rejson, type NativeWebconsole } from "./s
 
 export interface RunContext { lobby: string; owner: string; self: string; session: string; members: string[] }
 type EncodedWave = [number, string, string[], string, number, number, number, number, string];
-interface Frame { v: 3; s: string; o: string; l: string; h: string; n: number;
+interface Frame { v: 4; s: string; o: string; l: string; h: string; n: number;
   stage: SessionStage; phase: RunPhase; layer: number; token: number;
   w: EncodedWave; c: EncodedWave[]; earned: number; carts: number; deaths: number; cartUsed: boolean;
   camp: Position | null; killed: string[]; spawn: SpawnTicket | null; commit: boolean; }
@@ -47,6 +47,9 @@ export class MultiplayerRun implements SpawnSync {
   private stagedAt = 0;
   private preparedToken = -1;
   private members: { id: string; ack: string }[] = [];
+  private publications: { sequence: number; at: number }[] = [];
+  private peerHeartbeats = new Map<string, { sequence: number; at: number }>();
+  private static readonly FRESH_SECONDS = 15;
   private message = "等待全队进入任务并核对配置";
   constructor(private readonly context: RunContext, private readonly config: RogueConfig,
     private readonly catalog: MonsterCatalog, private readonly session: RunSession,
@@ -85,13 +88,35 @@ export class MultiplayerRun implements SpawnSync {
     return true;
   }
   canStage(): boolean { return !this.ticket || !this.committed || this.allReady(); }
-  private ack(f: Frame, status: string): string {
-    return `R3|${this.context.session}|${this.hash}|${stateKey(f)}|${ticketKey(this.localTicket)}|${ticketKey(this.activated)}|${status}`;
+  private ackPrefix(f: Frame, status: string): string {
+    return `R4|${this.context.session}|${this.hash}|${stateKey(f)}|${ticketKey(this.localTicket)}|${ticketKey(this.activated)}|${status}|`;
+  }
+  private ack(f: Frame, status: string): string { return `${this.ackPrefix(f, status)}${f.n}`; }
+  private observeHeartbeats(now: number): void {
+    for (const member of this.members) {
+      if (member.id === this.context.self) continue;
+      const parts = member.ack.split("|");
+      if (parts.length !== 8 || parts[0] !== "R4" || parts[1] !== this.context.session || parts[2] !== this.hash) continue;
+      const sequence = Number(parts[7]);
+      const published = this.publications.find(p => p.sequence === sequence);
+      const previous = this.peerHeartbeats.get(member.id);
+      // Only a newer echo of a recently published challenge proves a live peer.
+      // Re-reading a cached lobby ACK or receiving an ancient delayed ACK is not a heartbeat.
+      if (Number.isInteger(sequence) && published && now - published.at <= MultiplayerRun.FRESH_SECONDS &&
+          (!previous || sequence > previous.sequence)) this.peerHeartbeats.set(member.id, { sequence, at:now });
+    }
+  }
+  private peerReady(id: string): boolean {
+    if (!this.frame) return false;
+    if (id === this.context.self) return this.session.readingSnapshot?.quest?.playing === true && !this.busy();
+    const member = this.members.find(m => m.id === id), heartbeat = this.peerHeartbeats.get(id);
+    return !!member && !!heartbeat && clockSeconds() - heartbeat.at <= MultiplayerRun.FRESH_SECONDS &&
+      member.ack.startsWith(this.ackPrefix(this.frame, "ready")) &&
+      Number(member.ack.split("|")[7]) === heartbeat.sequence;
   }
   private allReady(): boolean {
-    if (!this.frame || !this.session.readingSnapshot?.quest?.playing) return false;
-    const wanted = this.ack(this.frame, "ready");
-    return this.context.members.every(id => id === this.context.self || this.members.some(m => m.id === id && m.ack === wanted));
+    return !!this.frame && this.session.readingSnapshot?.quest?.playing === true &&
+      this.context.members.every(id => this.peerReady(id));
   }
   canChoose(): boolean { return this.role === "host" && this.valid() && this.allReady() && !this.busy(); }
   private build(): Frame {
@@ -99,7 +124,7 @@ export class MultiplayerRun implements SpawnSync {
     if (!p) throw new Error("Multiplayer host has no active plan");
     if (this.localTicket && this.localTicket.token !== p.token) { this.localTicket = null; this.activated = null; }
     const spawn = this.ticket?.token === p.token ? this.ticket : null;
-    return { v:3, s:this.context.session, o:this.context.owner, l:this.context.lobby, h:this.hash, n:++this.sequence,
+    return { v:4, s:this.context.session, o:this.context.owner, l:this.context.lobby, h:this.hash, n:++this.sequence,
       stage:s.stage, phase:s.core.state.phase, layer:s.core.state.layer, token:p.token,
       w:encode(p.wave), c:s.core.state.currentChoices.map(encode), earned:s.earnedPt,
       carts:s.core.state.cartsLeft, deaths:s.readingSnapshot?.deaths ?? 0, cartUsed:s.core.state.cartRestoreUsed, camp:s.campSnapshot,
@@ -110,11 +135,13 @@ export class MultiplayerRun implements SpawnSync {
     // Native bridge enforces a 2048-byte Steam value limit. Lua string length is bytes.
     if (text.length > 2048 || !this.network.steam_plan?.(this.context.lobby, text)) throw new Error("Steam rejected multiplayer state publication");
     this.frame = f;
+    this.publications.push({ sequence:f.n, at:clockSeconds() });
+    if (this.publications.length > 128) this.publications.shift();
   }
   private accept(text: string): void {
     let f: Frame;
     try { f = rejson.load_string(text) as Frame; } catch { return; }
-    if (!f || f.v !== 3) return; // Entry prepare/post envelope until host attaches.
+    if (!f || f.v !== 4) return; // Entry prepare/post envelope until host attaches.
     if (f.s !== this.context.session || f.o !== this.context.owner || f.l !== this.context.lobby) throw new Error("Multiplayer session identity changed");
     if (f.h !== this.hash) throw new Error("房主与本机配置不一致；请安装同一 Nightly 并同步配置后重新开局");
     if (!Number.isInteger(f.n) || f.n <= this.lastSequence) return;
@@ -151,11 +178,12 @@ export class MultiplayerRun implements SpawnSync {
     try {
       if (!this.valid()) throw new Error("原生任务或房主身份发生变化");
       const snapshot = this.network.steam_snapshot?.();
-      const lobby = snapshot?.lobbies.find(l => l.id === this.context.lobby && l.owner === this.context.owner && l.self === this.context.self);
+      const lobby = snapshot?.lobbies?.find(l => l.id === this.context.lobby && l.owner === this.context.owner && l.self === this.context.self);
       if (!lobby || lobby.members.map(m => m.id).sort().join(",") !== [...this.context.members].sort().join(",")) throw new Error("固定队伍改变；暂不支持中途加入、离开或房主迁移");
       this.members = lobby.members;
       if (this.role === "host") {
-        if (this.members.some(m => m.ack.startsWith(`R3ERR|${this.context.session}|`))) throw new Error("队友同步失败，请下载双方日志");
+        if (this.members.some(m => m.ack.startsWith(`R4ERR|${this.context.session}|`))) throw new Error("队友同步失败，请下载双方日志");
+        this.observeHeartbeats(now);
         this.publish();
         if (this.allReady()) this.lastSeen = now;
         if (now - this.lastSeen > 120) throw new Error("等待队友同步超过120秒");
@@ -172,12 +200,12 @@ export class MultiplayerRun implements SpawnSync {
     if (!this.live) return;
     this.message = reason;
     if (this.role === "host") { try { this.session.failMultiplayer(reason); this.publish(); } catch { /* scope may already be gone */ } }
-    else { this.network.steam_ack?.(this.context.lobby, `R3ERR|${this.context.session}|${reason.slice(0,256)}`); this.session.failMultiplayer(reason); }
+    else { this.network.steam_ack?.(this.context.lobby, `R4ERR|${this.context.session}|${reason.slice(0,256)}`); this.session.failMultiplayer(reason); }
     this.live = false;
     this.runtime.report("multiplayer-run-error", { role:this.role, reason });
   }
   snapshot(): Record<string, unknown> { return { role:this.role, live:this.live, message:this.message,
     lobby:this.context.lobby, session:this.context.session, members:this.members.map(m => ({ id:m.id, self:m.id === this.context.self,
-      ready:!!this.frame && m.ack === this.ack(this.frame,"ready") })),
+      ready:this.role === "host" ? this.peerReady(m.id) : !!this.frame && m.ack.startsWith(this.ackPrefix(this.frame,"ready")) })),
     token:this.frame?.token ?? null, staged:this.localTicket, commit:this.committed, verifiedTwoClients:false }; }
 }

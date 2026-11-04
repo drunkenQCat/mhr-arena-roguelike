@@ -103,3 +103,32 @@ ctest --test-dir native/webconsole/.build/Plugin-Release-x64 -C Release --output
 测试使用实际编译的 Lua C API/桥接函数，覆盖三个 Lua 环境的创建/销毁、preload、GC、错误参数、队列上限、同一存储实例及旧代清理。Lua 源码已逐文件核对：61 个文件与 REFramework `5bae4701396248a776c1de19f5be9552022295d5` 中的 `dependencies/lua/src` 一致（归一化 CRLF）。原始版权与完整许可文本保留在 `lua54/lua.h` 末尾；分发时需保留对应许可声明。
 
 原来的 `scripts/review-webconsole.py` 使用文件信箱的隔离联调机制，尚未适配新内存后端，不能据此验收此版本；当前使用原生 CTest、Lua 探针语义检查和真实游戏 HTTP 回执验证。
+
+
+## 同机多个实例的后端端口
+
+每个游戏副本使用独立的 `reframework/data` 目录。在该副本的
+`reframework/plugins/webconsole.ini` 中写入：
+
+```ini
+[webconsole]
+port=11778
+openBrowser=0
+```
+
+默认端口仍为 11777，默认自动打开网页。端口必须为 1–65535 的十进制整数；
+非法配置会拒绝启动插件 HTTP 服务。环境变量 `MHR_WEBCONSOLE_PORT`、
+`MHR_WEBCONSOLE_OPEN_BROWSER`（0/1）分别覆盖 INI。同机两份副本应使用不同端口，
+重启游戏后生效；这只隔离后端服务，不提供第二个 Steam 身份或多人游戏能力。
+
+## 跨进程协议回归
+
+```powershell
+npm run build:nocopy
+python -m pip install lupa==2.8
+python scripts/check-multiplayer-process.py --report .local/dual-process-results.json
+```
+
+脚本启动两个独立 Python/Lua 5.4 进程，加载实际编译 Lua，经本机 HTTP 中转模拟
+Steam lobby 元数据。覆盖选波权限、私人 PT、登记/确认/提交/激活、奖励去重和冻结队友。
+原生读数为替身，不能替代两个 Rise 引擎的入场、怪物同步或伤害验证。CI 必须通过此项。

@@ -50,6 +50,9 @@ target_link_libraries(webconsole_test PRIVATE lua54 ws2_32.lib crypt32.lib iphlp
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(instance_config_test tests/instance_config_test.cpp)
+    target_include_directories(instance_config_test PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME instance_config COMMAND instance_config_test)
     add_executable(bridge_lifecycle_test tests/bridge_lifecycle.cpp src/lua_bridge.cpp src/http_server.cpp src/steam_lobby.cpp)
     target_include_directories(bridge_lifecycle_test PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(bridge_lifecycle_test PRIVATE lua54 ws2_32.lib crypt32.lib iphlpapi.lib shell32.lib)
