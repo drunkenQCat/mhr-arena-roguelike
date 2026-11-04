@@ -1,6 +1,8 @@
 export interface ShopEntry { id: string; name: string; category: string; price: number; cap: number; owned: number; mode: string; desc?: string; canBuy: boolean; reason?: string; }
 export interface Choice { index: number; label: string; monsters: string[]; mode?: string; hpMul: number; dmgMul: number; rewardPt: number; }
 export interface ConsoleState {
+  ui?: { scene: string; resultNode?: string | null;
+    returnFlow?: { state: "waiting" | "complete" | "stopped"; message: string } | null };
   multiplayerEntry?: { role: string; host: number | null; self: number | null; questId: number;
     mode: string | null; hash: string | null; revision: number | null;
     transport: string; posting: boolean; canPost: boolean; message: string;

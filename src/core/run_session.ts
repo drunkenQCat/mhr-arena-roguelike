@@ -20,6 +20,8 @@ export interface RuntimeReading {
   canPost: boolean;
   /** True when the arena quest object of a stopped/failed run is still registered. */
   staleQuest?: boolean;
+  /** Native load completion and running quest clock; isPlayQuest alone precedes actor placement. */
+  entryReady?: boolean;
 }
 export interface DeathReading { uid: number; typeId: number; kind: "kill" | "capture" }
 
@@ -446,7 +448,7 @@ export class RunSession {
       if (this.stage === "AwaitQuest") {
         if (reading.quest && this.plan && reading.quest.id === this.plan.questId && reading.quest.playing) {
           // During entry the engine can expose an uninitialised origin for one sample.
-          if (reading.players.length === 0 || reading.players.some((p) =>
+          if (reading.entryReady === false || reading.players.length === 0 || reading.players.some((p) =>
             p.position.x === 0 && p.position.y === 0 && p.position.z === 0)) {
             if (reading.time - this.requestedAt > this.settings.postTimeoutSeconds)
               this.fault("玩家位置尚未初始化，无法记录集结点；请检查玩家采样接口");

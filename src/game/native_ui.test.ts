@@ -31,7 +31,7 @@ function fixture() {
   host.objects["snow.QuestManager"] = obj("quest", {}, { isActiveQuest: false });
   host.objects[TITLE] = obj("title", {}, { getCurrentNodeName: () => state.node });
   host.objects[MENU] = obj("menu", {}, { get_TitleMenuState: () => state.menu, isOpenTitle: true, get_TitleMenuCursor: cursor });
-  return { ui: new NativeUi("epoch-1"), state, save, mouse };
+  return { ui: new NativeUi("epoch-1", () => 900103), state, save, mouse };
 }
 function signal(name: string, argument?: unknown) {
   const hook = host.hooks.get(`snow.gui.StmGuiInput.${name}`);
@@ -41,7 +41,7 @@ function signal(name: string, argument?: unknown) {
 beforeEach(() => { host.objects = {}; host.hooks.clear(); host.now = 100; host.storage = {}; });
 
 it("leaves absent UI unknown and never claims that missing players imply loading", () => {
-  const view = new NativeUi("bridge").observe();
+  const view = new NativeUi("bridge", () => 900103).observe();
   expect(view.scene).toBe("unknown"); expect(view.loading).toBeNull(); expect(view.allowedActions).toEqual([]);
 });
 it("does not treat preview players or default names in empty slots as a loaded save", () => {
@@ -104,4 +104,69 @@ it("does not inject save confirmation outside the native load routine", () => {
   scope.pre([]); expect(signal("getDecideButtonTrg")).toBe(1); scope.post(0);
   f.state.info = true;
   expect(f.ui.poll()?.status).toBe("applied");
+});
+
+function resultFixture() {
+  const f = fixture();
+  const r = { node:"Reward", active:true, playing:false, quest:900103, unique:7, receive:0, village:false };
+  host.objects["snow.QuestManager"] = obj("quest", {}, {isActiveQuest:()=>r.active, isPlayQuest:()=>r.playing,
+    get_ActiveQuestNo:()=>r.quest, getActiveQuestUniqueNo:()=>r.unique});
+  host.objects["snow.gui.GuiQuestResultFsmManager"] = obj("result", {}, {getCurrentNodeName:()=>r.node,
+    decideSendAllItem:()=>{r.receive++;}});
+  host.objects["snow.gui.GuiManager"] = obj("gui", {}, {IsCanInvokeQuestBoard:()=>r.village,
+    isOpenResultReward:()=>r.node==="Reward", isOpenResultPayOff:()=>["Payoffselect","Save"].includes(r.node)});
+  return {...f,r};
+}
+it("identifies result pages and waits for native transitions rather than closing windows",()=>{
+  const {ui,r}=resultFixture();
+  expect(ui.observe().scene).toBe("quest_reward");
+  ui.request({id:"receive",cmd:"result.receive",sceneToken:ui.observe().sceneToken});
+  expect(r.receive).toBe(1);expect(ui.poll()).toBeNull();
+  r.node="Payoffselect";expect(ui.poll()?.status).toBe("applied");
+  expect(ui.observe().scene).toBe("quest_payoff");
+  ui.request({id:"next",cmd:"result.next",sceneToken:ui.observe().sceneToken});
+  expect(signal("getAnyTrgSYS")).toBe(0);
+  expect(signal("getDecideButtonTrg")).toBe(1);
+  expect(signal("getDecideButtonTrg")).toBe(1);
+  r.node="Save";expect(signal("getDecideButtonTrg")).toBe(0);
+  expect(ui.poll()?.status).toBe("applied");
+  expect(ui.observe().allowedActions).toEqual([]);
+});
+it("automates only the pinned ended quest and completes on real village readiness",()=>{
+  const {ui,r}=resultFixture();ui.beginReturn(900103,7);ui.tickReturn();
+  expect(r.receive).toBe(1);ui.tickReturn();expect(r.receive).toBe(1);
+  r.node="Payoffselect";ui.poll();host.now++;ui.tickReturn();
+  expect(signal("getDecideButtonTrg")).toBe(1);r.node="Save";ui.poll();
+  host.now++;ui.tickReturn();expect(ui.observe().returnFlow.state).toBe("waiting");
+  r.active=false;r.village=true;r.node="End";host.now++;ui.tickReturn();
+  expect(ui.observe().returnFlow.state).toBe("complete");
+  ui.beginReturn(900103,7);expect(ui.observe().returnFlow.state).toBe("complete");
+});
+it("stops result automation on another quest, and never offers it during combat",()=>{
+ const {ui,r}=resultFixture();r.playing=true;
+ expect(ui.observe().allowedActions).not.toContain("result.receive");
+ r.playing=false;expect(()=>ui.beginReturn(900103,8)).toThrow("identity");
+ ui.beginReturn(900103,7);r.unique=8;host.now++;ui.tickReturn();
+ expect(r.receive).toBe(0);expect(ui.observe().returnFlow.state).toBe("stopped");
+ r.quest=10101;expect(ui.observe().allowedActions).not.toContain("result.receive");
+});
+it("bounds automatic return without forcing saving or unknown UI branches",()=>{
+ const {ui,r}=resultFixture();r.node="Save";ui.beginReturn(900103,7);
+ host.now+=121;ui.tickReturn();expect(ui.observe().returnFlow.state).toBe("stopped");expect(r.receive).toBe(0);
+});
+
+it("does not replay an automatic receive when its outcome is uncertain",()=>{
+ const {ui,r}=resultFixture();ui.beginReturn(900103,7);ui.tickReturn();expect(r.receive).toBe(1);
+ host.now+=9;expect(ui.poll()?.status).toBe("uncertain");
+ ui.tickReturn();expect(r.receive).toBe(1);expect(ui.observe().returnFlow.state).toBe("stopped");
+});
+
+it("uses the configured quest rather than a fixed list of test quest IDs", () => {
+  const {r} = resultFixture(); r.quest = 900199;
+  const ui = new NativeUi("custom", () => 900199);
+  expect(ui.observe().allowedActions).toContain("result.receive");
+  ui.beginReturn(900199, 7); ui.tickReturn(); expect(r.receive).toBe(1);
+  r.quest = 900103;
+  expect(ui.observe().allowedActions).not.toContain("result.receive");
+  expect(() => new NativeUi("custom", () => 900199).beginReturn(900103, 7)).toThrow("identity");
 });

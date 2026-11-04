@@ -278,6 +278,23 @@ await withPlugin({}, async (baseUrl) => {
   check("failing scenario exits 4", bad.code === 4, bad.stdout.slice(0, 200));
 });
 
+// Return must wait for actual village/player readiness, not only an applied command.
+await withPlugin({statePatch:s=>({ui:{scene:s.returnStarted?"village":"quest_reward"},preparation:{players:s.returnStarted?[{id:0}]:[]}})}, async(baseUrl,p)=>{
+ const result=await runCli(["game","return","--timeout","2","--json"],{baseUrl});
+ check("game return waits for village",result.code===5 && p.received.filter(x=>x.cmd==="returnToVillage").length===1,result.stdout);
+});
+await withPlugin({statePatch:s=>({ui:{scene:"village"},preparation:{players:[{id:0}]}})}, async(baseUrl,p)=>{
+ const result=await runCli(["game","return","--json"],{baseUrl});
+ check("game return already in village does not submit",result.code===0 && p.received.length===0,result.stdout);
+});
+
+let returningPlugin;
+await withPlugin({statePatch:s=>({ui:{scene:returningPlugin?.received.some(x=>x.cmd==="returnToVillage")?"village":"quest_reward"},preparation:{players:[{id:0}]}})}, async(baseUrl,p)=>{
+ returningPlugin=p;
+ const result=await runCli(["game","return","--timeout","2","--json"],{baseUrl});
+ check("game return completes after native state advances",result.code===0 && JSON.parse(result.stdout).scene==="village" && p.received.length===1,result.stdout);
+});
+
 // 9. Script control: reset, run-script content/path forms, timeout with error surfacing.
 await withPlugin({}, async (baseUrl, plugin) => {
   const reset = await runCli(["game", "reset", "--json"], { baseUrl });

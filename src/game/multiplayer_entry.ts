@@ -63,7 +63,7 @@ export class MultiplayerEntry {
     private readonly canPrepare: () => boolean, private readonly network = bridge()) {}
 
   private requireIdle(): void {
-    if (!this.canPrepare()) throw new Error("请先结束单人局并等待装备、背包恢复。");
+    if (!this.canPrepare()) throw new Error("请先结束当前局并等待恢复；上一轮联机结束后需全队回村并重载脚本。");
     if (questManager()?.call("isActiveQuest") !== false) throw new Error("请先取消或完成当前已承接任务。");
     if (this.pendingPost || this.transport?.isActive()) throw new Error("正在确认或承接任务，请等待。");
   }
@@ -214,7 +214,9 @@ export class MultiplayerEntry {
     lobby: string; owner: string; self: string; session: string; members: string[] } | null {
     const p = this.installer?.getPlan(), l = this.lobby;
     if (!p || !this.installer || !this.plan || this.plan.intent !== "post" || !l ||
-        this.applied !== key(this.plan) || questManager()?.call("get_ActiveQuestNo") !== ENTRY_QUEST_ID) return null;
+        this.applied !== key(this.plan) || this.pendingPost || this.transport?.isActive() ||
+        questManager()?.call("get_ActiveQuestNo") !== ENTRY_QUEST_ID ||
+        questManager()?.call("isPlayQuest") !== true) return null;
     const role = readLobbyIdentity().role;
     if (role !== "host" && role !== "guest") return null;
     return { installer: this.installer, plan: p, lobby: l.id, owner: l.owner, self: l.self,

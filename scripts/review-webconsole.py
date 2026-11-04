@@ -1,9 +1,10 @@
-"""Run emitted Lua + the real native HTTP server against an isolated fake game port.
+"""Run emitted Lua against an isolated fake game port.
 
 For browser verification without changing a live quest:
-  python scripts/review-webconsole.py --port 11877
+  python scripts/review-webconsole.py --port 11877 --fixture-http
 Open http://127.0.0.1:11877/console. This is NOT a live-game acceptance test.
-Requires console/build, build:nocopy, native build-standalone and lupa.
+Requires console/build, build:nocopy and lupa. The test-only Python HTTP transport
+does not validate the native memory transport or real game APIs.
 Control .local/console-review/control.json: {"x":200} moves the fake player;
 {"freeze":true} stops Lua updates while HTTP remains available.
 """
@@ -11,8 +12,10 @@ import argparse
 import json
 from pathlib import Path
 import shutil
-import subprocess
 import time
+import threading
+import queue
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from lupa.lua54 import LuaRuntime
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -22,14 +25,26 @@ def run():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=11877)
     parser.add_argument("--seconds", type=int, default=1200)
+    parser.add_argument("--fixture-http", action="store_true", help="Compatibility flag; this preview always uses isolated fixture HTTP")
     args = parser.parse_args()
     folder = ROOT / ".local/console-review"
     data = folder / "testdata"
     data.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(ROOT / "native/webconsole/webconsole_test.exe", folder / "webconsole_test.exe")
     shutil.copy2(ROOT / "console/dist/index.html", folder / "console.html")
     (folder / "control.json").write_text("{}", encoding="utf-8")
-    (data / "webconsole_cmd.json").write_text("{}", encoding="utf-8")
+    commands = queue.Queue(maxsize=32)
+    published = {}
+    lock = threading.Lock()
+
+    def publish(kind, text):
+        with lock:
+            published[kind] = text.encode("utf-8")
+
+    def take_command():
+        try:
+            return commands.get_nowait()
+        except queue.Empty:
+            return None
     lua = LuaRuntime(unpack_returned_tuples=True)
 
     def to_python(value):
@@ -68,7 +83,18 @@ def run():
     lua.globals().json = lua.table_from({"dump_file": dump, "dump_string": encode,
         "load_string": decode, "load_file": lambda p: decode(read(p))})
     lua.globals().fs = lua.table_from({"read": read, "write": write})
+    lua.globals().fixture_take_command = take_command
+    lua.globals().fixture_publish = publish
     lua.execute("""
+      package.preload['webconsole']=function() return {
+        epoch=function() return 1 end,
+        take_commands=function()
+          local cmd=fixture_take_command()
+          return cmd and {cmd} or {}
+        end,
+        publish_state=function(text) local state=json.load_string(text);state.testMode=true;fixture_publish('state',json.dump_string(state)) end,
+        publish_results=function(text) fixture_publish('results',text) end
+      } end
       local inventory = {}
       local pouch = {get_type_definition=function() return {get_method=function() return {} end} end}
       function pouch:call(method, id, count)
@@ -127,7 +153,7 @@ def run():
       tools={invincible=false,message='TEST HARNESS: no live game'}
       function tools:toggleGod() self.invincible=not self.invincible end
       function tools:requestKill() for _,e in ipairs(source.enemies) do e.dead=true end end
-      runtime={status=function()return 'ISOLATED TEST: emitted Lua, simulated native game API' end,testTools=tools}
+      runtime={ready=function()return true end,status=function()return 'ISOLATED TEST: emitted Lua, simulated native game API' end,testTools=tools}
       shop=new(modules.ShopWindow,core,function()return session:canShop()end,function()return session:shopQuest()end)
       bridge=new(modules.Bridge,session,runtime,shop)
       function frame(x)
@@ -135,13 +161,50 @@ def run():
         session:tick();shop:tick();bridge:tick()
       end
     """)
-    process = subprocess.Popen([str(folder / "webconsole_test.exe"), str(args.port)], cwd=folder,
-        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    print(f"Isolated Lua + native HTTP preview: http://127.0.0.1:{args.port}/console", flush=True)
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_): pass
+
+        def reply(self, status, body, content_type="application/json; charset=utf-8"):
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            if self.path == '/console':
+                self.reply(200, (folder / 'console.html').read_bytes(), 'text/html; charset=utf-8')
+                return
+            if self.path == '/api/health':
+                self.reply(200, b'{"ok":true,"protocol":4,"testMode":true}')
+                return
+            kind = {'/api/state': 'state', '/api/results': 'results'}.get(self.path)
+            with lock:
+                body = published.get(kind)
+            self.reply(200 if body else 503, body or b'{"error":"fixture state not ready"}')
+
+        def do_POST(self):
+            if self.path != '/api/command': self.send_error(404); return
+            try:
+                size = int(self.headers.get('Content-Length', '0'))
+                if not 0 < size <= 65536: raise ValueError("invalid size")
+                body = self.rfile.read(size).decode('utf-8')
+                command = json.loads(body)
+                if not isinstance(command, dict) or not command.get('id'): raise ValueError("missing id")
+                commands.put_nowait(body)
+            except queue.Full:
+                self.reply(429, b'{"error":"fixture queue full"}'); return
+            except (ValueError, UnicodeError):
+                self.reply(400, b'{"error":"invalid fixture command"}'); return
+            self.reply(200, b'{"ok":true,"queued":true}')
+
+    server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    print(f"ISOLATED FIXTURE (not a game): http://127.0.0.1:{args.port}/console", flush=True)
     print(f"Control file: {folder / 'control.json'}", flush=True)
     deadline = time.monotonic() + args.seconds
     try:
-        while time.monotonic() < deadline and process.poll() is None:
+        while time.monotonic() < deadline:
             try:
                 control = json.loads((folder / "control.json").read_text(encoding="utf-8"))
             except json.JSONDecodeError:
@@ -150,8 +213,7 @@ def run():
                 lua.globals().frame(control.get("x", 10))
             time.sleep(1 / 60)
     finally:
-        process.terminate()
-        process.wait(timeout=5)
+        server.shutdown(); server.server_close()
 
 
 if __name__ == "__main__":

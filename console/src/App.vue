@@ -32,7 +32,7 @@ async function send(cmd: string, extra: Record<string, unknown> = {}): Promise<C
     }
     const result = await waitForReceipt(id, bridge, { purchase: cmd === "buy", effect: cmd === "killAll" || cmd === "teleport", alive: () => alive,
       onPacket: (packet) => { results.value = packet.history ?? []; } });
-    const labels: Record<string, string> = { startRun: '已开始本局', choose: '已选择波次', setRoute: '路线已更新', setInvincible: '无敌设置已更新', killAll: '目标状态已确认', teleport: '位置已确认', stop: '本局已结束', retryPost: '已提交出发请求', getConfig: '配置已读取', buy: '购买完成' };
+    const labels: Record<string, string> = { startRun: '已开始本局', choose: '已选择波次', setRoute: '路线已更新', setInvincible: '无敌设置已更新', killAll: '目标状态已确认', teleport: '位置已确认', stop: '已停止，正在通过原生结算返回村庄', retryPost: '已提交出发请求', getConfig: '配置已读取', buy: '购买完成' };
     notice.value = result.status === 'applied' ? (cmd === 'buy' ? '购买完成，结果显示在商店中' : labels[cmd] ?? result.message ?? '操作完成') : `${result.status === 'queued' ? '游戏已排队，等待实际结果' : result.status === 'uncertain' ? '结果待核实，请勿重试' : '已拒绝'}：${result.message ?? '请检查当前条件'}`;
     return result;
   } catch (e) { notice.value = String(e).replace("Error: ", ""); return null; }
@@ -94,7 +94,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); });
     <p v-if="state?.testMode" class="alert">隔离验证环境：执行编译后的 Lua，玩家、怪物、背包与传输使用测试替身，不会操作实际游戏。</p>
     <p v-if="state && state.protocol !== 4" class="alert">当前 Lua 仍使用旧版协议，无法提供位置与商店资格。请在 REFramework → ScriptRunner 执行 Reset scripts；网页已禁止向旧脚本发送操作。</p>
     <div class="toolbar topnav"><button :class="{ selected: page === 'multiplayer' }" @click="page = 'multiplayer'">联机入场测试</button><button :class="{ selected: page === 'play' }" @click="page = 'play'">游戏与商店</button><button :class="{ selected: page === 'design' }" @click="page = 'design'">策划工作台</button><button :class="{ selected: page === 'events' }" @click="page = 'events'">命令记录</button><button :class="{ selected: page === 'help' }" @click="page = 'help'">安装与手机连接</button></div>
-    <p class="muted">联机入场实验版 · 房主选波、队友原生任务板加入；完整多人续波与奖励同步尚未实现。</p>
+    <p class="muted">联机测试版 · 本机双客户端已通过续波、个人购物和共享猫车；不同电脑的官方 Steam 联机仍需反馈。</p>
     <SupportBar />
     <ConnectionHelp v-if="page === 'help'" v-model:developer="developerMode" />
     <p class="notice" role="status">{{ notice }}</p>

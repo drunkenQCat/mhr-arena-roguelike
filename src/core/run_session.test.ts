@@ -477,3 +477,17 @@ describe("M3.5 ultimate kill drop", () => {
     expect(game.events.find((e) => e.event === "ultimate-drop")).toBeUndefined();
   });
 });
+
+it("waits for native load completion and the running quest clock before recording camp", () => {
+  const { game, session, start, enter, tick } = setup("inPlace");
+  start();
+  game.reading.entryReady = false;
+  game.reading.players = [{id:0, position:{x:-1498,y:-0.2,z:-1465}}];
+  enter();
+  expect(session.stage).toBe("AwaitQuest");
+  expect(session.campSnapshot).toBeNull();
+  game.reading.players = [{id:0, position:{x:0.1,y:50,z:47}}];
+  game.reading.entryReady = true; tick();
+  expect(session.stage).toBe("Combat");
+  expect(session.campSnapshot).toEqual({x:0.1,y:50,z:47});
+});

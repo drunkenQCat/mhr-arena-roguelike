@@ -73,6 +73,7 @@ const transactionText = computed(() => {
       <div v-if="combat" class="targets"><p>目标进度：{{ prep?.resolved ?? 0 }} / {{ prep?.expected ?? 0 }}</p><div v-for="enemy in state?.enemies ?? []" :key="enemy.uid" class="enemy-row"><span>{{ monsterName(enemy.typeId) }}</span><span class="badge">{{ enemy.captured ? '已捕获' : enemy.dead ? '已死亡' : '在场' }}</span></div><small v-if="!state?.enemies?.length">等待目标出现，空场不会自动结算。</small></div>
       <div v-if="carving" class="gather-card"><strong>{{ prep?.gathered ? '已到达起点' : '尚未到达起点' }}</strong><p v-if="distance != null">距离起点 {{ Math.round(distance) }} · 集结范围 {{ stat(prep?.radius) }}</p><p v-else>正在等待玩家位置。</p><p>剥取时间 {{ stat(prep?.carveRemaining) }} 秒 · 集结停留 {{ stat(prep?.dwellRemaining) }} 秒</p></div>
       <div v-if="allowed.retry" class="toolbar"><button @click="command('retryPost')">重试出发</button></div>
+      <p v-if="state?.ui?.returnFlow" class="notice" role="status">{{ state.ui.returnFlow.message }}</p>
       <p v-if="state?.sessionStage === 'Fault' && state?.message" class="notice">{{ state.message }}</p>
     </section>
 

@@ -55,6 +55,7 @@ const HELP = `用法: node cli/mhr.mjs <命令> [选项]
   wait --scene village --timeout 120     等待原生场景
 
 脚本控制（需 fork 版框架 dinput8）:
+  game return --timeout 120              继续结束任务的原生结算并等待回村
   game reset                             重置全部脚本（下一帧生效，epoch +1）
   game run-script <文件> [--timeout S]   执行一个 Lua 文件并等待其 publish_probe 报告；
                                          本地存在该文件则按内容上传，否则视为游戏目录相对路径
@@ -183,6 +184,25 @@ async function main() {
         output.result(body, (v) => `已请求重置脚本（下一帧生效，epoch ${v.epoch}）；旧 bridgeId 的请求将被拒绝`);
         return EXIT.OK;
       }
+      if (sub === "return") {
+        const identity = await captureIdentity(baseUrl, timeoutMs);
+        if (identity.state.ui?.scene === "village" && (identity.state.preparation?.players?.length ?? 0) > 0) { output.result({ok:true, scene:"village"}); return EXIT.OK; }
+        const result = await submit(baseUrl, {cmd:"returnToVillage"}, {identity, timeoutMs, receiptTimeoutMs});
+        requireReceipt(result.receipt);
+        const deadline = performance.now() + (options.timeout ?? 120) * 1000;
+        let last;
+        while (performance.now() < deadline) {
+          const current = await captureIdentity(baseUrl, Math.min(timeoutMs,3000));
+          if (current.bridgeId !== identity.bridgeId) throw rejected("回村期间脚本会话改变");
+          last = current.state.ui;
+          if (last?.scene === "village" && (current.state.preparation?.players?.length ?? 0) > 0) {
+            output.result({ok:true, scene:"village", receipt:result.receipt}); return EXIT.OK;
+          }
+          if (last?.returnFlow?.state === "stopped") throw rejected(last.returnFlow.message, {ui:last});
+          await sleep(500);
+        }
+        throw new CliError(EXIT.TIMEOUT,"原生回村未完成；请查看结算状态",{ui:last});
+      }
       if (sub === "last-error") {
         const { status, body } = await getRaw(baseUrl, "/api/script/error", timeoutMs * 1000);
         if (status !== 200 || !body) throw unavailable(`HTTP ${status}`);
@@ -232,7 +252,7 @@ ${v.error}` : "没有记录的脚本错误");
           (v) => `${script}: ${v.report.verdict}${v.report.error ? ` — ${v.report.error.split("\n")[0]}` : ""}`);
         return ok ? EXIT.OK : EXIT.REJECTED;
       }
-      if (sub !== "enter") throw usage("当前支持 game launch / enter / reset / run-script / last-error");
+      if (sub !== "enter") throw usage("当前支持 game launch / enter / return / reset / run-script / last-error");
       const { enterGame } = await import("./lib/game-entry.mjs");
       const result = await enterGame(baseUrl, options, output.progress);
       output.result(result); return EXIT.OK;

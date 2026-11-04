@@ -150,7 +150,8 @@ export const COMMAND_CATALOGUE = [
   { cmd: "teleport", writes: true, summary: "Task origin or live monster; solo active arena only" },
   { cmd: "killAll", writes: true, summary: "请求击杀当前已出场怪物" },
   { cmd: "retryPost", writes: true, summary: "重试原生接取" },
-  { cmd: "stop", writes: true, summary: "停止本局并恢复原生结算" },
+  { cmd: "stop", writes: true, summary: "停止本局并自动推进原生结算回村" },
+  { cmd: "returnToVillage", writes:true, summary:"继续结束后的自定义任务结算，不强制跳转场景" },
   { cmd: "setRoute", writes: true, summary: "切换 inPlace/reentry（仅开局前）" },
 ];
 
@@ -173,7 +174,7 @@ export function capabilitiesFrom(state, dllProtocol) {
   add("test.killAll", true, stage === "Combat", "仅战斗阶段");
   add("shop.buy", true, state?.shopAvailable === true && !busy && dllProtocol === 4,
     state?.shopAvailable ? (busy ? "商店交易进行中" : null) : (state?.shopReason ?? "当前不可购买"));
-  for (const name of ["startup.acknowledge", "title.advance", "title.continue", "save.load", "dialog.close"]) {
+  for (const name of ["startup.acknowledge", "title.advance", "title.continue", "save.load", "dialog.close", "result.receive", "result.next"]) {
     const implemented = state?.ui?.adapterVersion === 1;
     const allowed = implemented && state.ui.allowedActions?.includes(name) === true && !state.ui.busy;
     add(name, implemented, allowed, allowed ? null : "需要支持的原生菜单、当前 sceneToken/dialogToken 和空闲 UI");

@@ -1,5 +1,5 @@
 /** M3 商店窗口：单件 + 补满 + 猫车恢复；读回验证、事务日志、失败恢复。 */
-import type { RunCore, ShopEntry } from "../core/run_core";
+import type { RunCore, ShopEntry, PurchaseCheckpoint } from "../core/run_core";
 import { replaceOrAdd } from "../core/run_state";
 import { readLobbyIdentity } from "./multiplayer_entry";
 import { canTrade, grantFill, grantItem, pouchCount, pouchCanReceive, type TradeQuest } from "./item_grant";
@@ -58,7 +58,7 @@ export class ShopWindow
       return this.cachedCatalogue;
     const available = selecting && !this.busy && canTrade(this.questContext());
     const reason = this.busy ? "交易处理中或结果待核实" : !this.selecting()
-      ? "清波后返回集结点，等待进入整备阶段" : !available ? "等待单人任务和原生发货条件就绪" : null;
+      ? "清波后返回集结点，等待进入整备阶段" : !available ? "等待任务身份和原生发货条件就绪" : null;
     const unreadable: string[] = [];
     for (const item of this.core.config.shop) if (item.mode !== "service") {
       try {
@@ -111,12 +111,10 @@ export class ShopWindow
 
   open(): void { if (this.selecting()) this.visible = true; }
 
-  private settle(ok: boolean, notice: string, snapshot?: { wallet: RunCore["state"]["wallet"]; log: string[]; cartsLeft: number }): void {
+  private settle(ok: boolean, notice: string, snapshot?: PurchaseCheckpoint): void {
     if (!ok && snapshot) {
       // 未发货：恢复扣款与限购记录（Core.buy 已做的变更全部回滚）
-      this.core.state.wallet = snapshot.wallet;
-      this.core.state.log = snapshot.log;
-      this.core.state.cartsLeft = snapshot.cartsLeft;
+      this.core.rollbackPurchase(snapshot);
     }
     this.notice = notice;
     this.complete(this.unresolved ? "uncertain" : ok ? "applied" : "rejected", notice);
@@ -143,7 +141,7 @@ export class ShopWindow
           bag: replaceOrAdd(this.core.state.wallet.bag, req.id, owned) };
       }
       // 快照用于"未发货即回滚扣款与限购"
-      const snapshot = { wallet: this.core.state.wallet, log: this.core.state.log.slice(), cartsLeft: this.core.state.cartsLeft };
+      const snapshot = this.core.purchaseCheckpoint();
       const result = this.core.buy(item.id);
       if (!result.ok) { this.notice = result.message; this.complete("rejected", result.message ?? "购买未完成"); return; }
       debited = true;

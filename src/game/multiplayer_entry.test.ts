@@ -7,20 +7,21 @@ import type { NativeWebconsole } from "./sdk";
 
 const mock = vi.hoisted(() => ({ host: 0 as number | null, self: 0 as number | null,
   active: false, canPrepare: true, publish: vi.fn(), request: vi.fn(), cancel: vi.fn(),
-  running: false, now: 100, corrupt: false }));
+  running: false, playing: false, quest: -1, now: 100, corrupt: false }));
 vi.mock("./sdk", () => ({
   clockSeconds: () => mock.now, rejson: { load_string: JSON.parse, dump_string: JSON.stringify },
   getSingleton: () => ({ get_field: () => 1, call: (method: string) => {
     const index = method === "getHostIndex" ? mock.host : mock.self;
     return { get_field: (field: string) => field === "_HasValue" ? index !== null : index ?? 0 };
   } }),
-  questManager: () => ({ call: (method: string) => method === "isActiveQuest" ? mock.active : false }),
+  questManager: () => ({ call: (method: string) => method === "isActiveQuest" ? mock.active : method === "isPlayQuest" ? mock.playing : mock.quest }),
 }));
 vi.mock("./quest_installer", () => ({ QuestInstaller: class {
   plan: unknown;
   publish(plan: unknown) { mock.publish(plan); this.plan = plan; }
   multiplayerDescriptor() { return JSON.stringify(this.plan) + (mock.corrupt ? "changed" : ""); }
   getQuest() { return {}; }
+  getPlan() { return this.plan; }
 } }));
 vi.mock("./quest_transport", () => ({ QuestTransport: class {
   request = mock.request; cancel = mock.cancel;
@@ -49,7 +50,7 @@ function fixture() {
 }
 beforeEach(() => {
   vi.clearAllMocks(); mock.host = 0; mock.self = 0; mock.active = false;
-  mock.canPrepare = true; mock.running = false; mock.now = 100; mock.corrupt = false;
+  mock.canPrepare = true; mock.running = false; mock.playing = false; mock.quest = -1; mock.now = 100; mock.corrupt = false;
 });
 it("does not interpret nullable offline indices as a host", () => {
   mock.host = null; mock.self = null;
@@ -141,4 +142,19 @@ it("checks the complete business configuration before guest table mutation",()=>
  const f=fixture();f.as(0,()=>f.host.choose(0));const packet=JSON.parse(f.server.plan);
  packet.rules="a".repeat(64);f.server.plan=JSON.stringify(packet);mock.publish.mockClear();f.tick(1,f.guest);
  expect(mock.publish).not.toHaveBeenCalled();expect(f.server.acks["200"]).toBe("error");
+});
+
+it("keeps entry transport alive until posting finishes and the native quest is actually playing", () => {
+  const f = fixture(); f.prepare(); f.as(0, () => f.host.post());
+  f.tick(1, f.guest); f.tick(0, f.host);
+  mock.active = true; mock.quest = 900103; mock.running = true;
+  expect(f.as(0, () => f.host.runEntry())).toBeNull();
+  mock.running = false;
+  expect(f.as(0, () => f.host.runEntry())).toBeNull();
+  expect(f.as(1, () => f.guest.runEntry())).toBeNull();
+  mock.playing = true; mock.running = true;
+  expect(f.as(0, () => f.host.runEntry())).toBeNull();
+  mock.running = false;
+  expect(f.as(0, () => f.host.runEntry())).toMatchObject({owner: "100", self: "100"});
+  expect(f.as(1, () => f.guest.runEntry())).toMatchObject({owner: "100", self: "200"});
 });

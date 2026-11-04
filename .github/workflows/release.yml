@@ -169,7 +169,7 @@ jobs:
 
           下载 Assets 中的 MHR-Arena-Roguelike-nightly.zip，不要下载 Source code。双方先退出游戏，再安装同一份 ZIP。包内“测试与反馈.txt”有详细步骤；网页首页可一键下载测试日志。
 
-          当前版本已接入：Steam 自动准备、原生任务板入队、局内房主选波、全端原生出怪记录确认、个人 PT 与购物。默认启用，无需 DebugMode。真实双客户端战斗同步仍需玩家验证，不能把模拟测试视为联机验收。请按包内说明测试单怪、顺序双怪、同时双怪，并下载双方日志反馈。
+          当前版本已接入：Steam 自动准备、原生任务板入队、局内房主选波、全端原生出怪记录确认、个人 PT 与购物。默认启用，无需 DebugMode。本机双真实引擎已通过多波次、独立购物、共享猫车与三猫自动回村；本地模拟 Steam 传输不能替代不同电脑官方 Steam 验收。普通武器命中、捕获与长局仍需反馈。请按包内说明测试单怪、顺序双怪、同时双怪，并下载双方日志反馈。
           "@
           Set-Content -LiteralPath nightly-notes.md -Value $notes -Encoding utf8
           gh release view nightly --repo '${{ github.repository }}' *> $null

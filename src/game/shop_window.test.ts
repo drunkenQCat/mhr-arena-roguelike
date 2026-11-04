@@ -3,7 +3,8 @@ import { RunCore } from "../core/run_core";
 import { validateConfig } from "../core/config";
 import { defaultConfig } from "./default_config";
 const mock = vi.hoisted(() => ({ click: false, selecting: true, village: true, count: 2,
-  grant: vi.fn(), receive: true, dumps: vi.fn(), begin: vi.fn(), end: vi.fn(), text: vi.fn() }));
+  grant: vi.fn(), restore: vi.fn(), receive: true, dumps: vi.fn(), begin: vi.fn(), end: vi.fn(), text: vi.fn() }));
+vi.mock("./native_cart", () => ({ restoreNativeCart: mock.restore }));
 vi.mock("./item_grant", () => ({ canTrade: () => mock.village,
   pouchCount: () => mock.count, pouchCanReceive: () => mock.receive, grantItem: mock.grant }));
 vi.mock("./sdk", () => ({ clockSeconds: () => 0, rejson: { dump_file: mock.dumps }, imguiApi: {
@@ -25,6 +26,7 @@ function fixture() {
 beforeEach(() => {
   mock.click = false; mock.selecting = true; mock.village = true; mock.count = 2; mock.receive = true;
   mock.grant.mockReset(); mock.dumps.mockReset();
+  mock.restore.mockReset();
   mock.begin.mockReset().mockReturnValue(true); mock.end.mockReset(); mock.text.mockReset();
 });
 describe("shop transaction", () => {
@@ -160,6 +162,22 @@ describe("M3.6 service delivery", () => {
     shop.tick();
     expect(shop.lastTransaction?.status).toBe("rejected");
     expect(core.state.wallet.pt).toBe(core.config.startPt);
+  });
+
+  it("rolls back the cart restoration flag as well as PT and carts on definite native failure", () => {
+    const { shop, core } = serviceFixture();
+    core.state.wallet.pt = 500; core.state.cartsLeft = 2;
+    mock.restore.mockReturnValueOnce({ ok: false, reason: "native count unchanged" });
+    expect(shop.requestPurchase("cart_restore").ok).toBe(true);
+    shop.tick();
+    expect(shop.lastTransaction?.status).toBe("rejected");
+    expect(core.state).toMatchObject({ cartsLeft: 2, cartRestoreUsed: false,
+      wallet: { pt: 500, purchaseLog: [] } });
+    mock.restore.mockReturnValueOnce({ ok: true, before: 1, after: 0 });
+    expect(shop.requestPurchase("cart_restore").ok).toBe(true);
+    shop.tick();
+    expect(core.state).toMatchObject({ cartsLeft: 3, cartRestoreUsed: true,
+      wallet: { pt: 100, purchaseLog: ["cart_restore"] } });
   });
 });
 it("blocks native-refused stock before debiting PT", () => {

@@ -88,6 +88,7 @@ npm run test:cli
 ```powershell
 node cli/mhr.mjs game launch --json
 node cli/mhr.mjs game enter --slot 1 --timeout 120 --json
+node cli/mhr.mjs game return --timeout 120 --json
 node cli/mhr.mjs ui --json
 node cli/mhr.mjs saves list --json
 node cli/mhr.mjs title advance --json
@@ -115,7 +116,7 @@ node cli/mhr.mjs game last-error --json
 
 菜单稳定且心跳更新后才提交；每次写操作携带 sceneToken，弹窗操作额外携带 dialogToken。Lua 会再次核对。一次进入流程最多发起一次存档加载，防止加载时旧 UI 对象尚未销毁而重复操作。`saves load` 的回执证明原生加载流程已开始，不证明已经进村；完整完成判据由 `game enter` 检查。
 
-`state.ui.scene` 可包含 autosave_notice / title_press / title / save_select / save_menu_unknown / loading / village / quest / quest_ready / unknown。`loading` 在没有依据时为 null；玩家对象缺失不直接视为加载，玩家对象存在也不能直接视为进村（存档预览已有玩家）。空槽会带默认名字，occupied 还检查原生猎人等级。
+`state.ui.scene` 可包含 autosave_notice / title_press / title / save_select / save_menu_unknown / loading / village / quest / quest_ready / quest_reward / quest_payoff / quest_result_wait / unknown。`loading` 在没有依据时为 null；玩家对象缺失不直接视为加载，玩家对象存在也不能直接视为进村（存档预览已有玩家）。空槽会带默认名字，occupied 还检查原生猎人等级。
 
 当前菜单适配器固定于安装版 REFramework/游戏 RTTI，加载入口只接受实机观察过的原生 LoadDataSelect 节点。新游戏/保存/覆盖共用界面不会获得加载权限。网络错误自动关闭目前仅支持实测的 MR-111-83、BUTTON_CURSOR_ON 类型；未知错误/有按钮的未知提示会停止并报告。无按钮的连接/加载信息只等待，不发确认。
 
@@ -128,3 +129,12 @@ node cli/mhr.mjs game last-error --json
 - 实机结果与已知限制以最新 evidence 记录为准。单元测试、假 HTTP 服务和真实游戏验证分开报告。
 - 尚未实现通用游戏退出/返回标题、所有类型弹窗应答、远程 Reset、指定 UID 击杀与自动回营。
 - `killAll` 仍需用实际死亡/清波后置条件验收；不能把入队视为讨伐完成。
+
+
+## 结束本局与原生结算
+
+`run stop` 结束模组会话并允许原生任务结束；回执 applied 不代表已回到村庄。Ended owned run 会自动启动有界的结算推进，网页和 `state.ui.returnFlow` 显示 waiting / complete / stopped。仅处理本模组任务的原生 Reward 领取与 Payoffselect 确认；BeforeSave / Save 等待游戏自行完成。不强跳 FSM、不强制保存，也不自动确认未知弹窗。自动步骤不占用业务命令回执，防止 CLI 把后台结算动作误当成 stop 的结果。
+
+`game return --timeout 120` 用于已经 Finished / Fault 的本模组任务，提交一次返回请求后等待实际村庄就绪且存在玩家；本来就在村庄时不提交操作。活动战斗中不能用它代替 stop，未知弹窗或未确认的输入会停止，不能盲目重发。结算期间 PlayerList 为空是正常现象，不应据此调用玩家生成或回村接口。
+
+2026-11-05 本机双引擎已完成 stop 后两端自动回村；三猫失败曾在场景清理阶段崩溃；将原生结束请求移入QuestManager.update更新回调后，R12/R13两端共享次数、首波/续波后失败结算、保存与自动回村均已通过。详见 [多人运行说明](multiplayer-runtime.md)。

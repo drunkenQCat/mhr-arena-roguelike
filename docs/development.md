@@ -58,7 +58,7 @@ npm --prefix console run build
 
 ```powershell
 node cli/mhr.mjs doctor --json
-node cli/mhr.mjs game run-script reframework/autorun-probe/probe_playtest_snapshot.lua --json
+node cli/mhr.mjs game run-script path/to/read-only-probe.lua --json
 ```
 
 本地 Lua 文件存在时 CLI 上传内容并包装 executionId；只有对应执行的 report 才作为本次结果。运行前审查脚本是否只读、是否注册持续回调。新的诊断优先写一次性读数与有界输出，不注册每帧大快照、不反复重写历史文件。运行有写入效果的研究脚本必须明确目标任务与验收步骤。
@@ -84,10 +84,10 @@ node cli/mhr.mjs game run-script reframework/autorun-probe/probe_playtest_snapsh
 5. 完成单人一层、购物、结束、原生结算和恢复链；记录仍未验收项，不能把 mock 当真实多人。
 6. Release 附使用说明、测试反馈模板和 build-manifest；确认没有存档、恢复 journal、IP 快照或本机日志。
 
-当前恢复/多人等评审问题未因打包整理自动修复，见对应 review 文档。发行文字必须保持单人测试版定位。
+发行文字以已完成的验收为准，区分本机双真实引擎、本地模拟传输和不同电脑官方 Steam；不能把任意一种扩大成全场景联机保证。
 
 
-联机入场实验以《测试与反馈》为准，完整多人肉鸽未实现。CI 可复用 REFramework fork 的固定成功构建 40834594055（commit 2e7ce5b97dce68cc742b5c80ad421213c551c803）；同时核对产物 revision 和 dinput8.dll SHA256 BCB318D59FAA28B979BE26460CA8DF815D602197E2605DC6D90E4AAF1AEEDB15。下载失败、过期、权限或哈希不符时回退从固定源码构建，绝不采用浮动 latest 二进制。
+联机测试以《测试与反馈》和[联机运行说明](multiplayer-runtime.md)为准。本机双引擎已通过多波次、个人购物、共享猫车和失败回村。CI 可复用 REFramework fork 的固定成功构建 40834594055（commit 2e7ce5b97dce68cc742b5c80ad421213c551c803）；同时核对产物 revision 和 dinput8.dll SHA256 BCB318D59FAA28B979BE26460CA8DF815D602197E2605DC6D90E4AAF1AEEDB15。下载失败、过期、权限或哈希不符时回退从固定源码构建，绝不采用浮动 latest 二进制。
 
 
 ## Nightly 与反馈入口
@@ -97,3 +97,24 @@ node cli/mhr.mjs game run-script reframework/autorun-probe/probe_playtest_snapsh
 `GET /api/diagnostics` 是按需下载 JSON 的端点，返回 DLL 身份、内存中的状态与回执，以及固定白名单文件（manifest、REFramework 主日志、runtime/error）的每份最多 128 KB 尾部；不能通过参数读取其他路径。不读取存档和配置密钥，也不启动额外周期写盘。快照是发布时刻的数据，可能和日志尾部的旧局记录不同。网页首页的下载按钮调用此端点。
 
 HTTP 线程成功绑定端口后，游戏插件用系统默认浏览器打开 `http://localhost:11777/console`，独立测试进程不打开浏览器。重置 Lua 不会重启 HTTP 线程。电脑网页按需读取 `/api/connection` 显示手机地址，手机浏览器隐藏此提示；不自动更改防火墙或申请管理员权限。
+
+
+## 扩展功能的边界
+
+| 要改什么 | 规则与入口 | 验证重点 |
+| --- | --- | --- |
+| 价格、限购、怪池、曲线 | 网页策划工作台 → 配置校验 → RunCore | 显示、扣款和预览使用同一份规则；不得中途重算已选波次 |
+| 新商品或服务 | RunCore.buy 记账；ShopWindow 交付、原生读回 | 明确失败回滚；不确定结果保留扣款、锁交易，不能自动重发 |
+| 新原生能力 | NativeRuntime 或独立适配器；Bridge 分发命令 | 原生调用上下文、任务号与 unique、幂等性和完成后置条件 |
+| 新联机字段 | MultiplayerRun 编解码与协议版本 | 主从权限、旧帧/重复帧、配置摘要、慢端确认与超时 |
+| 新 UI / CLI 操作 | 同一 Bridge 命令与能力状态 | token 失效、拒绝原因、queued/applied/uncertain 的区别 |
+
+普通业务能力通过既有命令队列扩展，不需要新增 HTTP 路由或重新编译 DLL。只有桥接/传输能力变化才动原生插件。原生对象的操作不能直接放进 HTTP 工作线程；也不能认为任意 Lua 回调都适合原生分配、结算或场景销毁。结束请求排队到 QuestManager.update 的修复有真实崩溃前后对照，不要为缩短代码改回 onFrame 直接执行。
+
+购物事务变更的字段由 RunCore.purchaseCheckpoint / rollbackPurchase 统一列出。新增服务若影响其它业务字段，应同步扩展这里，避免各个前端各写一套退款规则。cartRestore() 兼容入口也调用 buy("cart_restore")；价格与禁售使用 shop 中该商品的 price/globalLimit，旧 cartRestorePrice/Limit 字段保留作配置格式兼容，不能作为另一套收款来源。当前恢复效果最多一次；globalLimit=0 禁售，设置大于1不会增加可恢复次数。
+
+单人配置的即时/下波/下局生效点以策划工作台提示为准。联机规则在入场时固定、摘要必须全队一致；改方案后全队完成结算并回村，再保存一致配置、Reset scripts、刷新网页开新局。当前脚本会话仅接管一局联机，重复承接入口禁用，后续若支持连续新局，应显式销毁旧同步器并重建服务，不得只放开按钮。
+
+验证按层推进：纯 TypeScript 规则 → 编译后的 Lua 沙箱与双进程协议 → 原生桥接 → 两个真实游戏引擎 → 不同电脑官方 Steam。单测通过不替代后两层。当前自动检查命令和[本地双客户端步骤](local-multiplayer-testing.md)共同维护；不要为低风险文字修改重复启动游戏。
+
+2026-11-05 临时现场探针已保留在本地 `.local/archived-probes/2026-11-05/`，不提交、不打包；可用 `rg --no-ignore-vcs` 按内容查找。受控网页预览可运行 `python scripts/review-webconsole.py --port 11877 --seconds 120`，只绑定回环地址，使用有界内存队列；它模拟游戏 API，不能用作原生桥或联机验收。

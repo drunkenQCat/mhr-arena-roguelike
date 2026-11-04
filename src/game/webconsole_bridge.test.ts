@@ -258,3 +258,10 @@ it("REVIEW2#4: expired 墓碑有界（容量上限）且 reset 清空", () => {
   p.reset();
   expect(p.expired.size).toBe(0); // reset 清墓碑
 });
+
+it("does not let automatic result steps replace the external command receipt",()=>{
+ const f=fixture();f.tick();const receipt=f.command("setRoute",{route:"inPlace"},"external-return");
+ const ui=(f.bridge as unknown as {nativeUi:{poll():unknown}}).nativeUi;
+ vi.spyOn(ui,"poll").mockReturnValue({id:"return-7-1",internal:true,status:"applied"});
+ f.tick();expect(host.files["webconsole_results.json"].last.id).toBe(receipt.id);
+});

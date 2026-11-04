@@ -68,7 +68,7 @@ export class WebConsoleBridge {
     this.party = party ?? new PartySession(this.session.configForEditing(), { layer: () => this.session.core.state.layer }, `run-${clockSeconds()}`);
     this.transport = loadWebconsole();
     this.bridgeId = `${this.transport.epoch()}-${clockSeconds()}-${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
-    this.nativeUi = new NativeUi(this.bridgeId);
+    this.nativeUi = new NativeUi(this.bridgeId, () => this.session.plan?.questId ?? this.session.core.config.quest.id);
     this.writeResults({ id: "", status: "ready" });
   }
 
@@ -82,8 +82,12 @@ export class WebConsoleBridge {
     try {
       if (this.pendingReceipt && !this.writeResults(this.pendingReceipt)) return;
       this.pollEffect();
+      const endedQuest = this.session.readingSnapshot?.quest;
+      if (this.session.stage === "Finished" && this.session.plan && endedQuest?.id === this.session.plan.questId)
+        this.nativeUi.beginReturn(endedQuest.id, endedQuest.unique);
+      this.nativeUi.tickReturn();
       const uiResult = this.nativeUi.poll();
-      if (uiResult) {
+      if (uiResult && uiResult.internal !== true) {
         const old = this.results.find(entry => entry.id === uiResult.id);
         if (old) Object.assign(old, uiResult);
         this.writeResults(old ?? uiResult);
@@ -212,7 +216,14 @@ export class WebConsoleBridge {
         return { status: "applied", message: "联机操作已提交；请查看全队同步和承接状态。" };
       }
       case "startup.acknowledge": case "title.advance": case "title.continue":
-      case "save.load": case "dialog.close": return this.nativeUi.request(cmd);
+      case "save.load": case "dialog.close": case "result.receive": case "result.next": return this.nativeUi.request(cmd);
+      case "returnToVillage": {
+        const q = s.readingSnapshot?.quest;
+        if (!["Finished", "Fault"].includes(s.stage) || !s.plan || !q || q.id !== s.plan.questId || q.playing)
+          throw new Error("仅结束后的自定义任务可以继续原生结算");
+        this.nativeUi.beginReturn(q.id, q.unique);
+        return { status: "applied", message: "已接管原生结算，请等待返回村庄" };
+      }
       case "getConfig": return { status: "applied", message: "已读取游戏配置（含下一局规则）", config: s.configForEditing(),
         activeRules: { startPt: s.core.config.startPt, maxCarts: s.core.config.maxCarts,
           runtime: s.settings }, configVersion: this.configVersion };

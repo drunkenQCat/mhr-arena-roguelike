@@ -49,8 +49,9 @@ try {
     hasGachaPool: (poolId: string) => gacha.hasPool(poolId),
   };
   let shopWindow = new ShopWindow(session.core, () => session.canShop(), () => session.shopQuest(), services);
+  let entryAttached = false;
   const multiplayerEntry = new MultiplayerEntry(config, monsterCatalog, () =>
-    ["Idle", "Finished", "Fault"].includes(session.stage) && !session.startupStatus.restorePending);
+    !entryAttached && ["Idle", "Finished", "Fault"].includes(session.stage) && !session.startupStatus.restorePending);
   let webConsole: WebConsoleBridge | null = null;
   try { webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry); }
   catch (error) { relog.warn(`[MhwRogue] webconsole unavailable: ${String(error)}`); }
@@ -58,7 +59,6 @@ try {
   runtime.setPartySizeSource(() => webConsole?.partyRosterSize() ?? null);
   let lastBuffState = "";
   let lastBuffPoll = -1;
-  let entryAttached = false;
   let multiplayerRun: MultiplayerRun | null = null;
   reframework.onFrame(() => {
     try {

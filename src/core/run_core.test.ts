@@ -3,11 +3,12 @@ import { describe, expect, it } from "vitest";
 import { validateConfig, type RogueConfig, type ShopItem } from "./config";
 import { RunCore } from "./run_core";
 
-/** 与 C# 测试同款的迷你配置：2 弱怪池 + 3 商品，刻意不配 unlockChain。 */
+/** 与 C# 测试同款的迷你配置：2 弱怪池 + 4 商品，刻意不配 unlockChain。 */
 function cfg(): RogueConfig {
   const shop: ShopItem[] = [
     { id: "secret", name: "秘药", category: "药", price: 80, cap: 2, mode: "perUnit" },
     { id: "ammo_n1", name: "通常弹1", category: "弹", price: 8, cap: 60, mode: "fill" },
+    { id: "cart_restore", name: "猫车恢复", category: "服务", price: 400, cap: 0, mode: "service", globalLimit: 1 },
     { id: "gacha", name: "抽取", category: "服务", price: 50, cap: 0, mode: "service" },
   ];
   return {
@@ -240,6 +241,22 @@ describe("Rise 新增语义", () => {
     expect(c.state.cartsLeft).toBe(3);
     expect(c.cartRestore().ok).toBe(false); // 整局一次已用
   });
+
+  it("shop cart restoration changes shared carts and the one-use flag, charging the displayed price once", () => {
+    const c = started();
+    c.config.shop.find(item => item.id === "cart_restore")!.price = 350;
+    c.state.wallet.pt = 1000;
+    expect(c.buy("cart_restore").ok).toBe(false);
+    expect(c.state.wallet.pt).toBe(1000);
+    c.state.cartsLeft = 2;
+    expect(c.buy("cart_restore").ok).toBe(true);
+    expect(c.state).toMatchObject({ cartsLeft: 3, cartRestoreUsed: true,
+      wallet: { pt: 650, purchaseLog: ["cart_restore"] } });
+    c.state.cartsLeft = 2;
+    expect(c.buy("cart_restore").ok).toBe(false);
+    expect(c.getShop()["服务"]!.find(e => e.id === "cart_restore")!.canBuy).toBe(false);
+    expect(c.state.wallet.pt).toBe(650);
+  });
 });
 
 it("offers Single, Sequential and Simultaneous as distinct normal-tier choices", () => {
@@ -326,4 +343,13 @@ describe("M3.5 ultimate pool (Rise 终盘重排)", () => {
       expect(byCn.get(name)!.id).toBeGreaterThan(0);
     }
   });
+});
+
+it("legacy cartRestore entry uses the shop price and records the shared limit", () => {
+  const c = started(); c.state.cartsLeft = 2; c.state.wallet.pt = 500;
+  c.config.shop.find(item => item.id === "cart_restore")!.price = 300;
+  expect(c.cartRestore().ok).toBe(true);
+  expect(c.state.wallet.pt).toBe(200);
+  expect(c.state.wallet.purchaseLog).toEqual(["cart_restore"]);
+  c.state.cartsLeft = 2; expect(c.buy("cart_restore").ok).toBe(false);
 });

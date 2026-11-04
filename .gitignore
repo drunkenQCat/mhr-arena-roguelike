@@ -42,3 +42,7 @@ src/game/gen/
 /docs/fix-playtest-*.md
 /docs/runtime-*.md
 /docs/release-readiness-*.md
+
+# Python test harness bytecode
+__pycache__/
+*.pyc

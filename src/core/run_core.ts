@@ -43,6 +43,9 @@ export interface ShopEntry {
   reason: string | null;
 }
 
+/** Fields changed by buy(); keep rollback ownership here when adding services. */
+export type PurchaseCheckpoint = Pick<RunState, "wallet" | "log" | "cartsLeft" | "cartRestoreUsed">;
+
 type Tier = { tag: string; monsters: string[]; tier: string };
 
 export class RunCore {
@@ -97,28 +100,13 @@ export class RunCore {
     return ok();
   }
 
-  /** 猫车恢复：全局限购一次（V1.3 §3.6）。 */
-  cartRestore(): Result {
-    if (this.state.phase !== "Prep" && this.state.phase !== "Choosing") {
-      return fail("只有起始点整备期可以购买");
-    }
-    if (this.state.cartRestoreUsed) {
-      return fail("猫车恢复整局仅限1次，已使用");
-    }
-    if (this.state.cartsLeft >= this.config.maxCarts) {
-      return fail("当前猫车已满，无需恢复");
-    }
-    if (this.state.wallet.pt < this.config.cartRestorePrice) {
-      return fail(`PT不足（需要 ${this.config.cartRestorePrice}）`);
-    }
-    this.state.wallet = {
-      ...this.state.wallet,
-      pt: this.state.wallet.pt - this.config.cartRestorePrice,
-    };
-    this.state.cartsLeft++;
-    this.state.cartRestoreUsed = true;
-    this.log(`猫车恢复（-${this.config.cartRestorePrice} PT），剩余猫车 ${this.state.cartsLeft}`);
-    return ok(`猫车 ${this.state.cartsLeft}/${this.config.maxCarts}`);
+  /** Compatibility entry; all callers use the displayed shop price and purchase ledger. */
+  cartRestore(): Result { return this.buy("cart_restore"); }
+
+  private cartRestoreUnavailable(): string | null {
+    if (this.state.cartRestoreUsed) return "猫车恢复整局仅限1次，已使用";
+    if (this.state.cartsLeft >= this.config.maxCarts) return "当前猫车已满，无需恢复";
+    return null;
   }
 
   /** 加权抽取：返回选中下标；weights 全 0 时返回 -1。确定性 RNG（可复现）。 */
@@ -154,6 +142,16 @@ export class RunCore {
 
   // ---------- 商店（分类检索 + 背包容量校验） ----------
 
+  purchaseCheckpoint(): PurchaseCheckpoint {
+    return { wallet: this.state.wallet, log: this.state.log.slice(), cartsLeft: this.state.cartsLeft,
+      cartRestoreUsed: this.state.cartRestoreUsed };
+  }
+
+  rollbackPurchase(snapshot: PurchaseCheckpoint): void {
+    this.state.wallet = snapshot.wallet; this.state.log = snapshot.log;
+    this.state.cartsLeft = snapshot.cartsLeft; this.state.cartRestoreUsed = snapshot.cartRestoreUsed;
+  }
+
   /** 按分类归组的商品列表，每项携带容量校验结果。 */
   getShop(): Record<string, ShopEntry[]> {
     const groups: Record<string, ShopEntry[]> = {};
@@ -182,6 +180,9 @@ export class RunCore {
     if (this.state.phase !== "Prep" && this.state.phase !== "Choosing") {
       canBuy = false;
       reason = "仅整备阶段可购买";
+    } else if (item.id === "cart_restore" && this.cartRestoreUnavailable()) {
+      canBuy = false;
+      reason = this.cartRestoreUnavailable();
     } else if (item.mode !== "service" && owned >= item.cap) {
       canBuy = false;
       reason = "已达持有上限";
@@ -217,6 +218,10 @@ export class RunCore {
     }
     const item = this.config.shop.find((i) => i.id === itemId);
     if (!item) return fail("无此商品");
+    if (itemId === "cart_restore") {
+      const unavailable = this.cartRestoreUnavailable();
+      if (unavailable) return fail(unavailable);
+    }
 
     const owned = countOf(this.state.wallet, itemId);
     if (item.mode !== "service" && owned >= item.cap) {
@@ -239,6 +244,11 @@ export class RunCore {
       purchaseLog: this.state.wallet.purchaseLog.concat([itemId]),
     };
     this.log(`购买 ${item.name}（-${item.price} PT）`);
+    if (itemId === "cart_restore") {
+      this.state.cartsLeft++;
+      this.state.cartRestoreUsed = true;
+      return ok(`猫车 ${this.state.cartsLeft}/${this.config.maxCarts}`);
+    }
     if (item.mode === "service") return ok(`${item.name} 已生效`);
     const n = countOf(this.state.wallet, itemId);
     return ok(`${item.name} → ${n}/${item.cap}`);

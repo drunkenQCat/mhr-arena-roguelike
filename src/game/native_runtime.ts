@@ -43,6 +43,8 @@ export class NativeRuntime implements SessionPort {
   private events: Diagnostic[] = [];
   private rateKeys: string[] = [];
   private rateEvidence: unknown[] = [];
+  private pendingFinish: { failed: boolean; questId: number; unique: number } | null = null;
+  private finishEvidence: { event: string; detail: unknown } | null = null;
   /** 离线队友调研 §6C：混合局权威人数来源（PartySession.rosterSize）。 */
   private multiplayer: (SpawnSync & { canChoose(): boolean; snapshot(): Record<string, unknown> }) | null = null;
   setMultiplayer(sync: SpawnSync & { canChoose(): boolean; snapshot(): Record<string, unknown> }): void { this.multiplayer = sync; this.inplace.setSync(sync); }
@@ -83,6 +85,8 @@ export class NativeRuntime implements SessionPort {
     const rates = this.rateEvidence;
     this.rateEvidence = [];
     for (const evidence of rates) this.report("rate-applied", evidence);
+    const finished = this.finishEvidence; this.finishEvidence = null;
+    if (finished) this.report(finished.event, finished.detail);
   }
   ready(): boolean { return this.installer.isInstalled() && this.hooks && this.bootError === null; }
   status(): string { return this.bootError ?? `${this.installer.getStatus()} / counter: ${this.transport.getStatus()} / ${this.inplace.status}`; }
@@ -168,7 +172,7 @@ export class NativeRuntime implements SessionPort {
   }
 
 
-  shutdown(): void { this.testTools.shutdown(); this.policy(null, false); this.transport.cancel(); }
+  shutdown(): void { this.pendingFinish = null; this.finishEvidence = null; this.testTools.shutdown(); this.policy(null, false); this.transport.cancel(); }
 
   now(): number { return clockSeconds(); }
 
@@ -179,6 +183,10 @@ export class NativeRuntime implements SessionPort {
     const active = !!callNative(qm, "isActiveQuest");
     const playing = active && !!callNative(qm, "isPlayQuest");
     const status = qm.get_field("_QuestStatus") as number;
+    // The play status is set while the village actors/positions still exist.
+    // Native loading must finish and the quest clock must advance before camp capture.
+    const entryReady = playing && callNative(qm, "isEndLoadQuest") === true &&
+      (qm.get_field("_QuestElapsedSec") as number) >= 1;
     const quest = active ? {
       id: callNative(qm, "get_ActiveQuestNo") as number,
       unique: callNative(qm, "getActiveQuestUniqueNo") as number, playing,
@@ -193,9 +201,12 @@ export class NativeRuntime implements SessionPort {
     if (array) for (let i = 0; i < array.get_size(); i++) {
       const player = array.get_element(i) as REManagedObject | null;
       if (!player) continue;
+      // isPlayQuest becomes true before PlayerList replaces the village actors.
+      // Those old coordinates must never become the arena gathering point.
+      if (playing && player.get_type_definition().get_full_name().startsWith("snow.player.PlayerLobby")) continue;
       if (playerManager?.call("isReadyPlayer", i) !== true) continue;
       const position = player.get_field("_PosAfterMotionUpdate") as { x: number; y: number; z: number } | null;
-      if (position && [position.x, position.y, position.z].every((value) => typeof value === "number")) {
+      if (position && [position.x, position.y, position.z].every((value) => Number.isFinite(value))) {
         players.push({ id: i, position: { x: position.x, y: position.y, z: position.z } });
       }
     }
@@ -239,7 +250,7 @@ export class NativeRuntime implements SessionPort {
       }
     }
     const gui = getSingleton("snow.gui.GuiManager");
-    return { time, quest, players, enemies, online, staleQuest,
+    return { time, quest, entryReady, players, enemies, online, staleQuest,
       deaths: active ? callNative(qm, "getDeathNum") as number : 0,
       canPost: !active && (!!gui?.call("IsCanInvokeQuestBoard") || !!getSingleton("snow.gui.fsm.questcounter.GuiQuestCounterFsmManager")) };
   }
@@ -287,8 +298,30 @@ export class NativeRuntime implements SessionPort {
     }
     if (this.multiplayerRole() === "guest") throw new Error("Only the quest host may finish a multiplayer run");
     this.holdClear = false;
-    if (failed) callNative(qm, "setQuestFail", snow_quest_FailReason.Normal);
-    else callNative(qm, "setQuestClear");
+    // netSendQuestDone allocates a managed message retained by QuestManager.
+    // Run from the engine's update context, after native faint/failure processing,
+    // rather than allocating that message from the external Lua frame callback.
+    this.pendingFinish = { failed, questId: this.cfg.quest.id,
+      unique: callNative(qm, "getActiveQuestUniqueNo") as number };
+  }
+
+  private finishInNativeUpdate(): void {
+    const pending = this.pendingFinish;
+    if (!pending) return;
+    this.pendingFinish = null; // Never replay an uncertain native mutation.
+    try {
+      const qm = questManager();
+      if (!qm || callNative(qm, "get_ActiveQuestNo") !== pending.questId ||
+          callNative(qm, "getActiveQuestUniqueNo") !== pending.unique ||
+          this.multiplayerRole() === "guest") return;
+      const status = qm.get_field("_QuestStatus");
+      if (status !== snow_QuestManager_Status.Play || callNative(qm, "isPlayQuest") !== true) return;
+      if (pending.failed) callNative(qm, "setQuestFail", snow_quest_FailReason.Normal);
+      else callNative(qm, "setQuestClear");
+      this.finishEvidence = { event: "native-finish-requested", detail: pending };
+    } catch (error) {
+      this.finishEvidence = { event: "native-finish-error", detail: { ...pending, error: String(error) } };
+    }
   }
 
   report(event: string, detail: unknown): void {
@@ -354,6 +387,11 @@ export class NativeRuntime implements SessionPort {
     const died = lookup(qmType, "questEnemyDie");
     const vital = lookup(emType, "getDifficultyRateVital");
     const attack = lookup(emType, "getDifficultyRateAttack");
+    const questUpdate = lookup(qmType, "update");
+    hookMethod(questUpdate, () => PRE_HOOK.CALL_ORIGINAL, value => {
+      this.finishInNativeUpdate();
+      return value;
+    });
     const preClear = (): number => this.inScope() && this.holdClear ? PRE_HOOK.SKIP_ORIGINAL : PRE_HOOK.CALL_ORIGINAL;
     // Explicit this:void on host callback types in sdk.ts prevents hidden Lua self arguments.
     hookMethod(clear, preClear);
