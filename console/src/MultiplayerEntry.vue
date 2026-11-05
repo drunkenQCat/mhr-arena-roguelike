@@ -1,41 +1,65 @@
 <script setup lang="ts">
-import type { ConsoleState } from "./api";
-defineProps<{ entry: ConsoleState["multiplayerEntry"]; run?: ConsoleState["multiplayerRun"]; busy: boolean }>();
-const emit = defineEmits<{ command: [cmd: string, extra: Record<string, unknown>] }>();
+import type { ConsoleState } from './api';
+import { entryGuidance, modeNames } from './play-model';
+defineProps<{ entry?: ConsoleState['multiplayerEntry']; run?: ConsoleState['multiplayerRun']; connected: boolean; busy: boolean }>();
+const emit = defineEmits<{ command: [cmd: string, extra: Record<string, unknown>]; play: [] }>();
 </script>
+
 <template>
-  <section class="panel">
-    <div v-if="run" class="notice">
+  <section class="panel entry-panel">
+    <template v-if="run?.live">
+      <p class="eyebrow">已接入本局</p>
       <h2>局内联机 · {{ run.role === 'host' ? '房主' : '队友' }}</h2>
       <p>{{ run.message }}</p>
-      <p>选波由房主操作；每人使用自己电脑上的控制台购物，个人 PT 和背包独立。猫车恢复由房主购买。</p>
-      <ul><li v-for="member in run.members ?? []" :key="member.id">{{ member.self ? '本机' : member.id }}：{{ member.ready ? '状态已确认' : '等待同步' }}</li></ul>
-      <p v-if="run.staged">出怪确认：UID {{ run.staged.uid }} / 槽位 {{ run.staged.slot }}</p>
-      <p class="alert">本机双引擎已通过多波次与共享猫车，官方 Steam 跨电脑仍需测试；有玩家离队、房主迁移或状态校验失败时，本局会停止并显示原因，请下载双方日志。</p>
-    </div>
-    <h2>真实队友 · Steam 自动同步入场</h2>
-    <p>房主选择入场波次，队友自动准备相同任务表；进入斗技场后自动接入局内循环。保留自己的装备与背包，后续清波 PT 每人独立结算。</p>
-    <p class="alert">本机双真实客户端已验证共同入场与肉鸽循环；不同电脑官方 Steam 仍待验收。所有人安装同一个新版包，只在约好的私人大厅测试。</p>
-    <ol>
-      <li>各自启动游戏并打开自己电脑的控制台，通过游戏信使创建／加入同一个在线大厅。</li>
-      <li>大厅房主在下方选波；队友无需选怪、复制任务码或输入 IP。等待全队显示“任务表一致”。</li>
-      <li>房主点“承接联机任务”。全队会再确认一次；确认齐全后才打开柜台。队友从原生任务板加入。</li>
-      <li>在游戏内确认参战名单齐全并准备完成，房主手动出发。网页不会提前出发。</li>
-    </ol>
-    <p>原生身份：<strong>{{ entry?.role === 'host' ? '大厅房主' : entry?.role === 'guest' ? '大厅队友' : '尚未进入在线大厅' }}</strong></p>
-    <p v-if="entry && !entry.sync.available" class="alert">{{ entry.sync.reason }}</p>
-    <p v-else-if="entry && !entry.sync.lobby" class="muted">等待 Steam 大厅；若已在大厅，请退出大厅后重新加入，让模组识别当前会话。</p>
-    <p v-if="!entry?.canPrepare" class="alert">先结束当前局并回村，等待原装备、背包恢复。上一轮联机结束后，全队在村庄 Reset scripts 再开新局；不要在任务或保存过程中重载。</p>
-    <div v-if="entry?.role === 'host'" class="toolbar">
-      <button v-for="option in entry.options ?? []" :key="option.index" :disabled="busy || !entry.canPrepare || entry.playing || entry.posting || !entry.sync.available" @click="emit('command', 'mpEntry', { sub: 'choose', index: option.index })">{{ option.label }}</button>
-    </div>
-    <p>当前波次 {{ entry?.mode ?? '房主尚未选择' }} · 任务 {{ entry?.questId ?? 900103 }} · 计划版本 {{ entry?.revision ?? '—' }}</p>
-    <ul v-if="entry?.sync.members?.length">
-      <li v-for="member in entry.sync.members" :key="member.id">{{ member.self ? '本机' : '队友' }} {{ member.id }}：<strong>{{ member.ready ? '任务表一致' : '等待准备／版本不符' }}</strong></li>
-    </ul>
-    <button v-if="entry?.role === 'guest'" :disabled="busy || !entry.canPrepare || entry.playing" @click="emit('command', 'mpEntry', { sub: 'retrySync' })">重试自动同步</button>
-    <button v-if="entry?.role === 'host'" :disabled="busy || !entry.canPost || !entry.canPrepare || entry.playing || entry.posting" @click="emit('command', 'mpEntry', { sub: 'post' })">承接联机任务（等待全队确认，不自动出发）</button>
-    <p class="notice">{{ entry?.message ?? '等待游戏加载新版 Lua。' }}</p>
-    <p class="muted">至少两名真实 Steam 大厅成员全部确认才能承接。当前任务 {{ entry?.activeQuest ?? '—' }} · 原生任务人数 {{ entry?.nativeQuestPlayerCount ?? '—' }} · 柜台 {{ entry?.transport ?? '—' }}。更新 DLL 后需重启游戏。详情见包内《测试与反馈》。</p>
+      <p>选波由房主操作；每人在自己的控制台购物。个人 PT 和背包独立，猫车恢复由房主购买。</p>
+      <button class="primary" @click="emit('play')">进入当前局 · 进度与商店</button>
+    </template>
+    <template v-else>
+      <p class="eyebrow">与朋友一起狩猎</p>
+      <div class="section-heading"><h2>联机大厅</h2><span class="badge">{{ !connected || !entry ? '等待大厅状态' : entry.role === 'host' ? '你是房主' : entry.role === 'guest' ? '你是队友' : '尚未进入大厅' }}</span></div>
+      <p>保留自己的装备与背包，清波奖励每人独立结算。</p>
+      <p class="notice" role="status">{{ entryGuidance(entry, connected) }}</p>
+      <template v-if="connected && entry">
+        <p v-if="entry.mode">入场波次：<strong>{{ modeNames[entry.mode] ?? entry.mode }}</strong></p>
+        <div v-if="entry.role === 'host' && !entry.playing" class="toolbar" aria-label="入场波次">
+          <button v-for="option in entry.options ?? []" :key="option.index" :class="{ selected: entry.mode === option.mode }" :aria-pressed="entry.mode === option.mode"
+            :disabled="busy || !entry.canPrepare || entry.posting || !entry.sync.available"
+            @click="emit('command', 'mpEntry', { sub: 'choose', index: option.index })">{{ option.label }}</button>
+        </div>
+        <ul v-if="entry.sync.members?.length" class="member-list">
+          <li v-for="(member, index) in entry.sync.members" :key="member.id">
+            <span>{{ member.self ? '你' : '队员 ' + (index + 1) }}</span>
+            <span :class="['badge', member.ready ? 'live' : 'pending']">{{ member.ready ? '任务表一致' : '等待同步确认' }}</span>
+          </li>
+        </ul>
+        <p v-if="entry.sync.members?.length" class="muted">同步完成只代表任务表一致。请在游戏内确认全员加入任务并准备好，再由房主手动出发。</p>
+        <div class="toolbar">
+          <button v-if="entry.role === 'host' && !entry.playing" class="primary" :disabled="busy || !entry.canPost || !entry.canPrepare || entry.posting"
+            @click="emit('command', 'mpEntry', { sub: 'post' })">{{ entry.posting ? '等待全队确认…' : '承接联机任务' }}</button>
+          <button v-if="entry.role === 'guest' && !entry.playing" :disabled="busy || !entry.canPrepare" @click="emit('command', 'mpEntry', { sub: 'retrySync' })">重试自动同步</button>
+          <button v-if="entry.playing" class="primary" @click="emit('play')">查看当前局</button>
+        </div>
+        <p v-if="entry.message" role="status">{{ entry.message }}</p>
+      </template>
+      <details class="advanced"><summary>第一次联机 · 四步入场</summary>
+        <ol>
+          <li>所有人安装同一版本，通过游戏信使创建或加入同一个在线大厅。</li>
+          <li>房主选择入场波次，等待全队“任务表一致”；队友不用选怪、复制任务码或输入 IP。</li>
+          <li>房主承接任务，全队确认后打开柜台；队友从游戏内任务板加入。</li>
+          <li>在游戏内确认参战名单与准备状态，房主手动出发。入场后到“当前局”购物与选波。</li>
+        </ol>
+        <p class="muted">至少两名真实 Steam 大厅成员全部确认才能承接。本机双客户端已通过测试，跨电脑官方 Steam 仍待验收；请在约好的私人大厅测试。</p>
+      </details>
+    </template>
+    <details v-if="entry" class="advanced"><summary>联机诊断</summary>
+      <p>任务 {{ entry.questId ?? '—' }} · 计划版本 {{ entry.revision ?? '—' }} · 柜台 {{ entry.transport }}</p>
+      <p>当前任务 {{ entry.activeQuest ?? '—' }} · 原生任务人数 {{ entry.nativeQuestPlayerCount ?? '—' }}</p>
+      <p v-if="run?.staged">出怪确认：UID {{ run.staged.uid }} / 槽位 {{ run.staged.slot }}</p>
+      <p>有玩家离队、房主迁移或校验失败时，本局会停止并显示原因。可在“帮助与连接”下载双方日志；更新 DLL 后需重启游戏。</p>
+    </details>
   </section>
 </template>
+
+<style scoped>
+.entry-panel{line-height:1.8}.member-list{list-style:none;padding:0;max-width:600px}.member-list li{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #443728}.entry-panel li{margin-bottom:8px}
+</style>

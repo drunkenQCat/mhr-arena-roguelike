@@ -36,13 +36,33 @@ export function editorConfig(raw: unknown): RogueConfig {
   return cfg;
 }
 
-export function preview(raw: unknown, layer: number, players: number, unlockAll = false) {
+export function preview(raw: unknown, layer: number, players: number, unlockAll = false, seed = 42) {
   const cfg = editorConfig(raw);
-  const core = new RunCore(cfg, 42);
+  if (!Number.isInteger(layer) || layer < 1 || layer > (cfg.pools.at(-1)?.to ?? 0))
+    throw new Error('预览层数必须是怪池范围内的整数');
+  if (![1, 2, 3, 4].includes(players)) throw new Error('预览人数须为 1 至 4 人');
+  const core = new RunCore(cfg, seed);
   core.startRun(cfg.armorOptions[0]!);
   core.state.layer = layer;
   if (unlockAll) core.state.killedUltimates = cfg.unlockChain.map((r) => r.requiresKilling);
   return core.generateChoices(players);
+}
+
+/** Fixed seeds make draft comparisons repeatable; samples are not exact probabilities. */
+export function sampleBalance(raw: unknown, layer: number, players: number, unlockAll = false) {
+  const groups = new Map<string, { mode: string; count: number; minPt: number; maxPt: number; totalPt: number; minHp: number; maxHp: number }>();
+  for (let i = 0; i < 24; i++) {
+    for (const choice of preview(raw, layer, players, unlockAll, 42 + i * 7919)) {
+      const mode = choice.mode ?? 'single';
+      const group = groups.get(mode) ?? { mode, count: 0, minPt: Infinity, maxPt: -Infinity, totalPt: 0, minHp: Infinity, maxHp: -Infinity };
+      group.count++;
+      group.minPt = Math.min(group.minPt, choice.rewardPt); group.maxPt = Math.max(group.maxPt, choice.rewardPt);
+      group.totalPt += choice.rewardPt;
+      group.minHp = Math.min(group.minHp, choice.hpMul); group.maxHp = Math.max(group.maxHp, choice.hpMul);
+      groups.set(mode, group);
+    }
+  }
+  return [...groups.values()].map(group => ({ ...group, meanPt: group.totalPt / group.count }));
 }
 
 export function changes(before: unknown, after: unknown, prefix = ""): { path: string; before: unknown; after: unknown }[] {

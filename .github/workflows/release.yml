@@ -76,7 +76,11 @@ jobs:
         working-directory: mod
         run: |
           npm --prefix console ci
+          if ($LASTEXITCODE -ne 0) { throw 'Web console dependency installation failed' }
           npm --prefix console run build
+          if ($LASTEXITCODE -ne 0) { throw 'Web console build failed' }
+          npm --prefix console run test:views
+          if ($LASTEXITCODE -ne 0) { throw 'Web console view regression checks failed' }
 
       - name: Build web console native plugin
         working-directory: mod
@@ -167,7 +171,9 @@ jobs:
           $notes = @"
           自动测试构建，来自提交 ${{ github.sha }}，运行 #${{ github.run_number }}。每天北京时间 04:00 和手动运行构建；测试通过后才替换此下载。
 
-          下载 Assets 中的 MHR-Arena-Roguelike-nightly.zip，不要下载 Source code。双方先退出游戏，再安装同一份 ZIP。包内“测试与反馈.txt”有详细步骤；网页首页可一键下载测试日志。
+          下载 Assets 中的 MHR-Arena-Roguelike-nightly.zip，不要下载 Source code。双方先退出游戏，再安装同一份 ZIP。包内“测试与反馈.txt”有详细步骤；网页“帮助与连接”可一键下载测试日志。
+
+          网页默认进入“当前局”，联机入场与房主／队友提示分开，新增波次取舍说明、本局结束摘要和购买记录。策划工作台统一预览条件，增加抽样范围与补给购买力参考。本轮桌面与窄屏布局使用模拟状态检查，不代表新增真实联机验收。
 
           当前版本已接入：Steam 自动准备、原生任务板入队、局内房主选波、全端原生出怪记录确认、个人 PT 与购物。默认启用，无需 DebugMode。本机双真实引擎已通过多波次、独立购物、共享猫车与三猫自动回村；本地模拟 Steam 传输不能替代不同电脑官方 Steam 验收。普通武器命中、捕获与长局仍需反馈。请按包内说明测试单怪、顺序双怪、同时双怪，并下载双方日志反馈。
           "@

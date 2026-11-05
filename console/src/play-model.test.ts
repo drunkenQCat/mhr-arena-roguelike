@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { actions, localizeTransaction, nextStep, monsterName, orderedCategories, percent } from './play-model';
+import { actions, chooseReason, entryGuidance, localizeTransaction, nextStep, monsterName, orderedCategories, percent } from './play-model';
 import type { ConsoleState } from './api';
 const state = () => ({ sessionStage: 'Selecting', capabilities: { start: true, choose: true, stop: true, route: true, retry: true, invincible: true, kill: true, teleport: true, teleportMonster: true, testLayer: true }, shopAvailable: true, shopBusy: false,
   control: { startup: { restorePending: false }, effectPending: false } }) as ConsoleState;
@@ -38,4 +38,25 @@ it('explains the unmet regroup condition before countdowns', () => {
   expect(nextStep(s, true)).toContain('回到任务起点');
   s.preparation.gathered = true;
   expect(nextStep(s, true)).toContain('停留 1 秒');
+});
+it('keeps guest shopping available but blocks departure even if a capability is inconsistent', () => {
+  const s = state();
+  s.multiplayerRun = { role: 'guest', live: true } as NonNullable<ConsoleState['multiplayerRun']>;
+  expect(actions(s, true, false).buy).toBe(true);
+  expect(actions(s, true, false).choose).toBe(false);
+  expect(chooseReason(s, true, false)).toContain('房主');
+  expect(nextStep(s, true)).toContain('等待房主');
+  s.multiplayerRun.role = 'host';
+  expect(actions(s, true, false).choose).toBe(true);
+  expect(chooseReason(s, true, true)).toContain('当前操作');
+});
+it('does not instruct players to restore or reset scripts while entry data is missing or stale', () => {
+  expect(entryGuidance(undefined, true)).toContain('读取');
+  expect(entryGuidance(undefined, false)).toContain('连接');
+  const entry = { canPrepare: false, playing: false } as NonNullable<ConsoleState['multiplayerEntry']>;
+  expect(entryGuidance(entry, false)).not.toContain('回村');
+  expect(entryGuidance(entry, true)).toContain('回村');
+  entry.playing = true;
+  expect(entryGuidance(entry, true)).toContain('当前局');
+  expect(entryGuidance(entry, true)).not.toContain('重载');
 });

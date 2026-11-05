@@ -270,7 +270,7 @@ function submit() {
       </div>
       <div v-if="tab === 'review'" class="editor-body">
         <h3>波次预览</h3><p class="muted">直接复用游戏 Core 的生成与计分公式；固定随机种子用于比较草稿，不代表下一次随机结果或原生最终 HP。</p>
-        <div class="toolbar"><NumberField v-model="previewLayer" label="预览层数" :min="1" :max="draft.pools.at(-1)?.to" /><label>人数<select v-model.number="players"><option :value="1">1 人 · 当前可用</option><option :value="2">2 人 · 仅数值预览</option><option :value="4">4 人 · 仅数值预览</option></select></label></div>
+        <div class="toolbar"><NumberField v-model="previewLayer" label="预览层数" :min="1" :max="draft.pools.at(-1)?.to" /><label>人数<select v-model.number="players"><option :value="1">1 人</option><option :value="2">2 人</option><option :value="4">4 人 · 实机待验收</option></select></label></div>
         <label class="check"><input v-model="unlockAll" type="checkbox" />预览时解锁所有极强怪（仅影响预览）</label>
         <p v-if="previewResult.error" class="alert">{{ previewResult.error }}</p>
         <div class="choice-grid"><article v-for="choice in previewResult.choices" :key="choice.index" class="subpanel"><b>{{ choice.label }}</b><p>HP ×{{ choice.hpMul }} · 伤害 ×{{ choice.dmgMul }}</p><strong class="gold">{{ choice.rewardPt }} PT</strong></article></div>
@@ -278,7 +278,7 @@ function submit() {
         <div class="table-scroll"><table><thead><tr><th>参数</th><th>载入值</th><th>草稿值</th></tr></thead><tbody><tr v-for="change in diff" :key="change.path"><td>{{ parameterLabel(change.path) }}</td><td>{{ JSON.stringify(change.before) ?? '未设置' }}</td><td>{{ JSON.stringify(change.after) ?? '移除' }}</td></tr></tbody></table></div>
         <p v-if="!diff.length" class="muted">还没有修改参数。</p>
       </div>
-      </div><BalancePreview :draft="draft" :baseline="baseline" /></div>
+      </div><BalancePreview :draft="draft" :baseline="baseline" v-model:layer="previewLayer" v-model:players="players" v-model:unlocked="unlockAll" /></div>
       <details class="advanced"><summary @click="rawText = JSON.stringify(draft, null, 2)">高级：JSON 草稿</summary><textarea v-model="rawText" rows="12" aria-label="高级 JSON 草稿" spellcheck="false" /><button @click="applyRaw">将 JSON 应用到表单草稿</button></details>
       <div class="submit-bar"><span>{{ error ? '请先修正上方配置错误' : '价格下次交易生效；曲线和怪池下次生成生效；装备、抽装池与增益保存后需重载脚本' }}</span>
         <button class="primary" :disabled="!!error || !diff.length || busy || !connected || conflict" @click="submit">{{ busy ? '等待游戏确认…' : '校验并提交到游戏' }}</button></div>
