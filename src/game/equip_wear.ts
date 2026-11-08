@@ -11,6 +11,7 @@
 
 import { getSingleton, relog, type REManagedObject, type RETypeDefinition } from "./sdk";
 import type { StartupRules } from "../core/config";
+import { validArmorId } from "../core/equipment_id";
 import { readRecoveryRecord, recoveryPending, writeRecoveryRecord, recoveryWriteFailure } from "./recovery_journal";
 import { assertRecoveryOwner, readRecoveryOwner, type RecoveryOwner } from "./recovery_owner";
 import { captureEquipmentBox, equipmentFingerprint, validateEquipmentSnapshot, verifyEquipmentBox, type EquipmentSnapshot } from "./equipment_snapshot";
@@ -148,6 +149,7 @@ export interface GrantReport {
 export function grantEquip(box: REManagedObject | null, idVal: number, kind: "armor" | "weapon",
   beforeGrant?: (entry: GrantedEntry) => boolean, reuseExisting = true,
   afterGrant?: (entry: GrantedEntry) => boolean): GrantReport {
+  if (kind === "armor" && !validArmorId(idVal)) return {ok:false,reason:"Invalid armor ID: expected part 1–5"};
   if (!box) return { ok: false, reason: "EquipBox unavailable" };
   const expectType = kind === "armor" ? 2 : 1;
   const existing = reuseExisting ? findEquipEntry(box, idVal, expectType) : null;

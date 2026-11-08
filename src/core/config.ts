@@ -4,6 +4,7 @@
  */
 
 import { DEFAULT_RUNTIME, type RuntimeSettings } from "./quest_plan";
+import { validArmorId } from "./equipment_id";
 
 export type QuestType = "A" | "B" | "C" | "D";
 /** AU = 极强怪高阶单怪（V1.3 §2.2），仅出现在 ultimate 层。 */
@@ -243,7 +244,9 @@ export function validateConfig(raw: unknown): RogueConfig {
     for (let i = 0; i < entriesRaw.length; i++) {
       const e = object(entriesRaw[i], `gachaPools.${key}.entries[${i}]`);
       if (e.kind !== "weapon" && e.kind !== "armor") fail(`gachaPools.${key}.entries[${i}].kind`);
-      entries.push({ kind: e.kind as "weapon" | "armor", id: number(e.id, `gachaPools.${key}.entries[${i}].id`, 1, true),
+      const id = number(e.id, `gachaPools.${key}.entries[${i}].id`, 1, true);
+      if (e.kind === "armor" && !validArmorId(id)) fail(`gachaPools.${key}.entries[${i}].id：防具部位必须为 1–5（0x0C1…–0x0C5…）`);
+      entries.push({ kind: e.kind as "weapon" | "armor", id,
         w: number(e.w, `gachaPools.${key}.entries[${i}].w`, 0) });
     }
     gachaPools[key] = { entries };

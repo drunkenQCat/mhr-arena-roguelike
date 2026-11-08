@@ -24,6 +24,8 @@ describe("configuration boundary", () => {
     ["dual strong without strong pool", (c: any) => { c.Pools[0].Types = ["D"]; }],
     ["pool gap", (c: any) => { c.Pools[1].From = 7; }],
     ["invalid rule", (c: any) => { c.UnlockChain[0].RequiresKilling = null; }],
+    ["armor ID with missing body part", (c: any) => { c.GachaPools.gacha_1.Entries[0].Id = 0x0c000009; }],
+    ["armor ID with invalid body part", (c: any) => { c.GachaPools.gacha_1.Entries[0].Id = 0x0c600009; }],
   ])("rejects %s before runtime", (_name, mutate) => {
     const c = config();
     mutate(c);

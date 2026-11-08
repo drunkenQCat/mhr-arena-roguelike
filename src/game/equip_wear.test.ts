@@ -152,6 +152,12 @@ const INITIAL = [90, 11, 12, 13, 14, 15, 60, 70];
 
 beforeEach(() => buildWorld(INITIAL, []));
 
+it("rejects malformed armor before reserving or mutating a native slot",()=>{
+ const reserve=vi.fn();const before=structuredClone(host.entries);
+ expect(grantEquip(boxFacade,0x0c000009,"armor",reserve,false).ok).toBe(false);
+ expect(reserve).not.toHaveBeenCalled();expect(host.entries).toEqual(before);
+});
+
 it("retains the complete original journal after memory restoration until native saving",()=>{
  equipStartupSet("iron",9,RULES,pouchPort);expect(startupCommitRecord()).toBeUndefined();
  const r=restoreStartup(pouchPort,true);expect(r.ok).toBe(true);expect(r.awaitingSave).toBe(true);
