@@ -9,9 +9,9 @@
  * 本模块不抛异常：所有失败都进 Report；中途失败会尝试回滚原装并撤销本局新发条目。
  */
 
-import { getSingleton, rejson, relog, type REManagedObject, type RETypeDefinition } from "./sdk";
+import { getSingleton, relog, type REManagedObject, type RETypeDefinition } from "./sdk";
 import type { StartupRules } from "../core/config";
-import { readRecoveryRecord, recoveryPending } from "./recovery_journal";
+import { readRecoveryRecord, recoveryPending, writeRecoveryRecord, recoveryWriteFailure } from "./recovery_journal";
 import { assertRecoveryOwner, readRecoveryOwner, type RecoveryOwner } from "./recovery_owner";
 import { captureEquipmentBox, equipmentFingerprint, validateEquipmentSnapshot, verifyEquipmentBox, type EquipmentSnapshot } from "./equipment_snapshot";
 
@@ -279,8 +279,8 @@ interface PersistedState {
 
 export function persistStartupState(state: PersistedState | null): boolean {
   try {
-    return rejson.dump_file(STATE_FILE, state ?? { active: false, armor: null, prevPack: [],
-      granted: [], pouchIsolated: false }, 2) === true;
+    return writeRecoveryRecord(STATE_FILE, state ?? { active: false, armor: null, prevPack: [],
+      granted: [], pouchIsolated: false });
   } catch (error) {
     relog.error(`[MhwRogue] startup journal failed: ${String(error)}`);
     return false;
@@ -346,7 +346,7 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
   try { originalBox = captureEquipmentBox(box); }
   catch (error) { return { ...report, reason:String(error) }; }
   const journal: PersistedState = { schema:3, active: true, owner, originalBox, armor, prevPack: prev, granted, pouchIsolated: false };
-  if (!persistStartupState(journal)) { report.reason = "Cannot save original equipment"; return report; }
+  if (!persistStartupState(journal)) { report.reason = recoveryWriteFailure() ?? "Cannot save original equipment"; return report; }
   const reserve = (entry: GrantedEntry): boolean => {
     granted.push(entry);
     return persistStartupState(journal);
@@ -513,8 +513,10 @@ export function restoreStartup(pouch: EquipWearPort | null, retainUntilSave = fa
     const restored = pouch.endPouchIsolation(retainUntilSave);
     if (!restored.ok) return { ...result, ok:false, reason:restored.reason };
     result.pouchRestored = true;
-    if (!retainUntilSave) state.pouchIsolated = false;
-    if (!persistStartupState(state)) return { ...result, ok:false, reason:"Cannot save pouch recovery progress" };
+    if (!retainUntilSave) {
+      state.pouchIsolated = false;
+      if (!persistStartupState(state)) return { ...result, ok:false, reason:"Cannot save pouch recovery progress" };
+    }
   }
   for (const entry of state.granted) {
     if (entry.removed && !reconcileSaved) continue;
@@ -528,15 +530,19 @@ export function restoreStartup(pouch: EquipWearPort | null, retainUntilSave = fa
         if (slot && slot.get_field("_IdType") !== 0) throw new Error("Equipment removal readback failed");
         result.removedEntries = removed() + 1;
       } else result.skippedEntries = skipped() + 1;
-      entry.removed = true;
-      if (!persistStartupState(state)) throw new Error("Cannot save cleanup progress");
+      if (!entry.removed) {
+        entry.removed = true;
+        if (!persistStartupState(state)) throw new Error("Cannot save cleanup progress");
+      }
     } catch (error) {
       return { ...result, ok: false, reason: String(error) };
     }
   }
   if (retainUntilSave) {
-    state.phase = "restored"; state.restoredProcess = process;
-    if (!persistStartupState(state)) return {...result,ok:false,reason:"Cannot retain recovery until native save"};
+    if (state.phase!=="restored" || state.restoredProcess!==process) {
+      state.phase = "restored"; state.restoredProcess = process;
+      if (!persistStartupState(state)) return {...result,ok:false,reason:"Cannot retain recovery until native save"};
+    }
     return {...result,awaitingSave:true};
   }
   // Immediate retirement is only for a synchronous, unsaved grant rollback.

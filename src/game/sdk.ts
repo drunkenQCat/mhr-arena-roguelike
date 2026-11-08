@@ -191,6 +191,7 @@ export interface NativeWebconsole {
   steam_plan?(lobby: string, value: string): boolean;
   steam_ack?(lobby: string, value: string): boolean;
   steam_digest?(value: string): string;
+  write_recovery?(name: string, json: string): boolean;
   ping(text: string): string;
   epoch(): number;
   session_id?(): string;

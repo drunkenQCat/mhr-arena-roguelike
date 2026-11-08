@@ -121,3 +121,6 @@ HTTP 线程成功绑定端口后，游戏插件用系统默认浏览器打开 `h
 
 
 NativeUi也必须跨业务重开复用：WebConsoleBridge.newScriptSession返回已清空输入的适配器，下一Bridge用它rebind新身份和任务读取器。仅换token，不重复注册原生输入钩子；旧sceneToken必须被拒绝。测试钩子数量时应剔除按需执行的实验脚本自身注册，或直接在原生操作前后测量差额。具体生产门槛与尚缺条款的实施顺序见[策划对照](design-coverage.md)。
+
+
+恢复记录写入统一走 `writeRecoveryRecord` → `webconsole.write_recovery`（DLL 0.4.1）。不要在新的装备或背包流程里直接 `json.dump_file` 覆盖原始备份。原生接口只接受startup/pouch两个文件名、最多2MiB，写入/刷新临时文件后再替换，Lua再精确读回。进度变化才写盘，恢复轮询不能反复flush不变内容。增加新类型记录时需扩展明确文件白名单和中断测试，不能开放任意路径。

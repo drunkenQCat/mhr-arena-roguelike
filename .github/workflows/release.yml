@@ -91,7 +91,7 @@ jobs:
         working-directory: mod
         shell: pwsh
         run: |
-          cmake --build native/webconsole/.build/Plugin-Release-x64 --config Release --target bridge_lifecycle_test fake_steam steam_lobby_test instance_config_test webconsole_test
+          cmake --build native/webconsole/.build/Plugin-Release-x64 --config Release --target bridge_lifecycle_test recovery_file_test fake_steam steam_lobby_test instance_config_test webconsole_test
           if ($LASTEXITCODE -ne 0) { throw 'Native test build failed' }
           ctest --test-dir native/webconsole/.build/Plugin-Release-x64 -C Release --output-on-failure
           if ($LASTEXITCODE -ne 0) { throw 'Native tests failed' }

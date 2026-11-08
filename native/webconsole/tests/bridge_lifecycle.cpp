@@ -4,12 +4,17 @@
 #include <lua.hpp>
 #include <stdexcept>
 #include <iostream>
+#include <filesystem>
 
 static void check(bool ok, const char* message) {
     if (!ok) throw std::runtime_error(message);
 }
 
 int main() try {
+    const auto journal_directory = std::filesystem::temp_directory_path() /
+        (L"mhr-bridge-journal-test-" + std::to_wstring(GetCurrentProcessId()));
+    check(std::filesystem::create_directory(journal_directory), "cannot create journal test directory");
+    webconsole::g_data_dir = journal_directory.wstring();
     webconsole::init_session_id();
     auto& bridge = webconsole::bridge();
     for (int generation = 1; generation <= 3; ++generation) {
@@ -29,6 +34,10 @@ int main() try {
             assert(b.ping(payload) == payload)
             assert(not pcall(b.ping, {}))
             assert(not pcall(b.take_commands, 999))
+            assert(b.write_recovery('mhw_rogue_startup_state.json', '{"active":true}') == true)
+            assert(b.write_recovery('mhw_rogue_pouch_state.json', '{"active":false}') == true)
+            assert(b.write_recovery('../escape.json', '{}') == false)
+            assert(not pcall(b.write_recovery, 'mhw_rogue_startup_state.json', ''))
             assert(b.take_commands(1)[1] == 'request-1')
             b.publish_state('state')
             b.publish_results('result')
@@ -41,8 +50,11 @@ int main() try {
         }
         check(bridge.state_snapshot() == "state" && bridge.results_snapshot() == "result" &&
             bridge.probe_snapshot() == "probe", "Lua/HTTP storage singleton differs");
+        check(webconsole::read_text(webconsole::data_path(L"mhw_rogue_startup_state.json")) == "{\"active\":true}",
+              "Lua recovery writer did not publish exact contents");
         lua_close(L);
     }
+    std::filesystem::remove_all(journal_directory);
     bridge.clear_snapshots();
     for (size_t i = 0; i < webconsole::MemoryBridge::MAX_COMMANDS; ++i)
         check(bridge.push_command("bounded"), "Queue rejected before capacity");

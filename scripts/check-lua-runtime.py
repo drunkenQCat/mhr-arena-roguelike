@@ -315,3 +315,34 @@ multi.execute('''
   assert(g.core.state.layer==3)
 ''')
 print("PASS Lua 5.4: two-peer multiplayer choice/staging/commit/activation/reward and personal-wallet isolation")
+
+# Execute the emitted recovery writer with Lua C-module calling conventions.
+# Never substitute an unsafe json.dump_file fallback when a DLL is older/missing.
+journal = LuaRuntime(unpack_returned_tuples=True)
+journal.globals().journal_dump = lambda value, *_: json.dumps(wire_value(value), ensure_ascii=False, separators=(",", ":"))
+journal.globals().journal_load = lambda text: journal.table_from(json.loads(text), recursive=True)
+journal.execute("""
+  sdk={PreHookResult={CALL_ORIGINAL=0,SKIP_ORIGINAL=1}};re={};thread={};log={};imgui={}
+  disk='{"active":true,"original":1}';writer_exists=true;write_ok=true;readback_ok=true
+  fs={read=function() return disk end,glob=function() return {'mhw_rogue_startup_state.json'} end}
+  json={dump_string=journal_dump,load_string=journal_load,dump_file=function() error('unsafe fallback') end}
+  package.preload.webconsole=function()
+    return {write_recovery=writer_exists and function(name,text)
+      assert(name=='mhw_rogue_startup_state.json' and type(text)=='string')
+      if not write_ok then return false end
+      disk=readback_ok and text or 'wrong';return true
+    end or nil}
+  end
+""")
+journal.globals().journal_module = journal.execute(original_bundle.replace(entry, 'return require("src.game.recovery_journal")'))
+journal.execute("""
+  local m=journal_module;local f='mhw_rogue_startup_state.json'
+  writer_exists=false;package.loaded.webconsole=nil
+  assert(not m.writeRecoveryRecord(nil,f,{active=false}) and disk:find('original'))
+  writer_exists=true;write_ok=false;package.loaded.webconsole=nil
+  assert(not m.writeRecoveryRecord(nil,f,{active=false}) and disk:find('original'))
+  write_ok=true;readback_ok=false;assert(not m.writeRecoveryRecord(nil,f,{active=false}))
+  readback_ok=true;assert(m.writeRecoveryRecord(nil,f,{active=true,original=2}))
+  assert(m.readRecoveryRecord(nil,f).original==2)
+""")
+print("PASS Lua 5.4: atomic recovery writer arguments, missing DLL, failed write and exact readback")

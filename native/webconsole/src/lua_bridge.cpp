@@ -26,6 +26,7 @@
 #include "memory_bridge.h"
 #include "lua_bridge.h"
 #include "steam_lobby.h"
+#include "recovery_file.h"
 
 #include <lua.hpp>
 
@@ -156,7 +157,20 @@ int lua_steam_digest(lua_State* L) {
     lua_pushlstring(L, hash.data(), hash.size()); return 1;
 }
 
+int lua_write_recovery(lua_State* L) {
+    size_t name_length = 0, body_length = 0;
+    const auto* name = luaL_checklstring(L, 1, &name_length);
+    const auto* body = luaL_checklstring(L, 2, &body_length);
+    luaL_argcheck(L, name_length <= 64, 1, "invalid recovery filename");
+    luaL_argcheck(L, body_length > 0 && body_length <= 2 * 1024 * 1024, 2, "recovery record too large or empty");
+    bool ok = false;
+    try { ok = webconsole::write_recovery(std::string(name, name_length), std::string(body, body_length)); }
+    catch (...) { /* Do not propagate C++ exceptions through the host Lua state. */ }
+    lua_pushboolean(L, ok); return 1;
+}
+
 const luaL_Reg MODULE_FUNCS[] = {
+    { "write_recovery", lua_write_recovery },
     { "steam_snapshot", lua_steam_snapshot },
     { "steam_plan", lua_steam_plan },
     { "steam_ack", lua_steam_ack },

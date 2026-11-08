@@ -38,7 +38,7 @@ vi.mock("./recovery_owner", () => ({
  }
 }));
 vi.mock("./sdk", async () => { const { createHash } = await import("node:crypto"); return ({
-  loadWebconsole: () => ({steam_digest:(s:string)=>createHash("sha256").update(s).digest("hex")}),
+  loadWebconsole: () => ({write_recovery:(_p:string,text:string)=>{if(host.persistFails)return false;host.persisted=JSON.parse(text);return true;},steam_digest:(s:string)=>createHash("sha256").update(s).digest("hex")}),
   refFs: { read: () => host.persisted === null ? "" : JSON.stringify(host.persisted), glob: () => host.persisted === null ? [] : ["mhw_rogue_startup_state.json", "mhw_rogue_pouch_state.json"] },
  getSingleton: () => ({
     get_field: () => null,

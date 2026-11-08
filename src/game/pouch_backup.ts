@@ -19,8 +19,8 @@
  * 空 Lua 表写成 JSON null 的绑定差异；缺失非空分类时不能当空背包恢复。
  */
 
-import { findTypeDefinition, getSingleton, relog, rejson, type REManagedObject, type RETypeDefinition } from "./sdk";
-import { readRecoveryRecord } from "./recovery_journal";
+import { findTypeDefinition, getSingleton, relog, type REManagedObject, type RETypeDefinition } from "./sdk";
+import { readRecoveryRecord, writeRecoveryRecord } from "./recovery_journal";
 import { assertRecoveryOwner, readRecoveryOwner, type RecoveryOwner } from "./recovery_owner";
 
 const POUCH = "snow.data.ItemPouch";
@@ -184,7 +184,7 @@ export function beginPouchIsolation(): PouchSnapshot {
     }
     // A durable obligation exists before any native mutation.
     const categoryTotals = RESTORE_TYPES.map(t => Object.values(original[String(t)]!).reduce((sum, n) => sum + n, 0));
-    if (rejson.dump_file(SNAPSHOT_FILE, { schema:2, active: true, owner, boot: BOOT_ID, items: original, stacks, categoryTotals }, 2) !== true) return { ok: false, recoveryRequired: false, reason: "Cannot journal original pouch" };
+    if (writeRecoveryRecord(SNAPSHOT_FILE, { schema:2, active: true, owner, boot: BOOT_ID, items: original, stacks, categoryTotals }) !== true) return { ok: false, recoveryRequired: false, reason: "Cannot journal original pouch" };
     isolationActive = true;
     recoveryRequired = true;
     pouch.call("saveToBackupInventory");
@@ -254,9 +254,12 @@ export function endPouchIsolation(retainUntilSave = false): PouchSnapshot {
       else restoreDurable(pouch, expected, journal.stacks);
     }
     if (!sameSnapshot(expected, inventorySnapshot(pouch, false))) throw new Error("Pouch item IDs/counts do not match original; recovery retained");
-    journal.restoredProcess = readRecoveryOwner().process;
-    if (rejson.dump_file(SNAPSHOT_FILE, retainUntilSave ? journal : { active: false }, 2) !== true)
-      throw new Error("Cannot persist pouch recovery");
+    const process=readRecoveryOwner().process;
+    if (!retainUntilSave || journal.restoredProcess!==process) {
+      journal.restoredProcess = process;
+      if (writeRecoveryRecord(SNAPSHOT_FILE, retainUntilSave ? journal : { active: false }) !== true)
+        throw new Error("Cannot persist pouch recovery");
+    }
     isolationActive = false;
     return { ok: true };
   } catch (error) {
@@ -278,5 +281,5 @@ export function pouchCommitRecord(): PouchJournal | null | undefined {
 }
 
 export function retirePouchCommit(): boolean {
-  return rejson.dump_file(SNAPSHOT_FILE,{active:false},2)===true;
+  return writeRecoveryRecord(SNAPSHOT_FILE,{active:false})===true;
 }

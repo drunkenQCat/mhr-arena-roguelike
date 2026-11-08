@@ -26,7 +26,7 @@
 
 namespace webconsole {
 
-inline constexpr const char* PLUGIN_VERSION = "0.4.0";
+inline constexpr const char* PLUGIN_VERSION = "0.4.1";
 inline unsigned short g_listen_port = 11777;
 inline bool g_open_browser = true;
 

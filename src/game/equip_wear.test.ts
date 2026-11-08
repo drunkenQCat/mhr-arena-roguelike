@@ -36,7 +36,7 @@ const host = vi.hoisted(() => ({
   packFacade: null as { get_field(n: string): unknown } | null,
   boxFacade: null as Record<string, unknown> | null,
   entries: [] as FakeEntry[],
-  persistFails: false,
+  writeCalls:0, persistFails: false,
   grantWorks: true,
   grantThrows: false,
   persisted: null as unknown,
@@ -51,7 +51,7 @@ vi.mock("./recovery_owner", () => ({
  }
 }));
 vi.mock("./sdk", async () => { const { createHash } = await import("node:crypto"); return ({
-  loadWebconsole: () => ({steam_digest:(s:string)=>createHash("sha256").update(s).digest("hex")}),
+  loadWebconsole: () => ({write_recovery:(_p:string,text:string)=>{host.writeCalls++;if(host.persistFails)return false;host.persisted=JSON.parse(text);return true;},steam_digest:(s:string)=>createHash("sha256").update(s).digest("hex")}),
   refFs: { read: () => host.persisted === null ? "" : JSON.stringify(host.persisted), glob: () => host.persisted === null ? [] : ["mhw_rogue_startup_state.json", "mhw_rogue_pouch_state.json"] },
  getSingleton: (name: string) => {
     if (name === "snow.data.EquipDataManager") {
@@ -85,7 +85,7 @@ let boxFacade: {
 };
 
 function buildWorld(initialPack: number[], preOwnedParts: number[], grantWorks = true): void {
-  host.persistFails = false;
+  host.persistFails = false;host.writeCalls=0;
   host.grantWorks = grantWorks;
   host.grantThrows = false;
   host.removedIds = [];
@@ -321,4 +321,11 @@ it("rejects and rolls back preparation when pouch isolation fails",()=>{
  const report=equipStartupSet("iron",9,RULES,{...pouchPort,beginPouchIsolation:()=>({ok:false,reason:"backup failed"})});
  expect(report.ok).toBe(false);expect(report.rollbackAttempted).toBe(true);expect(Array.from(host.packArr!)).toEqual(INITIAL);
  expect(host.entries.every(e=>e._IdType===0)).toBe(true);
+});
+
+it("rechecks live recovery without repeatedly flushing unchanged restored journals",()=>{
+ equipStartupSet("iron",9,RULES,pouchPort);restoreStartup(pouchPort,true);const writes=host.writeCalls;
+ expect(restoreStartup(pouchPort,true).ok).toBe(true);expect(host.writeCalls).toBe(writes);
+ host.packArr![1]=-1;expect(restoreStartup(pouchPort,true).ok).toBe(true);
+ expect(Array.from(host.packArr!)).toEqual(INITIAL);expect(host.writeCalls).toBe(writes);
 });

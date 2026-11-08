@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const h=vi.hoisted(()=>({bag:[] as any[],backup:null as any,saved:null as any,failClear:false,failRead:false,failSave:false,failAdd:false}));
+const h=vi.hoisted(()=>({bag:[] as any[],backup:null as any,saved:null as any,failClear:false,failRead:false,failSave:false,failAdd:false,writeCalls:0}));
 function list(items:any[]) { return {call:(m:string,i:number)=>m==="get_Count"?items.length:{
  get_type_definition:()=>({get_method:()=>({})}),
  call:(n:string,...args:number[])=>{
@@ -17,6 +17,7 @@ vi.mock("./recovery_owner", () => ({
  }
 }));
 vi.mock("./sdk",()=>({
+ loadWebconsole:()=>({write_recovery:(_p:string,text:string)=>{h.writeCalls++;if(h.failSave)return false;h.saved=JSON.parse(text);return true;}}),
  refFs: { read: () => h.saved === null ? "" : JSON.stringify(h.saved), glob: () => h.saved === null ? [] : ["mhw_rogue_startup_state.json", "mhw_rogue_pouch_state.json"] },
  getSingleton:()=>({get_field:()=>({call:(m:string,t:number)=>{
   if(m==="getInventoryDataList") {if(h.failRead)throw Error("unreadable");return list(h.bag[t]);}
@@ -26,7 +27,7 @@ vi.mock("./sdk",()=>({
   if(m==="loadFromBackupInventory"&&h.backup)h.bag=structuredClone(h.backup);
  }})}),
  findTypeDefinition:()=>({get_fields:()=>["Normal","Temporary","BulletBottle","Regular","WireJumpInsect","OtDogItemPouch"].map((name,i)=>({get_name:()=>name,is_static:()=>true,get_data:()=>i}))}),
- rejson:{load_string: (text: string) => { try { return JSON.parse(text); } catch { return null; } },
+ rejson:{dump_string:JSON.stringify,load_string: (text: string) => { try { return JSON.parse(text); } catch { return null; } },
     load_file:()=>h.saved,dump_file:(_p:string,d:any)=>{if(h.failSave)return false;h.saved=structuredClone(d);return true;}},
  relog:{info:vi.fn(),warn:vi.fn(),error:vi.fn()}
 }));
@@ -35,7 +36,7 @@ let beginPouchIsolation:typeof import("./pouch_backup").beginPouchIsolation;
 let endPouchIsolation:typeof import("./pouch_backup").endPouchIsolation;
 beforeEach(async()=>{
  vi.resetModules();({beginPouchIsolation,endPouchIsolation}=await import("./pouch_backup"));
- Object.assign(h,{failClear:false,failRead:false,failSave:false,failAdd:false,bag:empty(),backup:empty(),saved:null});
+ Object.assign(h,{failClear:false,failRead:false,failSave:false,failAdd:false,writeCalls:0,bag:empty(),backup:empty(),saved:null});
  h.bag[0][0]={id:1,n:10};h.bag[2][0]={id:2,n:20};
 });
 it("journals before native backup moves the pouch, then restores exact original counts",()=>{
@@ -96,4 +97,11 @@ it("restores empty categories serialized as null by the native Lua JSON binding"
  beginPouchIsolation();h.saved.items['1']=null;delete h.saved.items['5'];h.saved.stacks['1']=null;
  h.backup=null;vi.resetModules();const fresh=await import("./pouch_backup");
  expect(fresh.endPouchIsolation().ok).toBe(true);expect(h.bag[0][0]).toEqual({id:1,n:10});
+});
+
+it("does not flush an unchanged retained pouch record on every recovery poll",()=>{
+ beginPouchIsolation();endPouchIsolation(true);const writes=h.writeCalls;
+ expect(endPouchIsolation(true).ok).toBe(true);expect(h.writeCalls).toBe(writes);
+ h.bag[0][0]={id:99,n:1};expect(endPouchIsolation(true).ok).toBe(true);
+ expect(h.bag[0][0]).toEqual({id:1,n:10});expect(h.writeCalls).toBe(writes);
 });

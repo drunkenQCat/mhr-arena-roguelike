@@ -50,6 +50,9 @@ target_link_libraries(webconsole_test PRIVATE lua54 ws2_32.lib crypt32.lib iphlp
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(recovery_file_test tests/recovery_file_test.cpp)
+    target_include_directories(recovery_file_test PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME recovery_file COMMAND recovery_file_test)
     add_executable(instance_config_test tests/instance_config_test.cpp)
     target_include_directories(instance_config_test PRIVATE src ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME instance_config COMMAND instance_config_test)
