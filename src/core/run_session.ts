@@ -1,3 +1,4 @@
+import {rollSupplyDrops, type SupplyDrop} from "./supply_drops";
 import { RunCore, fail, ok, type Result } from "./run_core";
 import { DEFAULT_RUNTIME, makeQuestPlan, type MonsterCatalog, type QuestPlan, type RuntimeSettings } from "./quest_plan";
 import type { WaveOption } from "./run_state";
@@ -14,6 +15,7 @@ export interface RuntimeReading {
   time: number;
   quest: QuestReading | null;
   players: PlayerReading[];
+  localPlayerId?: number | null;
   enemies: EnemyReading[];
   deaths: number;
   online: boolean;
@@ -46,6 +48,7 @@ export interface SessionPort {
   /** 回村恢复原装（幂等）；失败返回 ok=false，会话稍后重试。 */
   startupRestore?(): { ok: boolean; reason?: string };
   /** V1.3 §2.3 极强击杀掉落：ultimate 波清波后触发一次顶级抽取（免费、发件入局末清理）。 */
+  supplyDrop?(itemId: string, count: number): { granted: boolean; actual?: number; deferred?: boolean; reason?: string };
   ultimateDrop?(): { ok: boolean; name?: string; reused?: boolean; reason?: string };
   /** 离线队友调研 §6C：权威参战人数（混合实机 mock 名单）。null=沿用原生人数。 */
   partySize?(): number | null;
@@ -53,9 +56,10 @@ export interface SessionPort {
   multiplayerRole?(): "host" | "guest" | null;
   multiplayerValid?(): boolean;
   multiplayerCanChoose?(): boolean;
+  canFinishLocal?(): boolean;
 }
 
-export type SessionStage = "Idle" | "Selecting" | "AwaitQuest" | "Combat" | "Carve" | "Returning" | "Finished" | "Fault";
+export type SessionStage = "Idle" | "Preparing" | "Selecting" | "AwaitQuest" | "Combat" | "Carve" | "Returning" | "Finished" | "Fault";
 
 export class RunSession {
   /** The same sampled reading drives both progression and the web console. */
@@ -72,6 +76,7 @@ export class RunSession {
   private startupRestorePending = false;
   /** 本会话成功执行过开局准备（fault/stop 时据此决定是否需要恢复）。 */
   private startupPrepared = false;
+  private preparationQuest: number | null = null;
   private startupNotice: string | null = null;
 
   /** 脚本重载后恢复"上局未恢复"状态（main.ts 读持久化文件后调用）。 */
@@ -137,7 +142,7 @@ export class RunSession {
     const gathered = this.roster.length > 0 && this.roster.every((id) =>
       players.some((p) => p.id === id && p.campDistance !== null && p.campDistance <= this.settings.campRadius));
     const remaining = this.stage === "Carve" ? Math.max(0, this.settings.carveSeconds - ((reading?.time ?? 0) - this.clearAt)) : 0;
-    return { camp: this.camp, radius: this.settings.campRadius, players, gathered,
+    return { camp: this.camp, radius: this.settings.campRadius, players, gathered, localPlayerId: reading?.localPlayerId ?? null,
       carveRemaining: remaining,
       dwellRemaining: this.campSince === null ? this.settings.campDwellSeconds :
         Math.max(0, this.settings.campDwellSeconds - ((reading?.time ?? 0) - this.campSince)),
@@ -146,6 +151,12 @@ export class RunSession {
   }
 
   canShop(): boolean {
+    if (this.stage === "Preparing") {
+      const r = this.readingSnapshot;
+      return this.startupPrepared && !!r && (r.quest
+        ? r.quest.id === this.plan?.questId && !r.quest.playing && r.quest.status === "ready"
+        : r.canPost);
+    }
     if (this.stage !== "Selecting") return false;
     const r = this.readingSnapshot;
     if (!r || (r.online && !this.onlineAllowed(r))) return false;
@@ -165,13 +176,64 @@ export class RunSession {
   private seenSpawnReported = false;
   private entryHostRun = false;
   earnedPt = 0;
+  private startedAt = 0;
+  private clearedWaves = 0;
+  private pendingSupplies: SupplyDrop[] = [];
+  supplyLoot: {itemId:string;count:number;actual:number;granted:boolean;reason?:string}[] = [];
+  runSummary() { return { layer:this.core.state.layer, clearedWaves:this.clearedWaves,
+    earnedPt:this.earnedPt, spentPt:this.core.config.startPt+this.earnedPt-this.core.state.wallet.pt,
+    balance:this.core.state.wallet.pt, remainingCarts:this.core.state.cartsLeft,
+    cartRestored:this.core.state.cartRestoreUsed, armor:this.core.state.armor,
+    purchases:this.core.state.wallet.purchaseLog.slice(), reason:this.message,
+    durationSeconds:Math.max(0,(this.readingSnapshot?.time ?? this.startedAt)-this.startedAt),
+    restored:!this.startupRestorePending, role:this.multiplayerRole }; }
+  private queueSupplies(plan: QuestPlan): void {
+    this.clearedWaves++;
+    this.pendingSupplies.push(...rollSupplyDrops(this.core.config.supplyDrops, plan.monsterIds.length, w=>this.core.rollWeighted(w)));
+  }
+  private deliverSupplies(): void {
+    if (!this.port.supplyDrop || !["Carve","Selecting"].includes(this.stage)) return;
+    while(this.pendingSupplies.length > 0) {
+      const item=this.pendingSupplies[0]!; const report=this.port.supplyDrop(item.itemId,item.count);
+      if (report.deferred) return; // Host clear may arrive before the guest's native death.
+      this.pendingSupplies.shift();
+      this.supplyLoot.push({...item,actual:report.actual??0,granted:report.granted,reason:report.reason});
+      if(this.supplyLoot.length>10)this.supplyLoot.shift();
+      this.announce("supply-drop",this.supplyLoot[this.supplyLoot.length-1]);
+    }
+  }
   private mirroredReward = 0;
+  private mirroredClears: number[] = [];
   get multiplayerRole(): "host" | "guest" | null { return this.port.multiplayerRole?.() ?? null; }
   canChoose(): boolean { return this.multiplayerRole !== "guest" && this.canShop() && (!this.multiplayerRole || this.port.multiplayerCanChoose?.() === true); }
   failMultiplayer(reason: string): void { this.fault(reason); }
   adoptMultiplayerEntry(plan: QuestPlan): Result {
     if (!this.multiplayerRole || !this.port.multiplayerValid?.()) return fail("Multiplayer identity unavailable");
     return this.adoptPostedEntry(plan);
+  }
+  /** Called only after MultiplayerEntry has pinned a native lobby and validated its plan. */
+  prepareMultiplayer(plan: QuestPlan, armor: string): Result {
+    const r = this.port.read();
+    if (r.quest || !r.canPost || plan.questId !== 900103 || this.core.config.quest.id !== 900103)
+      return fail("请在联机大厅村庄、未承接任务时准备本局");
+    if (this.stage === "Preparing" && this.startupPrepared) { this.plan = plan; return ok(); }
+    if (!["Idle", "Finished", "Fault"].includes(this.stage) || this.startupRestorePending)
+      return fail("上局恢复尚未完成");
+    if (!this.core.config.armorOptions.includes(armor)) return fail("未知初始装备");
+    const prepared = this.port.startupPrepare?.(armor);
+    if (!prepared?.ok || prepared.notice) {
+      this.startupRestorePending = true;
+      return this.fault(prepared?.reason ?? prepared?.notice ?? "联机开局准备接口不可用");
+    }
+    this.startupPrepared = true; this.startupRestorePending = true;
+    const started = this.core.startRun(armor);
+    if (!started.ok) return this.fault(started.message);
+    this.startedAt = r.time;
+    this.plan = plan; this.stage = "Preparing"; this.route = "inPlace";
+    this.readingSnapshot = r;
+    this.message = "本机零物资与初始装备已准备，可用初始 PT 购物；全队准备后承接并出发";
+    this.announce("multiplayer-startup-prepared", { armor, pt: this.core.state.wallet.pt });
+    return ok();
   }
   /** Guest has its own wallet. Apply cumulative host rewards once, never copy host spending. */
   mirrorMultiplayer(frame: { stage: SessionStage; phase: import("./run_state").RunPhase; layer: number;
@@ -182,7 +244,13 @@ export class RunSession {
     const newReward = frame.earned > this.mirroredReward;
     this.core.state.wallet.pt += frame.earned - this.mirroredReward;
     this.mirroredReward = frame.earned; this.earnedPt = frame.earned;
-    if (newReward && frame.plan.wave.tier === "ultimate") this.grantUltimateDrop();
+    const cleared = newReward || frame.stage === "Carve" || frame.stage === "Selecting" && frame.layer > 1;
+    if (cleared && !this.mirroredClears.includes(frame.plan.token)) {
+      this.mirroredClears.push(frame.plan.token);
+      if (this.mirroredClears.length > 256) this.mirroredClears.shift();
+      this.queueSupplies(frame.plan);
+      if (frame.plan.wave.tier === "ultimate") this.grantUltimateDrop();
+    }
     this.stage = frame.stage; this.core.state.phase = frame.phase; this.core.state.layer = frame.layer;
     this.core.state.cartsLeft = frame.carts; this.core.state.cartRestoreUsed = frame.cartUsed;
     this.core.state.killedUltimates = [...frame.killed];
@@ -203,7 +271,9 @@ export class RunSession {
   private onlineAllowed(reading: RuntimeReading): boolean {
     return this.port.allowEntryHostTest?.(reading) === true || (!!this.multiplayerRole && this.port.multiplayerValid?.() === true);
   }
-  shopQuest(): { questId: number; questUnique: number; entryHostTest?: boolean; multiplayer?: boolean } | undefined {
+  shopQuest(): { questId: number; questUnique: number; entryHostTest?: boolean; multiplayer?: boolean; preparing?: boolean } | undefined {
+    if (this.stage === "Preparing" && this.plan) return { questId: this.plan.questId,
+      questUnique: this.readingSnapshot?.quest?.unique ?? -1, multiplayer: true, preparing: true };
     if (this.stage === "Selecting" && this.route === "inPlace" && this.plan && this.questUnique !== null) {
       return { questId: this.plan.questId, questUnique: this.questUnique,
         ...(this.readingSnapshot && this.port.allowEntryHostTest?.(this.readingSnapshot) ? { entryHostTest: true } : {}),
@@ -216,9 +286,9 @@ export class RunSession {
 
   adoptPostedEntry(plan: QuestPlan): Result {
     const reading = this.port.read();
-    if (this.stage !== "Idle" || plan.questId !== 900103 || this.core.config.quest.id !== 900103 ||
+    if (!["Idle", "Preparing"].includes(this.stage) || plan.questId !== 900103 || this.core.config.quest.id !== 900103 ||
         reading.quest?.id !== plan.questId || !this.onlineAllowed(reading)) return fail("Entry host test scope unavailable");
-    const started = this.core.startRun(this.core.config.armorOptions[0]!);
+    const started = this.stage === "Preparing" && this.startupPrepared ? ok() : this.core.startRun(this.core.config.armorOptions[0]!);
     if (!started.ok) return started;
     this.core.generateChoices(1);
     this.core.state.currentChoices = [plan.wave];
@@ -227,10 +297,11 @@ export class RunSession {
     this.plan = plan; this.token = plan.token; this.route = "inPlace";
     this.entryHostRun = !this.multiplayerRole;
     this.testOnly = false; this.resetTracking(reading, false);
+    if (this.multiplayerRole === "guest" && reading.quest?.playing) this.questUnique = reading.quest.unique;
     this.port.policy(plan, true);
     this.stage = "AwaitQuest";
-    this.message = this.multiplayerRole ? "联机局已接入：保留现有装备和背包，由房主出发与选波" : "房主本机接线测试：保留现有装备和背包，等待手动出发；真实队友加入后停止测试";
-    this.announce(this.multiplayerRole ? "multiplayer-adopted" : "entry-host-adopted", { plan, scope: this.multiplayerRole ?? "one-native-host-only", startupIsolation: false });
+    this.message = this.multiplayerRole ? "联机局已接入：首波正常计分，保留开局购物结果，由房主选波" : "房主本机接线测试";
+    this.announce(this.multiplayerRole ? "multiplayer-adopted" : "entry-host-adopted", { plan, scope: this.multiplayerRole ?? "one-native-host-only", startupIsolation: this.startupPrepared });
     return ok();
   }
 
@@ -258,6 +329,7 @@ export class RunSession {
         if (!prep.ok) { this.startupRestorePending = true; return fail(prep.reason ?? "开局穿装失败"); }
         this.startupPrepared = true;
       }
+      this.startedAt = reading.time;
       const result = this.core.startRun(armor);
       if (!result.ok) {
         // 穿装已完成但 PT 发放失败：仍需回村恢复原装
@@ -384,9 +456,9 @@ export class RunSession {
   stop(): void {
     const reading = this.port.read();
     this.port.cancelPost();
+    if ((this.port.canFinishLocal?.() ?? this.multiplayerRole !== "guest") && this.plan && reading.quest?.id === this.plan.questId && reading.quest.playing) this.port.finish(true);
     this.port.policy(null, false);
     this.core.abortRun("Run stopped");
-    if (this.multiplayerRole !== "guest" && this.plan && reading.quest?.id === this.plan.questId && reading.quest.playing) this.port.finish(true);
     if (this.startupPrepared) this.startupRestorePending = true;
     this.stage = "Finished";
     this.message = "已终止；回村后自动恢复原装备";
@@ -404,7 +476,7 @@ export class RunSession {
       // 不能在活跃局内触发——inPlace 首波前 Selecting 与 reentry 波间 Selecting 都在村庄。
       if (this.startupRestorePending && this.port.startupRestore &&
         ["Idle", "Finished", "Fault"].includes(this.stage)) {
-        const backInVillage = reading.canPost && (!reading.online || !!this.multiplayerRole) && (!reading.quest || reading.staleQuest === true);
+        const backInVillage = reading.canPost && reading.players.length > 0 && (!reading.quest || reading.staleQuest === true);
         if (backInVillage) {
           const restore = this.port.startupRestore();
           if (restore.ok) {
@@ -416,11 +488,44 @@ export class RunSession {
         }
       }
       if (["Idle", "Finished", "Fault"].includes(this.stage)) return;
+      // Native failure/return is authoritative on EVERY peer, including Selecting and guests.
+      // It must be observed before the guest/progression and scope early returns below.
+      const pinned = this.questUnique !== null && this.plan !== null;
+      const same = reading.quest?.id === this.plan?.questId && reading.quest?.unique === this.questUnique;
+      if ((this.multiplayerRole || this.stage === "Preparing") && ((this.stage === "Preparing" && reading.quest && reading.quest.id === this.plan?.questId &&
+            ["failed", "return", "success"].includes(reading.quest.status)) ||
+          (pinned && (!same || !!reading.quest && ["failed", "return", "success"].includes(reading.quest?.status ?? ""))))) {
+        if (same && Number.isInteger(reading.deaths) && reading.deaths >= 0)
+          this.core.state.cartsLeft = Math.max(0,this.core.config.maxCarts-reading.deaths);
+        this.core.abortRun("原生任务已结束或离开"); this.port.policy(null, false); this.port.cancelPost();
+        this.stage = "Finished"; this.message = "本局已结束，等待原生回村并恢复个人装备与背包";
+        this.announce("native-run-ended", { quest: reading.quest, deaths: reading.deaths });
+        return;
+      }
+      if (this.stage === "Preparing") {
+        if (reading.quest?.id === this.plan?.questId) this.preparationQuest = reading.quest?.unique ?? null;
+        else if (this.preparationQuest !== null) {
+          this.core.abortRun("原生入场任务已取消"); this.stage = "Finished";
+          this.message = "已取消入场，回村恢复后可重新准备";
+        }
+        return;
+      }
+      if (pinned && same && this.multiplayerRole !== "guest") {
+        const delta = Math.max(0, reading.deaths - this.lastDeaths); this.lastDeaths = reading.deaths;
+        for (let i = 0; i < delta && this.core.state.phase !== "GameOver"; i++) this.core.cart(reading.quest?.playing === true);
+        if (this.core.state.phase === "GameOver") {
+          if (reading.quest?.playing) this.port.finish(true);
+          this.port.policy(null, false);
+          this.stage = "Finished"; this.message = "全队猫车耗尽，等待原生结算与个人恢复";
+          return;
+        }
+      }
       if (this.entryHostRun && !this.port.allowEntryHostTest?.(reading)) {
         this.fault("Entry host test identity changed or a real teammate joined"); return;
       }
       if (reading.online && !this.onlineAllowed(reading)) { this.fault("Online session detected; native hooks released"); return; }
       if (this.multiplayerRole && !this.port.multiplayerValid?.()) { this.fault("联机房间、房主或固定队伍已改变"); return; }
+      this.deliverSupplies();
       // The guest reads native facts but never runs the host progression or awards itself kills.
       if (this.multiplayerRole === "guest") return;
       const postError = this.port.postingError();
@@ -500,6 +605,7 @@ export class RunSession {
         if (this.resolved.length === this.plan!.monsterIds.length) {
           this.core.killWave();
           this.earnedPt += this.plan!.wave.rewardPt;
+          this.queueSupplies(this.plan!);
           // V1.3 §2.3：极强波清波掉落一次顶级抽取（"古龙临时毕业装备"）
           if (this.plan!.wave.tier === "ultimate" && this.port.ultimateDrop) {
             this.grantUltimateDrop();
@@ -603,6 +709,12 @@ export class RunSession {
 
   private fault(error: unknown): Result {
     if (this.stage === "Fault" && this.message === String(error)) return fail(this.message);
+    const q = this.readingSnapshot?.quest;
+    if (this.multiplayerRole && (this.port.canFinishLocal?.() ?? this.multiplayerRole === "host") && q?.playing && this.plan?.questId === q.id &&
+        (this.questUnique === null || this.questUnique === q.unique)) {
+      try { this.port.finish(true); }
+      catch (finishError) { this.announce("fault-finish-deferred",String(finishError)); }
+    }
     this.stage = "Fault";
     this.message = String(error);
     this.port.policy(null, false);

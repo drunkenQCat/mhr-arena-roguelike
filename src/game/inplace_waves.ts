@@ -17,7 +17,7 @@ export interface SpawnSync {
 export class InplaceWaves {
   private sync: SpawnSync | null = null;
   private staged: SpawnTicket | null = null;
-  setSync(sync: SpawnSync): void { this.sync = sync; }
+  setSync(sync: SpawnSync | null): void { this.sync = sync; }
   private plan: QuestPlan | null = null;
   private unique = 0;
   private pending: number[] = [];

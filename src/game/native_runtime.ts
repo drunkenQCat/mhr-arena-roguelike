@@ -1,3 +1,5 @@
+import {canTrade,grantItem} from "./item_grant";
+import {readLobbyIdentity} from "./multiplayer_entry";
 import { InplaceWaves, type SpawnSync } from "./inplace_waves";
 import { TestTools } from "./test_tools";
 import { entryHostTestScope } from "./entry_host_scope";
@@ -44,10 +46,11 @@ export class NativeRuntime implements SessionPort {
   private rateKeys: string[] = [];
   private rateEvidence: unknown[] = [];
   private pendingFinish: { failed: boolean; questId: number; unique: number } | null = null;
+  private failedEnding: { questId: number; unique: number } | null = null;
   private finishEvidence: { event: string; detail: unknown } | null = null;
   /** 离线队友调研 §6C：混合局权威人数来源（PartySession.rosterSize）。 */
   private multiplayer: (SpawnSync & { canChoose(): boolean; snapshot(): Record<string, unknown> }) | null = null;
-  setMultiplayer(sync: SpawnSync & { canChoose(): boolean; snapshot(): Record<string, unknown> }): void { this.multiplayer = sync; this.inplace.setSync(sync); }
+  setMultiplayer(sync: (SpawnSync & { canChoose(): boolean; snapshot(): Record<string, unknown> }) | null): void { this.multiplayer = sync; this.inplace.setSync(sync); }
   multiplayerState(): Record<string, unknown> | null { return this.multiplayer?.snapshot() ?? null; }
   mirrorCartRestore(deaths: number): void {
     if (this.multiplayerRole() !== "guest" || !this.multiplayerValid() || !Number.isInteger(deaths) || deaths < 0) throw new Error("Cart restore mirror scope unavailable");
@@ -61,11 +64,18 @@ export class NativeRuntime implements SessionPort {
   multiplayerCanChoose(): boolean { return this.multiplayer?.canChoose() ?? false; }
   private partySizeSource: (() => number | null) | null = null;
 
-  constructor(private readonly cfg: RogueConfig, readonly installer: QuestInstaller,
+  constructor(private cfg: RogueConfig, public installer: QuestInstaller,
     private readonly gacha?: GachaService, private readonly entryHostTest = false) {
-    this.transport = new QuestTransport(() => installer.getQuest(),
+    this.transport = new QuestTransport(() => this.installer.getQuest(),
       (cfg.runtime ?? DEFAULT_RUNTIME).postTimeoutSeconds);
     this.questTransport = this.transport;
+  }
+
+  /** Reuse the installed hooks across runs; callbacks read this current context. */
+  rebind(config: RogueConfig, installer: QuestInstaller): void {
+    this.shutdown(); this.setMultiplayer(null);
+    this.cfg = config; this.installer = installer;
+    this.transport.retarget(config.quest.id); this.deaths = []; this.rateKeys = [];
   }
 
   /** main.ts 在 PartySession 建立后接线；null=沿用原生人数。 */
@@ -138,7 +148,8 @@ export class NativeRuntime implements SessionPort {
   private requireTeleportScope(): void {
     const q = questManager();
     const stage = getSingleton("snow.stage.StageManager");
-    if (!q || !stage || (this.entryHostTest && !entryHostTestScope()) || (stage.call("get_IsQuestOnline") !== false && !(this.entryHostTest && entryHostTestScope())) ||
+    const authorized = this.multiplayerValid() || (this.entryHostTest && entryHostTestScope());
+    if (!q || !stage || (this.entryHostTest && !authorized) || (stage.call("get_IsQuestOnline") !== false && !authorized) ||
       q.call("isPlayQuest") !== true || q.call("get_ActiveQuestNo") !== this.cfg.quest.id) {
       throw new Error("teleport: requires the active solo custom arena quest");
     }
@@ -172,7 +183,7 @@ export class NativeRuntime implements SessionPort {
   }
 
 
-  shutdown(): void { this.pendingFinish = null; this.finishEvidence = null; this.testTools.shutdown(); this.policy(null, false); this.transport.cancel(); }
+  shutdown(): void { this.pendingFinish = null; this.failedEnding = null; this.finishEvidence = null; this.testTools.shutdown(); this.policy(null, false); this.transport.cancel(); }
 
   now(): number { return clockSeconds(); }
 
@@ -197,10 +208,13 @@ export class NativeRuntime implements SessionPort {
     } : null;
     const players: PlayerReading[] = [];
     const playerManager = getSingleton("snow.player.PlayerManager");
+    const master = playerManager?.call("findMasterPlayer") as REManagedObject | null;
+    let localPlayerId: number | null = null;
     const array = playerManager?.get_field("PlayerList") as REManagedArray | null;
     if (array) for (let i = 0; i < array.get_size(); i++) {
       const player = array.get_element(i) as REManagedObject | null;
       if (!player) continue;
+      if (master && player.get_address() === master.get_address()) localPlayerId = i;
       // isPlayQuest becomes true before PlayerList replaces the village actors.
       // Those old coordinates must never become the arena gathering point.
       if (playing && player.get_type_definition().get_full_name().startsWith("snow.player.PlayerLobby")) continue;
@@ -250,7 +264,7 @@ export class NativeRuntime implements SessionPort {
       }
     }
     const gui = getSingleton("snow.gui.GuiManager");
-    return { time, quest, entryReady, players, enemies, online, staleQuest,
+    return { time, quest, entryReady, players, localPlayerId, enemies, online, staleQuest,
       deaths: active ? callNative(qm, "getDeathNum") as number : 0,
       canPost: !active && (!!gui?.call("IsCanInvokeQuestBoard") || !!getSingleton("snow.gui.fsm.questcounter.GuiQuestCounterFsmManager")) };
   }
@@ -276,6 +290,17 @@ export class NativeRuntime implements SessionPort {
   }
 
   /** V1.3 §2.3 极强击杀掉落：gacha_4 一次，发件并入局末清理（复用件不追踪不清理）。 */
+  supplyDrop(itemId: string, count: number) {
+    const qm = questManager();
+    if (!this.activePlan || !qm || qm.call("get_ActiveQuestNo") !== this.activePlan.questId || !qm.call("isPlayQuest"))
+      return {granted:false,reason:"奖励任务已结束"};
+    const context = {questId:this.activePlan.questId,questUnique:qm.call("getActiveQuestUniqueNo") as number,
+      multiplayer:this.multiplayerValid(),entryHostTest:this.entryHostTest};
+    if (!canTrade(context)) return {granted:false,deferred:true};
+    const report = grantItem(itemId,count,context);
+    return {granted:report.granted,actual:Math.max(0,(report.after??0)-(report.before??0)),reason:report.reason};
+  }
+
   ultimateDrop(): { ok: boolean; name?: string; reused?: boolean; reason?: string } {
     if (!this.gacha) return { ok: false, reason: "GachaService unavailable" };
     const rolled = this.gacha.roll("gacha_4");
@@ -296,13 +321,21 @@ export class NativeRuntime implements SessionPort {
     if (!qm || callNative(qm, "get_ActiveQuestNo") !== this.cfg.quest.id || !callNative(qm, "isActiveQuest")) {
       throw new Error("Refusing to finish an unrelated quest");
     }
-    if (this.multiplayerRole() === "guest") throw new Error("Only the quest host may finish a multiplayer run");
-    this.holdClear = false;
+    if (!this.canFinishLocal())
+      throw new Error("Only the quest host may finish a multiplayer run");
+    // Completed original objectives are still true during inPlace waves. Releasing
+    // their clear gate before native failure runs lets success win the next update.
+    if (failed) this.failedEnding = {questId: this.cfg.quest.id, unique: callNative(qm, "getActiveQuestUniqueNo") as number};
+    else this.holdClear = false;
     // netSendQuestDone allocates a managed message retained by QuestManager.
     // Run from the engine's update context, after native faint/failure processing,
     // rather than allocating that message from the external Lua frame callback.
     this.pendingFinish = { failed, questId: this.cfg.quest.id,
       unique: callNative(qm, "getActiveQuestUniqueNo") as number };
+  }
+
+  canFinishLocal(): boolean {
+    return this.multiplayerRole() === null || ["offline","host"].includes(readLobbyIdentity().role);
   }
 
   private finishInNativeUpdate(): void {
@@ -313,7 +346,7 @@ export class NativeRuntime implements SessionPort {
       const qm = questManager();
       if (!qm || callNative(qm, "get_ActiveQuestNo") !== pending.questId ||
           callNative(qm, "getActiveQuestUniqueNo") !== pending.unique ||
-          this.multiplayerRole() === "guest") return;
+          !this.canFinishLocal()) return;
       const status = qm.get_field("_QuestStatus");
       if (status !== snow_QuestManager_Status.Play || callNative(qm, "isPlayQuest") !== true) return;
       if (pending.failed) callNative(qm, "setQuestFail", snow_quest_FailReason.Normal);
@@ -392,11 +425,16 @@ export class NativeRuntime implements SessionPort {
       this.finishInNativeUpdate();
       return value;
     });
-    const preClear = (): number => this.inScope() && this.holdClear ? PRE_HOOK.SKIP_ORIGINAL : PRE_HOOK.CALL_ORIGINAL;
+    const blocksClear = (): boolean => {
+      const q = questManager(), ending = this.failedEnding;
+      return !!ending && !!q && callNative(q, "get_ActiveQuestNo") === ending.questId &&
+        callNative(q, "getActiveQuestUniqueNo") === ending.unique || this.inScope() && this.holdClear;
+    };
+    const preClear = (): number => blocksClear() ? PRE_HOOK.SKIP_ORIGINAL : PRE_HOOK.CALL_ORIGINAL;
     // Explicit this:void on host callback types in sdk.ts prevents hidden Lua self arguments.
     hookMethod(clear, preClear);
     hookMethod(clearSub, preClear);
-    hookMethod(check, () => {}, (retval) => this.inScope() && this.holdClear ? toPtr(0) : retval);
+    hookMethod(check, () => {}, (retval) => blocksClear() ? toPtr(0) : retval);
     hookMethod(over, () => {}, (retval) => this.inScope() ? toPtr(0) : retval);
     hookMethod(unlimited, () => {}, (retval) => this.inScope() ? toPtr(1) : retval);
     hookMethod(died, (args) => {

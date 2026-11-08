@@ -175,6 +175,13 @@ export class MultiplayerRun implements SpawnSync {
     const now = clockSeconds();
     if (!this.live || this.lastPoll === now) return;
     this.lastPoll = now;
+    // Native return can finish locally before the last Steam frame or lobby teardown.
+    // Never turn an already-ended local run back into a synchronization fault.
+    if (["Finished", "Fault"].includes(this.session.stage)) {
+      if (this.role === "host") { try { this.publish(); } catch { /* native lobby may already be retired */ } }
+      this.live = false; this.message = "本局已结束，等待回村恢复后重新开局";
+      return;
+    }
     try {
       if (!this.valid()) throw new Error("原生任务或房主身份发生变化");
       const snapshot = this.network.steam_snapshot?.();

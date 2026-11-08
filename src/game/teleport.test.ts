@@ -51,3 +51,12 @@ it("drives the stage warp flow (engine fast-travel path) with a value vec3", () 
   expect(host.warp).toEqual({ pos: { x: 1, y: 2, z: 3 }, rot: 0.0, context: 1 });
   expect(host.flow).toBe(0);
 });
+
+it("permits only an owned live multiplayer session and closes the gate when that session retires", () => {
+  host.online = true;
+  const r = runtime(); let live = true;
+  r.setMultiplayer({ role: "guest", valid: () => live } as any);
+  r.teleportPlayer({x:1,y:2,z:3}); expect(host.flow).toBe(0);
+  live = false; host.flow = null;
+  expect(() => r.teleportPlayer({x:1,y:2,z:3})).toThrow(); expect(host.flow).toBeNull();
+});

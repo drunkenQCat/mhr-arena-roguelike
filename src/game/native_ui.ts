@@ -21,6 +21,8 @@ interface UiSnapshot extends Record<string, any> {
 type Pending = { id: string; action: string; token: string; before: string; deadline: number; consumed: boolean; pulseActive: boolean; internal?: boolean };
 
 export class NativeUi {
+  /** Retired bridges must never keep injecting native input into a later run. */
+  shutdown(): void { this.pending = null; this.returning = null; }
   private revision = 0;
   private fingerprint = "";
   private hooks = false;

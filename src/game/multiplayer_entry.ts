@@ -2,7 +2,8 @@
 import { canonical } from "./wire_canonical";
 import type { RogueConfig } from "../core/config";
 import { makeQuestPlan, type MonsterCatalog } from "../core/quest_plan";
-import type { WaveOption } from "../core/run_state";
+import { RunCore } from "../core/run_core";
+import type { QuestPlan } from "../core/quest_plan";
 import { QuestInstaller } from "./quest_installer";
 import { QuestTransport } from "./quest_transport";
 import { clockSeconds, getSingleton, loadWebconsole, questManager, rejson,
@@ -12,8 +13,8 @@ export const ENTRY_QUEST_ID = 900103;
 const modes = ["single", "sequential", "simultaneous"] as const;
 type SteamSnapshot = NonNullable<ReturnType<NonNullable<NativeWebconsole["steam_snapshot"]>>>;
 type Lobby = SteamSnapshot["lobbies"][number];
-interface Plan { schema: 2; session: string; revision: number; owner: string; lobby: string;
-  index: number; hash: string; rules: string; intent: "prepare" | "post"; }
+interface Plan { schema: 3; seed: number; members: string[]; session: string; revision: number; owner: string; lobby: string;
+  index: number; hash: string; rules: string; intent: "prepare" | "post" | "cancel"; }
 function nullableIndex(lobby: REManagedObject, method: string): number | null {
   const value = lobby.call(method) as REManagedObject | null;
   if (!value || value.get_field("_HasValue") !== true) return null;
@@ -29,19 +30,27 @@ export function readLobbyIdentity(): { host: number | null; self: number | null;
   } catch { return { host: null, self: null, role: "unavailable" }; }
 }
 function key(plan: Plan): string {
-  return `${plan.schema}|${plan.lobby}|${plan.owner}|${plan.session}|${plan.revision}|${plan.index}|${plan.hash}|${plan.rules}|${plan.intent}`;
+  return `${plan.schema}|${plan.seed}|${plan.members.join(",")}|${plan.lobby}|${plan.owner}|${plan.session}|${plan.revision}|${plan.index}|${plan.hash}|${plan.rules}|${plan.intent}`;
 }
 function decode(text: string, lobby: Lobby): Plan | null {
   if (!text || text.length > 2048) return null;
   try {
     const p = rejson.load_string(text) as Plan | null;
-    return p?.schema === 2 && p.owner === lobby.owner && p.lobby === lobby.id &&
+    return p?.schema === 3 && Number.isInteger(p.seed) && p.seed >= 0 &&
+      Array.isArray(p.members) && p.members.length >= 1 && p.members.length <= 4 &&
+      p.members.every(id => typeof id === "string") && new Set(p.members).size === p.members.length && p.members.includes(p.owner) && p.owner === lobby.owner && p.lobby === lobby.id &&
       typeof p.session === "string" && p.session.length > 0 && p.session.length < 128 &&
       Number.isInteger(p.revision) && p.revision > 0 && Number.isInteger(p.index) && p.index >= 0 && p.index < 3 &&
-      typeof p.hash === "string" && p.hash.length === 64 && typeof p.rules === "string" && p.rules.length === 64 && (p.intent === "prepare" || p.intent === "post") ? p : null;
+      typeof p.hash === "string" && p.hash.length === 64 && typeof p.rules === "string" && p.rules.length === 64 && (p.intent === "prepare" || p.intent === "post" || p.intent === "cancel") ? p : null;
   } catch { return null; }
 }
 function bridge(): NativeWebconsole | null { try { return loadWebconsole(); } catch { return null; } }
+
+export interface EntryLifecycle {
+  prepare(plan: QuestPlan, installer: QuestInstaller, armor: string): void;
+  prepared(): boolean;
+  cancel(): void;
+}
 
 export class MultiplayerEntry {
   private installer: QuestInstaller | null = null;
@@ -58,30 +67,62 @@ export class MultiplayerEntry {
   private steam: SteamSnapshot = { available: false, reason: "等待 Steam 桥接", lobbies: [] };
   private lobby: Lobby | null = null;
   private message = "进入同一个在线大厅后，由大厅房主选波；队友自动同步。";
-  private readonly session = `${clockSeconds()}-${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
+  private session = `${clockSeconds()}-${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
+  private previewSeed = Math.floor(Math.random() * 0x7fffffff);
+  private armor: string;
+  private retired: string[] = [];
   constructor(private readonly config: RogueConfig, private readonly catalog: MonsterCatalog,
-    private readonly canPrepare: () => boolean, private readonly network = bridge()) {}
+    private readonly canPrepare: () => boolean, private readonly network = bridge(), private readonly lifecycle?: EntryLifecycle) {
+    this.armor = config.armorOptions[0]!;
+  }
+
+  setArmor(armor: string): void {
+    this.requireIdle();
+    if (this.lifecycle?.prepared()) throw new Error("本局已穿戴初始装备，请结束准备并恢复后再更换");
+    if (!this.config.armorOptions.includes(armor)) throw new Error("未知初始套装");
+    this.armor = armor;
+  }
+  resetForNextRun(): void {
+    if (this.plan) { this.retired.push(this.plan.session); if (this.retired.length > 32) this.retired.shift(); }
+    if (this.lobby) {
+      if (this.lobby.self === this.lobby.owner && this.plan?.intent !== "cancel") this.network?.steam_plan?.(this.lobby.id, "");
+      this.network?.steam_ack?.(this.lobby.id, "");
+    }
+    this.invalidate("上局已结束并恢复，可以准备新局");
+    this.session = `${clockSeconds()}-${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
+    this.previewSeed = Math.floor(Math.random() * 0x7fffffff);
+    this.revision = 0; this.lastPoll = -1;
+  }
+  cancel(): void {
+    if (questManager()?.call("isPlayQuest")) throw new Error("已进入战斗，请使用结束本局");
+    if (questManager()?.call("isActiveQuest")) throw new Error("请先在游戏菜单取消已承接任务；工具会自动恢复并开放新局");
+    if (this.plan && this.lobby?.self === this.lobby?.owner) this.publish({ ...this.plan, intent: "cancel", revision: ++this.revision });
+    this.lifecycle?.cancel(); this.resetForNextRun();
+  }
 
   private requireIdle(): void {
-    if (!this.canPrepare()) throw new Error("请先结束当前局并等待恢复；上一轮联机结束后需全队回村并重载脚本。");
+    if (!this.canPrepare()) throw new Error("请先结束当前局并等待装备与背包恢复。");
     if (questManager()?.call("isActiveQuest") !== false) throw new Error("请先取消或完成当前已承接任务。");
     if (this.pendingPost || this.transport?.isActive()) throw new Error("正在确认或承接任务，请等待。");
   }
-  private prepare(index: number): string {
-    if (this.config.quest.baseId !== 603 || this.config.quest.mapNo !== 10) throw new Error("联机实验仅支持模板603 / 斗技场10。");
-    const mode = modes[index];
-    if (!mode) throw new Error("无效的联机选项。");
+  private choices(seed: number, players: number) {
+    const core = new RunCore(this.config, seed);
+    core.startRun(this.config.armorOptions[0]!);
+    return core.generateChoices(players);
+  }
+  private prepare(index: number, seed: number, players: number): string {
+    if (this.config.quest.baseId !== 603 || this.config.quest.mapNo !== 10) throw new Error("联机仅支持模板603 / 斗技场10。");
     const cfg = { ...this.config, quest: { ...this.config.quest, id: ENTRY_QUEST_ID } };
-    const wave: WaveOption = { index, mode, typeTag: "MP-ENTRY", label: `联机入场 / ${mode}`,
-      monsters: mode === "single" ? ["Great Izuchi"] : ["Great Izuchi", "Great Baggi"],
-      tier: "weak", hpMul: 1, dmgMul: 1, rewardMul: 0, rewardPt: 0 };
-    const plan = makeQuestPlan(cfg, this.catalog, wave, 1, 1, mode === "sequential");
+    const wave = this.choices(seed, players)[index];
+    if (!wave) throw new Error("无效的联机选项");
+    const plan = makeQuestPlan(cfg, this.catalog, wave, 1, 1, wave.mode === "sequential");
     if (!this.installer) this.installer = new QuestInstaller(cfg, plan, true);
     this.installer.publish(plan, false);
+    this.lifecycle?.prepare(plan, this.installer, this.armor);
     return this.digest();
   }
   private rulesDigest(): string {
-    const hash = this.network?.steam_digest?.(canonical({ rules:this.config, runtimeProtocol:4 })) ?? "";
+    const hash = this.network?.steam_digest?.(canonical({ rules:this.config, runtimeProtocol:5 })) ?? "";
     if (hash.length !== 64) throw new Error("Cannot hash multiplayer rules");
     return hash;
   }
@@ -114,12 +155,14 @@ export class MultiplayerEntry {
     }
   }
   private invalidate(message: string): void {
+    this.lifecycle?.cancel();
     this.pendingPost = false; this.transport?.cancel();
     this.plan = null; this.lobby = null; this.applied = ""; this.attempted = ""; this.wire = "";
     this.message = message;
   }
   private acknowledged(lobby: Lobby, plan: Plan): boolean {
     return lobby.members.length >= 2 && lobby.members.some((m) => m.id === lobby.self) &&
+      lobby.members.map(m => m.id).sort().join(",") === plan.members.join(",") &&
       lobby.members.every((m) => m.ack === key(plan));
   }
   private publish(plan: Plan): void {
@@ -138,8 +181,9 @@ export class MultiplayerEntry {
     // Invalidate previous ACKs before local table mutation, including a failed preparation.
     if (!this.network!.steam_plan!(this.lobby.id, "")) throw new Error("无法撤销旧计划。");
     this.plan = null; this.applied = "";
-    const hash = this.prepare(index);
-    this.publish({ schema: 2, session: this.session, revision: ++this.revision,
+    const seed = this.previewSeed, members = this.lobby.members.map(m => m.id).sort();
+    const hash = this.prepare(index, seed, members.length);
+    this.publish({ schema: 3, seed, members, session: this.session, revision: ++this.revision,
       owner: this.lobby.owner, lobby: this.lobby.id, index, hash, rules: this.rulesDigest(), intent: "prepare" });
     this.message = "已通过 Steam 发布波次，等待所有队友自动准备并确认相同任务表。";
   }
@@ -172,6 +216,14 @@ export class MultiplayerEntry {
         const candidates = this.steam.lobbies.filter((l) => !!decode(l.plan, l));
         if (candidates.length !== 1) return;
         const lobby = candidates[0]!, plan = decode(lobby.plan, lobby)!;
+        if (this.retired.includes(plan.session)) return;
+        if (plan.intent === "cancel") {
+          if (this.plan?.session === plan.session) this.lifecycle?.cancel();
+          this.retired.push(plan.session); if (this.retired.length > 32) this.retired.shift();
+          this.invalidate("房主已取消本局准备，等待个人恢复后可重新同步");
+          this.network?.steam_ack?.(lobby.id, "cancelled"); return;
+        }
+        if (lobby.members.map(m => m.id).sort().join(",") !== plan.members.join(",")) return;
         const identity = key(plan);
         if (this.attempted === identity) return;
         this.attempted = identity; this.lobby = lobby; this.plan = plan;
@@ -181,7 +233,7 @@ export class MultiplayerEntry {
         }
         this.network!.steam_ack!(lobby.id, "preparing"); this.applied = "";
         if (this.rulesDigest() !== plan.rules) throw new Error("房主与本机配置不一致，请全队同步配置后重试");
-        const hash = this.prepare(plan.index);
+        const hash = this.prepare(plan.index, plan.seed, plan.members.length);
         if (hash !== plan.hash) throw new Error("两端原生任务表哈希不一致，请确认游戏及模组版本相同。");
         if (!this.network!.steam_ack!(lobby.id, identity)) throw new Error("Steam 准备回执提交失败。");
         this.applied = identity;
@@ -236,8 +288,10 @@ export class MultiplayerEntry {
       message: this.message, activeQuest: qm?.call("get_ActiveQuestNo") ?? null,
       playing: qm?.call("isPlayQuest") ?? false,
       nativeQuestPlayerCount: getSingleton("snow.LobbyManager")?.get_field("currentQuestPlayerCount") ?? null,
-      canPrepare: this.canPrepare(), options: modes.map((mode, index) => ({ index, mode,
-        label: mode === "single" ? "单怪：镰鼬龙王" : mode === "sequential" ? "顺序：镰鼬龙王 → 眠狗龙王" : "同时：镰鼬龙王 + 眠狗龙王" })),
+      canPrepare: this.canPrepare(), armor: this.armor, armorOptions: this.config.armorOptions,
+      prepared: this.lifecycle?.prepared() ?? false,
+      options: this.choices(this.plan?.seed ?? this.previewSeed, lobby?.members.length ?? 2).map(wave => ({
+        index: wave.index, mode: wave.mode, label: wave.label, rewardPt: wave.rewardPt, monsters: wave.monsters })),
       scope: "native-entry-experiment", verifiedTwoClients: false };
   }
 }

@@ -429,8 +429,9 @@ export class RunCore {
     return ok(`+${w.rewardPt} PT`);
   }
 
-  cart(): Result {
-    if (this.state.phase !== "Combat" && this.state.phase !== "Carve") {
+  cart(nativeQuestPlaying = false): Result {
+    if (this.state.phase !== "Combat" && this.state.phase !== "Carve" &&
+        !(nativeQuestPlaying && ["Choosing", "Prep"].includes(this.state.phase))) {
       return fail("不在战斗中");
     }
     this.state.cartsLeft--;

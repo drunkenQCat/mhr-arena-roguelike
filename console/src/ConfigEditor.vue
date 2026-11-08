@@ -210,6 +210,17 @@ function submit() {
           <label class="check"><input v-model="draft.startupRules.stripTalismans" type="checkbox" />卸下护石</label>
           <label class="check"><input v-model="draft.startupRules.stripInsect" type="checkbox" />卸下猎虫</label>
         </div>
+        <h3>普通清波补给掉落</h3>
+        <p class="muted">每只怪独立判定，每位玩家独立领取。概率为 0 时关闭；物品必须是商店中的真实道具，满袋不会重复发放或扣 PT。</p>
+        <button v-if="!draft.supplyDrops" @click="draft.supplyDrops = {chance:0.35,entries:[{itemId:'honey',count:1,weight:1}]}">启用补给掉落</button>
+        <template v-if="draft.supplyDrops">
+          <NumberField v-model="draft.supplyDrops.chance" label="每只怪掉落概率（0—1）" :step="0.05" />
+          <div v-for="(item,index) in draft.supplyDrops.entries" :key="index" class="equipment-entry">
+            <label>道具<select v-model="item.itemId"><option v-for="good in draft.shop.filter(x=>x.mode!=='service')" :key="good.id" :value="good.id">{{ good.name }}</option></select></label>
+            <NumberField v-model="item.count" label="数量" :min="1" /><NumberField v-model="item.weight" label="权重" :min="0.01" />
+            <button :disabled="draft.supplyDrops.entries.length<=1" @click="draft.supplyDrops.entries.splice(index,1)">移除</button>
+          </div><button @click="draft.supplyDrops.entries.push({itemId:'honey',count:1,weight:1})">添加掉落道具</button>
+        </template>
         <h3>单波增益 <span class="badge">保存后重载脚本生效</span></h3>
         <div v-if="draft.buffAmounts" class="fields"><NumberField v-model="draft.buffAmounts.atk" label="每次购买攻击增加" /><NumberField v-model="draft.buffAmounts.def" label="每次购买防御增加" /><NumberField v-model="draft.buffAmounts.crit" label="每次购买会心增加（%）" /></div>
         <h3>装备抽取池 <span class="badge">保存后重载脚本生效</span></h3>

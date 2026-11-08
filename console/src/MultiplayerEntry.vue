@@ -17,9 +17,17 @@ const emit = defineEmits<{ command: [cmd: string, extra: Record<string, unknown>
     <template v-else>
       <p class="eyebrow">与朋友一起狩猎</p>
       <div class="section-heading"><h2>联机大厅</h2><span class="badge">{{ !connected || !entry ? '等待大厅状态' : entry.role === 'host' ? '你是房主' : entry.role === 'guest' ? '你是队友' : '尚未进入大厅' }}</span></div>
-      <p>保留自己的装备与背包，清波奖励每人独立结算。</p>
+      <p>每人选择初始套装，原装备与背包会备份并在局末恢复。开局各有初始 PT，第一波也正常发放奖励。</p>
       <p class="notice" role="status">{{ entryGuidance(entry, connected) }}</p>
       <template v-if="connected && entry">
+        <label class="text-field">本机初始套装
+          <select :value="entry.armor" :disabled="busy || !entry.canPrepare || entry.prepared || entry.playing" @change="emit('command', 'mpEntry', { sub: 'setArmor', armor: ($event.target as HTMLSelectElement).value })">
+            <option v-for="armor in entry.armorOptions ?? []" :key="armor" :value="armor">{{ armor }}</option>
+          </select>
+        </label>
+        <p class="muted">先各自选好套装，再由房主选波。穿装和零物资准备成功后，即可进入开局商店。</p>
+        <button v-if="entry.prepared && !entry.playing" class="primary" @click="emit('play')">开局商店 · 使用初始 PT</button>
+        <button v-if="entry.prepared && !entry.playing && (entry.activeQuest == null || entry.activeQuest < 0)" :disabled="busy" @click="emit('command', 'mpEntry', { sub: 'cancel' })">取消本局准备并恢复</button>
         <p v-if="entry.mode">入场波次：<strong>{{ modeNames[entry.mode] ?? entry.mode }}</strong></p>
         <div v-if="entry.role === 'host' && !entry.playing" class="toolbar" aria-label="入场波次">
           <button v-for="option in entry.options ?? []" :key="option.index" :class="{ selected: entry.mode === option.mode }" :aria-pressed="entry.mode === option.mode"
@@ -46,7 +54,7 @@ const emit = defineEmits<{ command: [cmd: string, extra: Record<string, unknown>
           <li>所有人安装同一版本，通过游戏信使创建或加入同一个在线大厅。</li>
           <li>房主选择入场波次，等待全队“任务表一致”；队友不用选怪、复制任务码或输入 IP。</li>
           <li>房主承接任务，全队确认后打开柜台；队友从游戏内任务板加入。</li>
-          <li>在游戏内确认参战名单与准备状态，房主手动出发。入场后到“当前局”购物与选波。</li>
+          <li>在游戏内确认参战名单与准备状态，房主手动出发。准备好任务后可先到“当前局”购物，再出发。</li>
         </ol>
         <p class="muted">至少两名真实 Steam 大厅成员全部确认才能承接。本机双客户端已通过测试，跨电脑官方 Steam 仍待验收；请在约好的私人大厅测试。</p>
       </details>

@@ -49,21 +49,6 @@ function entryName(entry: REManagedObject | null): string | null {
   }
 }
 
-/** 发放后按 id 找回条目对象（grantEquip 只回索引；名字读回需要对象本身）。 */
-function findEntryObject(box: REManagedObject, idVal: number, idType: number): REManagedObject | null {
-  try {
-    const list = box.get_field("_WeaponArmorInventoryList") as REManagedObject | null;
-    if (!list) return null;
-    const count = list.call("get_Count") as number;
-    for (let i = 0; i < count; i++) {
-      const e = list.call("get_Item", i) as REManagedObject | null;
-      if (!e) continue;
-      if ((e.get_field("_IdVal") as number) === idVal && (e.get_field("_IdType") as number) === idType) return e;
-    }
-  } catch { /* 名字读不到不影响交付 */ }
-  return null;
-}
-
 export class GachaService {
   constructor(private readonly pools: Record<string, GachaPoolSpec>, private readonly deps: GachaDeps) {}
 
@@ -82,12 +67,14 @@ export class GachaService {
     const entry: GachaEntry = pool.entries[picked]!;
     const box = equipmentBox();
     if (!box) return { ok: false, reason: "EquipBox unavailable" };
-    const grant = grantEquip(box, entry.id, entry.kind, appendGrantedEntry);
+    const grant = grantEquip(box, entry.id, entry.kind, appendGrantedEntry, false);
     if (!grant.ok || grant.boxIndex === undefined) {
       return { ok: false, uncertain: grant.uncertain,
         reason: grant.reason ?? "发放未生效", kind: entry.kind, id: entry.id };
     }
-    const name = entryName(findEntryObject(box, entry.id, entry.kind === "armor" ? 2 : 1));
+    let name: string | null = null;
+    try { name = entryName((box.get_field("_WeaponArmorInventoryList") as REManagedObject | null)?.call("get_Item", grant.boxIndex) as REManagedObject | null); }
+    catch { /* Delivery was already verified; a missing display name cannot refund it. */ }
     if (grant.reused) {
       relog.info(`[MhwRogue] 抽取复用已有装备: ${name ?? entry.id}`);
     } else {

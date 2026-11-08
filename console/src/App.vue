@@ -24,6 +24,9 @@ const heartbeat = new Freshness();
 const developerMode = ref(false);
 let alive = true, timer: ReturnType<typeof setTimeout> | undefined, loadedBridge = "";
 const connected = computed(() => !stale.value && state.value?.protocol === 4);
+watch(() => state.value?.sessionStage, (stage, previous) => {
+  if (stage === "Preparing" && previous !== stage && page.value === "multiplayer") page.value = "play";
+});
 watch(() => state.value?.multiplayerRun?.live, (live, previous) => {
   if (live && !previous && page.value === 'multiplayer') page.value = 'play';
 });

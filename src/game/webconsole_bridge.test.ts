@@ -265,3 +265,19 @@ it("does not let automatic result steps replace the external command receipt",()
  vi.spyOn(ui,"poll").mockReturnValue({id:"return-7-1",internal:true,status:"applied"});
  f.tick();expect(host.files["webconsole_results.json"].last.id).toBe(receipt.id);
 });
+
+
+it("verifies multiplayer teleport against the local guest and preserves arrival evidence across a faint", () => {
+ const f=fixture();f.session.start(f.cfg.armorOptions[0]!);f.session.choose(0);
+ f.reading.quest={id:f.cfg.quest.id,unique:42,playing:true,status:"play"};f.reading.canPost=false;f.tick();
+ f.reading.online=true;f.reading.localPlayerId=1;
+ Object.assign((f.session as any).port,{multiplayerRole:()=>"guest",multiplayerValid:()=>true});
+ Object.assign(f.runtime,{multiplayerValid:()=>true});
+ f.reading.players=[{id:0,position:{x:104,y:5,z:80}},{id:1,position:{x:10,y:50,z:47}}];
+ const receipt=f.command("teleport",{to:"monster"},"guest-warp");expect(receipt.status).toBe("queued");
+ f.tick();expect(host.files["webconsole_results.json"].last.status).toBe("queued");
+ f.reading.players[1]!.position={x:104,y:5,z:80};f.tick();
+ expect(host.files["webconsole_results.json"].last).toMatchObject({status:"applied",position:{x:104,y:5,z:80},verifiedAt:host.now});
+ f.reading.players[1]!.position={x:0,y:50,z:47};f.tick();
+ expect(host.files["webconsole_results.json"].last.position).toEqual({x:104,y:5,z:80});
+});

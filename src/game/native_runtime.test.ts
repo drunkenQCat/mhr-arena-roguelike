@@ -157,10 +157,10 @@ it("does not capture village actors as quest players during the entry transition
   qm.call.mockImplementation((name: string) => name === "isActiveQuest" ? true : name === "isPlayQuest" ? playing :
     name === "isEndLoadQuest" ? loaded : name === "get_ActiveQuestNo" ? plan.questId : null);
   Object.assign(qm, { get_field: (name: string) => name === "_QuestElapsedSec" ? elapsed : null });
-  const player = (type: string, x: number) => ({ get_type_definition: () => ({ get_full_name: () => type }),
+  const player = (type: string, x: number) => ({ get_address: () => x + 10000, get_type_definition: () => ({ get_full_name: () => type }),
     get_field: () => ({x, y:50, z:47}) });
   let actors = [player("snow.player.PlayerLobbyBase", -1498), player("snow.player.LongSword", 2)];
-  const pm = {get_field: () => ({get_size: () => actors.length, get_element: (i: number) => actors[i]}), call: () => true};
+  const pm = {get_field: () => ({get_size: () => actors.length, get_element: (i: number) => actors[i]}), call: (name: string) => name === "findMasterPlayer" ? actors[1] ?? actors[0] : true};
   mock.singleton.mockImplementation((name: string) => name === "snow.player.PlayerManager" ? pm :
     name === "snow.enemy.EnemyManager" ? {call: () => 0} : name === "snow.stage.StageManager" ? {call: () => false} : null);
   expect(runtime.read().players).toEqual([{id:1, position:{x:2,y:50,z:47}}]);
@@ -187,4 +187,18 @@ it("discards a queued native finish when its runtime is detached", () => {
   Object.assign(qm, {get_field: () => 2});
   runtime.finish(true); runtime.shutdown(); hooks("snow.QuestManager", "update").post(0);
   expect(qm.call.mock.calls.some(c => c[0] === "setQuestFail")).toBe(false);
+});
+
+
+it("does not release completed native objectives before an owned failure has been processed", () => {
+ const {runtime,qm,plan,hooks,foreign}=fixture();let status=2;
+ qm.call.mockImplementation((n:string)=>n==="isActiveQuest"||n==="isPlayQuest"?true:n==="get_ActiveQuestNo"?plan.questId:n==="getActiveQuestUniqueNo"?12:null);
+ Object.assign(qm,{get_field:()=>status});runtime.policy(plan,true);
+ runtime.policy(null,false);runtime.finish(true);
+ const clear=hooks("snow.QuestManager","setQuestClear"), check=hooks("snow.QuestManager","checkQuestClear");
+ expect(clear.pre()).toBe(1);expect(check.post(1)).toBe(0);
+ hooks("snow.QuestManager","update").post(0);expect(qm.call).toHaveBeenCalledWith("setQuestFail",1);
+ status=4;expect(clear.pre()).toBe(1);
+ qm.call.mockImplementation((n:string)=>n==="get_ActiveQuestNo"?101:n==="getActiveQuestUniqueNo"?13:true);
+ expect(clear.pre()).toBe(0);
 });

@@ -103,13 +103,14 @@ describe("gacha", () => {
     expect(svc.roll("gacha_1").id).toBe(0x0c100009);
   });
 
-  it("已有装备复用：reused=true（不得进清理清单）", () => {
+  it("同款抽取仍发独立临时装备，玩家原有条目不进回收清单", () => {
     host.entries[0] = { _IdType: 2, _IdVal: 0x0c100009, _Name: "合金头盔" };
     const svc = new GachaService(POOLS, { rollIndex: () => 0 });
     const r = svc.roll("gacha_1");
     expect(r.ok).toBe(true);
-    expect(r.reused).toBe(true);
-    expect(r.name).toBe("合金头盔");
+    expect(r.reused).toBe(false);
+    expect(r.boxIndex).toBe(1);
+    expect(host.entries[0]!._Name).toBe("合金头盔");
   });
 
   it("空池/未配置 → 拒绝", () => {
@@ -153,4 +154,12 @@ it("refuses delivery when the cleanup journal cannot be saved",()=>{
   const svc=new GachaService(POOLS,{rollIndex:()=>0});
   expect(svc.roll("gacha_1").ok).toBe(false);
   expect(host.entries.every(e=>e._IdType===0)).toBe(true);
+});
+
+
+it("does not refund a verified equipment grant just because its display-name lookup failed",()=>{
+ const original=boxFacade.get_field;let reads=0;
+ boxFacade.get_field=(n:string)=>{reads++;if(reads>3 && host.entries.some(e=>e._IdType!==0))throw Error("name list unavailable");return original(n);};
+ const r=new GachaService(POOLS,{rollIndex:()=>0}).roll("gacha_1");
+ expect(r.ok).toBe(true);expect(host.entries.filter(e=>e._IdType!==0)).toHaveLength(1);
 });

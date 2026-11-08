@@ -19,7 +19,7 @@ export function entryGuidance(entry: ConsoleState['multiplayerEntry'], connected
   if (!connected) return '正在等待游戏连接，请保持游戏开启并进入村庄。';
   if (!entry) return '正在读取大厅状态，请稍候。';
   if (entry.playing) return '当前已进入任务，请到“当前局”查看进度和购买补给。';
-  if (!entry.canPrepare) return '先结束当前局并回村，等待装备与背包恢复；如上一轮联机已结束，全队在村庄安全重载脚本后再开局。';
+  if (!entry.canPrepare) return '等待当前局结算、回村和个人装备、背包恢复；完成后可直接准备新局。';
   if (!entry.sync.available) return entry.sync.reason || 'Steam 同步暂不可用，请检查游戏内的连接状态。';
   if (!entry.sync.lobby) return '在游戏信使处创建或加入同一个在线大厅。';
   if (entry.posting) return '正在确认全队任务表，请等待游戏打开柜台。';
@@ -27,7 +27,7 @@ export function entryGuidance(entry: ConsoleState['multiplayerEntry'], connected
   if (entry.canPost) return '任务已准备好，可以承接联机任务；出发前在游戏内确认参战名单。';
   return '选择入场波次，等待所有队友的任务表一致后承接任务。';
 }
-export const stageNames: Record<string, string> = { Idle: '未开局', Selecting: '整备 · 选择波次', AwaitQuest: '等待进入任务', Combat: '战斗中', Carve: '剥取 · 集结', Returning: '返回村庄', Finished: '本局结束', Fault: '需要处理' };
+export const stageNames: Record<string, string> = { Idle: '未开局', Preparing: '联机开局整备', Selecting: '整备 · 选择波次', AwaitQuest: '等待进入任务', Combat: '战斗中', Carve: '剥取 · 集结', Returning: '返回村庄', Finished: '本局结束', Fault: '需要处理' };
 const names = new Map(Object.values(catalog).map(m => [m.id, m.cn]));
 export const monsterName = (id: number) => names.get(id) ?? `怪物 ${id}`;
 export const stat = (n?: number | null) => n == null || !Number.isFinite(n) ? '—' : String(Number(n.toFixed(4)));
@@ -64,6 +64,7 @@ export function nextStep(s: ConsoleState | null, connected: boolean): string {
   if (['Idle', 'Finished', 'Fault'].includes(s.sessionStage) && s.control?.startup.restorePending)
     return '请回村，等待原装备与背包恢复完成后再开局。';
   switch (s.sessionStage) {
+    case 'Preparing': return '已穿戴初始装备并隔离背包，可用初始 PT 购物；全队加入任务后，由房主手动出发。';
     case 'Selecting': if (s.multiplayerRun?.role === 'guest') return '可在本机购买补给，等待房主选择下一波；请留在起点集结。'; return '先购买补给或服务，再选择下一波。选定后自动开始战斗流程。';
     case 'AwaitQuest': return '等待任务接取与出发；失败时查看提示，再使用重试出发。';
     case 'Combat': return '讨伐本波全部目标；两只怪之间的空场不会结算。';

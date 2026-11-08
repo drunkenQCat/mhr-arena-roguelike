@@ -13,6 +13,8 @@ const wave = computed(() => props.state?.control?.activeWave);
 const buffs = computed(() => props.state?.services?.buffs);
 const categories = computed(() => orderedCategories(Object.keys(props.state?.shop ?? {})));
 const idle = computed(() => !props.state || ['Idle', 'Finished'].includes(props.state.sessionStage));
+const summary = computed(() => props.state?.runSummary ?? props.state?.previousRun);
+const lootName = (id: string) => Object.values(props.state?.shop ?? {}).flat().find(x=>x.id===id)?.name ?? id;
 const finished = computed(() => props.state?.sessionStage === 'Finished');
 const guest = computed(() => props.state?.multiplayerRun?.role === 'guest');
 const choiceBlocked = computed(() => chooseReason(props.state, props.connected, props.busy));
@@ -28,10 +30,12 @@ const rewardDifference = (reward: number) => {
   const difference = reward - single.rewardPt;
   return `比本轮单怪${difference > 0 ? '多' : '少'} ${Math.abs(difference)} PT`;
 };
-const selecting = computed(() => props.state?.sessionStage === 'Selecting');
+const preparing = computed(() => props.state?.sessionStage === 'Preparing');
+const selecting = computed(() => preparing.value || props.state?.sessionStage === 'Selecting');
 const combat = computed(() => props.state?.sessionStage === 'Combat');
 const carving = computed(() => props.state?.sessionStage === 'Carve');
-const distance = computed(() => prep.value?.players?.[0]?.campDistance);
+const distance = computed(() => prep.value?.players?.find(p => p.id === prep.value?.localPlayerId)?.campDistance ??
+  (!props.state?.online ? prep.value?.players?.[0]?.campDistance : null));
 const goods = computed(() => Object.values(props.state?.shop ?? {}).flat().filter(item =>
   (category.value === '全部' || item.category === category.value) &&
   `${item.name} ${item.desc ?? ''}`.toLowerCase().includes(search.value.trim().toLowerCase())));
@@ -65,21 +69,23 @@ const transactionText = computed(() => {
       <div><small>可用 PT</small><strong class="gold">{{ state?.pt ?? '—' }}</strong></div>
       <div><small>剩余猫车</small><strong>{{ state?.cartsLeft ?? '—' }} / {{ state?.maxCarts ?? '—' }}</strong></div>
     </section>
-    <nav v-if="selecting" class="prep-switch" aria-label="整备操作"><button :class="{ selected: prepView === 'shop' }" :aria-pressed="prepView === 'shop'" @click="prepView = 'shop'">补给商店</button><button :class="{ selected: prepView === 'choices' }" :aria-pressed="prepView === 'choices'" @click="prepView = 'choices'">{{ guest ? '查看候选波次' : '选择下一波' }}</button></nav>
+    <nav v-if="selecting" class="prep-switch" aria-label="整备操作"><button :class="{ selected: prepView === 'shop' }" :aria-pressed="prepView === 'shop'" @click="prepView = 'shop'">补给商店</button><button v-if="!preparing" :class="{ selected: prepView === 'choices' }" :aria-pressed="prepView === 'choices'" @click="prepView = 'choices'">{{ guest ? '查看候选波次' : '选择下一波' }}</button></nav>
     </div>
 
-    <section v-if="finished" class="panel run-summary" aria-label="本局结果">
+    <section v-if="finished || (idle && summary)" class="panel run-summary" aria-label="本局结果">
       <p class="eyebrow">本次狩猎记录</p><h2>本局已结束</h2>
-      <p>到达第 <strong class="gold">{{ state?.layer }}</strong> 层 · 剩余 <strong class="gold">{{ state?.pt }} PT</strong> · 剩余猫车 {{ state?.cartsLeft }} / {{ state?.maxCarts }}</p>
-      <p>{{ state?.cartsLeft === 0 ? '猫车次数已耗尽。' : '本局流程已结束。' }}{{ state?.control?.startup.restorePending ? '请回村等待原装备与背包恢复。' : '可查看下方购买记录，再准备下一局。' }}</p>
-      <p v-if="state?.message" class="muted">游戏说明：{{ state.message }}</p>
+      <p v-if="summary">清除 {{ summary.clearedWaves }} 波 · 获得 {{ summary.earnedPt }} PT · 消费 {{ summary.spentPt }} PT · 余款 {{ summary.balance }} PT · 时长 {{ Math.floor(summary.durationSeconds / 60) }} 分 {{ Math.floor(summary.durationSeconds % 60) }} 秒</p>
+      <p v-if="summary" class="muted">{{ summary.restored ? '个人装备与背包已恢复，可以直接准备下一局。' : '等待回村恢复个人装备与背包。' }}</p>
+      <p v-if="finished">到达第 <strong class="gold">{{ state?.layer }}</strong> 层 · 剩余 <strong class="gold">{{ state?.pt }} PT</strong> · 剩余猫车 {{ state?.cartsLeft }} / {{ state?.maxCarts }}</p>
+      <p v-if="finished">{{ state?.cartsLeft === 0 ? '猫车次数已耗尽。' : '本局流程已结束。' }}{{ state?.control?.startup.restorePending ? '请回村等待原装备与背包恢复。' : '可查看下方购买记录，再准备下一局。' }}</p>
+      <p v-if="finished && state?.message" class="muted">游戏说明：{{ state.message }}</p>
       <p v-if="state?.ui?.returnFlow" role="status">{{ state.ui.returnFlow.message }}</p>
       <small>显示游戏保留的本局状态；剩余 PT 不代表累计收益。</small>
     </section>
 
     <section v-if="idle" class="panel stage-panel">
       <p class="eyebrow">开始狩猎</p><h2>准备新的一局</h2>
-      <div class="entry-options"><div><h3>与朋友联机</h3><p class="muted">保留自己的装备与背包，在游戏内创建或加入大厅。</p><button :class="{ primary: state?.online }" @click="emit('multiplayer')">前往联机大厅</button></div><div><h3>单人挑战</h3><p class="muted">使用下方开局方案，按本局规则准备装备与物资。</p></div></div>
+      <div class="entry-options"><div><h3>与朋友联机</h3><p class="muted">在游戏内进入同一大厅，选择初始套装；个人装备与物资会备份，局末恢复。</p><button :class="{ primary: state?.online }" @click="emit('multiplayer')">前往联机大厅</button></div><div><h3>单人挑战</h3><p class="muted">使用下方开局方案，按本局规则准备装备与物资。</p></div></div>
       <template v-if="!state?.online">
       <p class="guidance">{{ nextStep(state, connected) }}</p>
       <label class="text-field">选择开局防具<select v-model="armor" :disabled="!allowed.start"><option v-for="item in state?.armorOptions ?? []" :key="item">{{ item }}</option></select></label>
@@ -115,6 +121,9 @@ const transactionText = computed(() => {
         <div class="chips"><span v-for="(member, index) in state.multiplayerRun.members ?? []" :key="member.id" :class="['badge', member.ready ? 'live' : 'pending']">{{ member.self ? '你' : '队员 ' + (index + 1) }} · {{ member.ready ? '同步已确认' : '等待同步' }}</span></div>
       </template>
     </section>
+    <section v-if="state?.supplyLoot?.length" class="panel" aria-label="清波补给">
+      <h2>本局最近掉落</h2><p v-for="(item,index) in state.supplyLoot" :key="index">{{ lootName(item.itemId) }} × {{ item.actual }}<small v-if="!item.granted">{{ item.reason || '背包已满或无法完整接收，未扣 PT' }}</small></p>
+    </section>
     <div v-if="selecting" class="prep-workbench" :data-view="prepView">
       <section class="panel shop-panel"><div class="section-heading"><div><p class="eyebrow">波次间整备</p><h2>购买补给</h2></div><div class="balance">可用 <strong>{{ state?.pt ?? '—' }} PT</strong></div></div>
         <p v-if="!state?.shopAvailable" class="notice">{{ state?.shopReason || '当前无法购买，请等待游戏准备完成。' }}</p><p v-else class="muted">{{ guest ? '按需购买补给，完成后等待房主选波。' : '补给按需购买，准备完毕后选择下一波。' }}</p>
@@ -123,9 +132,10 @@ const transactionText = computed(() => {
         <div class="tabs"><button v-for="tab in ['全部', ...categories]" :key="tab" :class="{ selected: category === tab }" @click="category = tab">{{ tab }}</button></div>
         <label class="text-field">查找商品<input v-model="search" type="search" placeholder="商品名或说明" /></label>
         <div class="table-scroll"><table><thead><tr><th>商品</th><th>持有 / 上限</th><th>价格</th><th>交易</th></tr></thead><tbody><tr v-for="item in goods" :key="item.id"><td><b>{{ item.name }}</b><small v-if="item.desc">{{ item.desc }}</small></td><td>{{ item.mode === 'service' ? '服务' : `${item.owned} / ${item.cap}` }}</td><td class="gold">{{ item.price }} PT</td><td><button :disabled="!allowed.buy || !item.canBuy" @click="command('buy', { itemId: item.id })">{{ buyLabel(item.mode, item.id) }}</button><small v-if="!item.canBuy && state?.shopAvailable">{{ item.reason || '当前不可购买' }}</small></td></tr></tbody></table></div>
+        <p class="muted">装备抽取会新增本局临时条目；在原生道具箱或营地帐篷中更换装备，局末回收并恢复原装。</p>
         <p v-if="!goods.length" class="muted">没有符合条件的商品。</p>
       </section>
-      <section class="panel choices-panel"><div class="section-heading"><div><p class="eyebrow">{{ guest ? '由房主决定出战' : '准备好即可出战' }}</p><h2>{{ guest ? '本轮候选波次' : '选择下一波' }}</h2></div><span v-if="!guest" class="muted">选定即出战</span></div>
+      <section v-if="!preparing" class="panel choices-panel"><div class="section-heading"><div><p class="eyebrow">{{ guest ? '由房主决定出战' : '准备好即可出战' }}</p><h2>{{ guest ? '本轮候选波次' : '选择下一波' }}</h2></div><span v-if="!guest" class="muted">选定即出战</span></div>
         <p class="muted">生命 / 伤害为相对原生基础值的规则倍率，非最终实机数值；双怪倍率按每只计算。</p>
         <p v-if="choiceBlocked" class="reason" role="status">{{ choiceBlocked }}</p>
         <div v-if="state?.choices?.length" class="choice-grid"><article v-for="choice in state.choices" :key="choice.index" class="subpanel"><span class="badge">{{ modeNames[choice.mode ?? ''] ?? choice.label }}</span><h3>{{ choice.monsters.join(' + ') }}</h3><p>{{ modeHints[choice.mode ?? ''] }}</p><p class="muted">生命约 {{ percent(choice.hpMul) }}% · 伤害约 {{ percent(choice.dmgMul) }}%</p><strong class="gold">{{ choice.rewardPt }} PT</strong><small v-if="choice.mode !== 'single'">{{ rewardDifference(choice.rewardPt) }}</small><button v-if="!guest" class="primary" :disabled="!allowed.choose" @click="command('choose', { index: choice.index })">选择{{ modeNames[choice.mode ?? ''] ?? '此波' }}并开始</button></article></div>

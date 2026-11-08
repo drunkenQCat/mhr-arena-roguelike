@@ -361,7 +361,7 @@
     },
     {
       "Id": "fishscale",
-      "Name": "磨刀鱼鳞",
+      "Name": "大切味鱼（快速磨刀）",
       "Category": "基础补给",
       "Price": 30,
       "Cap": 5,
@@ -823,6 +823,16 @@
       "Mode": "service"
     }
   ],
+  "SupplyDrops": {
+    "Chance": 0.35,
+    "Entries": [
+      { "ItemId": "ammo_n2", "Count": 10, "Weight": 3 },
+      { "ItemId": "ammo_p2", "Count": 10, "Weight": 2 },
+      { "ItemId": "mat_husk", "Count": 5, "Weight": 3 },
+      { "ItemId": "honey", "Count": 1, "Weight": 2 },
+      { "ItemId": "fishscale", "Count": 1, "Weight": 1 }
+    ]
+  },
   "Runtime": {
     "Route": "inPlace",
     "SpawnMode": "sequential",

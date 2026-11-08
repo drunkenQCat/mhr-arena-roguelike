@@ -64,7 +64,7 @@ export class WebConsoleBridge {
 
   constructor(private readonly session: RunSession, private readonly runtime: NativeRuntime,
     private readonly shop: ShopWindow, private readonly serviceStatus: () => unknown = () => null,
-    party?: PartySession, private readonly multiplayerEntry?: MultiplayerEntry) {
+    party?: PartySession, private readonly multiplayerEntry?: MultiplayerEntry, private readonly previousRun: () => unknown = () => null) {
     this.party = party ?? new PartySession(this.session.configForEditing(), { layer: () => this.session.core.state.layer }, `run-${clockSeconds()}`);
     this.transport = loadWebconsole();
     this.bridgeId = `${this.transport.epoch()}-${clockSeconds()}-${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
@@ -74,6 +74,7 @@ export class WebConsoleBridge {
 
   newScriptSession(): void {
     this.closed = true;
+    this.nativeUi.shutdown();
     this.transport.publish_state(rejson.dump_string({ ok: false, closed: true, bridgeId: this.bridgeId }, 0));
   }
 
@@ -83,7 +84,7 @@ export class WebConsoleBridge {
       if (this.pendingReceipt && !this.writeResults(this.pendingReceipt)) return;
       this.pollEffect();
       const endedQuest = this.session.readingSnapshot?.quest;
-      if (this.session.stage === "Finished" && this.session.plan && endedQuest?.id === this.session.plan.questId)
+      if (["Finished", "Fault"].includes(this.session.stage) && this.session.plan && endedQuest?.id === this.session.plan.questId && !endedQuest.playing)
         this.nativeUi.beginReturn(endedQuest.id, endedQuest.unique);
       this.nativeUi.tickReturn();
       const uiResult = this.nativeUi.poll();
@@ -96,6 +97,8 @@ export class WebConsoleBridge {
         const result = this.results.find((entry) => entry.id === this.purchase!.id);
         if (result) {
           Object.assign(result, this.shop.lastTransaction);
+          // An applied receipt must not race the previous wallet snapshot.
+          this.publish();
           const saved = this.writeResults(result);
           if (!saved) return;
         }
@@ -122,8 +125,12 @@ export class WebConsoleBridge {
     if (reading.quest?.unique !== effect.unique) { status = "uncertain"; message = "Quest changed before effect could be verified"; }
     else if (effect.kind === "teleport") {
       const target = effect.destination!;
-      const pos = reading.players[0]?.position;
-      if (pos && (pos.x-target.x)**2 + (pos.y-target.y)**2 + (pos.z-target.z)**2 <= 25) { status = "applied"; message = "Position verified"; }
+      const pos = reading.localPlayerId != null ? reading.players.find(p => p.id === reading.localPlayerId)?.position
+        : !reading.online ? reading.players[0]?.position : null;
+      if (pos && (pos.x-target.x)**2 + (pos.y-target.y)**2 + (pos.z-target.z)**2 <= 25) {
+        status = "applied"; message = "Position verified";
+        result.position = {...pos}; result.verifiedAt = reading.time;
+      }
     } else {
       const deaths = reading.enemies.filter((e) => e.dead || e.captured).map((e) => e.uid);
       if (effect.targets!.every((uid) => deaths.includes(uid) || reading.enemies.some((e) => e.uid === uid && (e.dead || e.captured)))) {
@@ -212,6 +219,8 @@ export class WebConsoleBridge {
         if (cmd.sub === "choose") this.multiplayerEntry.choose(cmd.index!);
         else if (cmd.sub === "retrySync") this.multiplayerEntry.retrySync();
         else if (cmd.sub === "post") this.multiplayerEntry.post();
+        else if (cmd.sub === "setArmor") this.multiplayerEntry.setArmor(cmd.armor!);
+        else if (cmd.sub === "cancel") this.multiplayerEntry.cancel();
         else throw new Error("无效的联机入场命令。");
         return { status: "applied", message: "联机操作已提交；请查看全队同步和承接状态。" };
       }
@@ -228,7 +237,7 @@ export class WebConsoleBridge {
         activeRules: { startPt: s.core.config.startPt, maxCarts: s.core.config.maxCarts,
           runtime: s.settings }, configVersion: this.configVersion };
       case "submitConfig": {
-        if (s.multiplayerRole) throw new Error("联机局中不支持单机修改配置；请停局后全队同步配置再开局");
+        if (s.multiplayerRole || s.stage === "Preparing") throw new Error("联机准备或局中不支持单机修改配置；请停局后全队同步配置再开局");
         if (this.shop.busy) throw new Error("请等待商店交易完成后提交配置");
         if (cmd.configVersion !== this.configVersion) throw new Error("配置已被其他页面修改，请重新载入并合并");
         const cfg = validateConfig(cmd.config);
@@ -324,8 +333,9 @@ export class WebConsoleBridge {
         return { status: "queued", message: "Waiting for native death evidence", targets };
       }
       case "teleport": {
-        if (!s.plan || !s.readingSnapshot?.quest?.playing || (s.readingSnapshot.online && !this.runtime.allowEntryHostTest?.(s.readingSnapshot)) ||
-          !["Combat", "Carve", "Returning", "Selecting"].includes(s.stage)) throw new Error("TP requires an active solo arena run");
+        if (!s.plan || !s.readingSnapshot?.quest?.playing || (s.readingSnapshot.online &&
+            !this.runtime.multiplayerValid?.() && !this.runtime.allowEntryHostTest?.(s.readingSnapshot)) ||
+          !["Combat", "Carve", "Returning", "Selecting"].includes(s.stage)) throw new Error("TP requires an owned active arena run");
         if (this.effect) throw new Error("Another test effect is pending");
         if (cmd.to !== "origin" && cmd.to !== "monster") throw new Error("Use origin or monster");
         const target = cmd.to === "origin" ? s.campSnapshot
@@ -341,7 +351,10 @@ export class WebConsoleBridge {
       case "retryPost": {
         const r = s.retryPost(); return { status: r.ok ? "applied" : "rejected", message: r.message };
       }
-      case "stop": s.stop(); return { status: "applied", message: "已停止本局" };
+      case "stop":
+        if (s.stage === "Preparing" && this.multiplayerEntry) this.multiplayerEntry.cancel();
+        else s.stop();
+        return { status: "applied", message: "已停止本局" };
       case "setRoute": {
         if (!["Idle", "Finished", "Fault"].includes(s.stage)) throw new Error("路线只能在开局前切换");
         if (cmd.route !== "inPlace" && cmd.route !== "reentry") throw new Error("无效路线");
@@ -410,7 +423,7 @@ export class WebConsoleBridge {
     const next = s.configForEditing();
     const idle = ["Idle", "Finished", "Fault"].includes(s.stage);
     const entryHostTest = !!r && !!this.runtime.allowEntryHostTest?.(r);
-    const activeSolo = !!r?.quest?.playing && (!r?.online || entryHostTest) && !!s.plan;
+    const activeSolo = !!r?.quest?.playing && (!r?.online || entryHostTest || this.runtime.multiplayerValid?.()) && !!s.plan;
     const ready = this.runtime.ready?.() ?? false;
     const canStart = idle && ready && !r?.online && !!r?.canPost && (!r?.quest || !!r.staleQuest) && !s.startupStatus.restorePending;
     const alive = r?.enemies.some((enemy) => !enemy.dead && !enemy.captured) ?? false;
@@ -429,7 +442,8 @@ export class WebConsoleBridge {
       entryHostTest,
       // 评审二轮 #1：party 会话身份直接发布在顶层，CLI 无需解析 businessParty。
       partyGeneration: this.party.active ? this.party.currentGeneration() : null,
-      killedUltimates: core.state.killedUltimates,
+      previousRun: this.previousRun(), runSummary: ["Finished","Fault"].includes(s.stage) ? s.runSummary() : null,
+      supplyLoot:s.supplyLoot, killedUltimates: core.state.killedUltimates,
       invincible: this.runtime.testTools.invincible,
       activeWave: core.state.activeWave?.label ?? null, preparation: s.preparation(),
       enemies: r?.enemies ?? [], choices: s.stage === "Selecting" ? core.state.currentChoices : [],

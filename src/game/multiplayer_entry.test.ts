@@ -31,7 +31,7 @@ vi.mock("./quest_transport", () => ({ QuestTransport: class {
   tick() {}
   getError() { return null; }
 } }));
-function fixture() {
+function fixture(lifecycle?: import("./multiplayer_entry").EntryLifecycle) {
   const server = { plan: "", owner: "100", members: ["100", "200"], acks: {} as Record<string, string> };
   const port = (self: string): NativeWebconsole => ({
     ping: (s) => s, epoch: () => 1, take_commands: () => [], publish_state: () => {}, publish_results: () => {},
@@ -41,7 +41,7 @@ function fixture() {
     steam_ack: (_lobby, value) => { server.acks[self] = value; return true; },
     steam_digest: (s) => createHash("sha256").update(s).digest("hex"),
   });
-  const make = (self: string) => new MultiplayerEntry(validateConfig(defaultConfig), monsterCatalog, () => mock.canPrepare, port(self));
+  const make = (self: string) => new MultiplayerEntry(validateConfig(defaultConfig), monsterCatalog, () => mock.canPrepare, port(self), lifecycle);
   const host = make("100"), guest = make("200");
   const as = <T>(self: number, action: () => T): T => { mock.self = self; return action(); };
   const tick = (self: number, e: MultiplayerEntry) => as(self, () => { mock.now++; e.tick(); });
@@ -60,7 +60,9 @@ it("does not interpret nullable offline indices as a host", () => {
 });
 it("automatically prepares the guest and requires fresh ACKs before hall posting", () => {
   const f = fixture(); f.prepare();
-  expect(mock.publish.mock.calls[0]![0]).toMatchObject({ questId: 900103, sequential: false, monsterIds: [98, 54] });
+  expect(mock.publish.mock.calls[0]![0]).toMatchObject({ questId: 900103, sequential: false });
+  expect(mock.publish.mock.calls[0]![0].wave.rewardPt).toBeGreaterThan(0);
+  expect(mock.publish.mock.calls[0]![0].wave.hpMul).toBeGreaterThan(0);
   expect(f.host.snapshot().canPost).toBe(true);
   const oldAck = f.server.acks["200"];
   f.as(0, () => f.host.post());
@@ -157,4 +159,32 @@ it("keeps entry transport alive until posting finishes and the native quest is a
   mock.running = false;
   expect(f.as(0, () => f.host.runEntry())).toMatchObject({owner: "100", self: "100"});
   expect(f.as(1, () => f.guest.runEntry())).toMatchObject({owner: "100", self: "200"});
+});
+
+
+it("cancels preparation on both peers, rejects the retired plan, then prepares a fresh session", () => {
+  const life = {prepare:vi.fn(),prepared:()=>true,cancel:vi.fn()}; const f=fixture(life);
+  f.prepare(); const old=JSON.parse(f.server.plan);
+  f.as(0,()=>f.host.cancel()); f.tick(1,f.guest);
+  expect(life.cancel).toHaveBeenCalled(); expect(f.guest.snapshot().sync).toMatchObject({applied:false});
+  f.server.plan=JSON.stringify(old); const before=life.prepare.mock.calls.length; f.tick(1,f.guest);
+  expect(life.prepare).toHaveBeenCalledTimes(before);
+  f.as(0,()=>f.host.choose(0)); f.tick(1,f.guest); f.tick(0,f.host);
+  expect(JSON.parse(f.server.plan).session).not.toBe(old.session); expect(f.host.snapshot().canPost).toBe(true);
+});
+
+it("never acknowledges a guest whose personal startup kit failed", () => {
+ const f=fixture({prepare:()=>{if(mock.self===1)throw new Error("pouch backup failed");},prepared:()=>false,cancel:vi.fn()});
+ f.as(0,()=>f.host.choose(0)); f.tick(1,f.guest); f.tick(0,f.host);
+ expect(f.server.acks["200"]).toBe("error"); expect(f.host.snapshot().canPost).toBe(false);
+});
+
+
+it("posts the displayed choice and preserves the shared pair when comparing sequential with simultaneous", () => {
+ const f=fixture();f.tick(0,f.host);
+ const options=f.host.snapshot().options as {index:number;monsters:string[]}[];
+ f.as(0,()=>f.host.choose(1));expect((mock.publish.mock.calls.at(-1)![0] as any).wave.monsters).toEqual(options[1]!.monsters);
+ const seed=JSON.parse(f.server.plan).seed;
+ f.as(0,()=>f.host.choose(2));expect(JSON.parse(f.server.plan).seed).toBe(seed);
+ expect((mock.publish.mock.calls.at(-1)![0] as any).wave.monsters).toEqual(options[2]!.monsters);
 });

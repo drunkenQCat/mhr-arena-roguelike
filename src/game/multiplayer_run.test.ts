@@ -138,3 +138,20 @@ it("keeps a responsive guest ready while state stays unchanged for over 120 seco
  const f=fixture();f.tick();f.clear();for(let i=0;i<140;i++)f.tick();
  expect(f.host.run.valid()).toBe(true);expect(f.host.session.canChoose()).toBe(true);
 });
+
+it("keeps native terminal state terminal even after the quest lobby becomes unavailable", () => {
+ const f=fixture();f.tick();f.host.reading.quest!.status="failed";f.host.reading.quest!.playing=false;
+ f.guest.reading.quest!.status="failed";f.guest.reading.quest!.playing=false;
+ mock.valid=false;f.tick();
+ expect(f.host.session.stage).toBe("Finished");expect(f.guest.session.stage).toBe("Finished");
+ expect(f.host.run.valid()).toBe(false);expect(f.guest.run.valid()).toBe(false);
+ expect(f.guest.finish).not.toHaveBeenCalled();
+});
+
+
+it("awards personal supplies once on a zero-PT clear instead of tying loot to wallet deltas",()=>{
+ const f=fixture();f.guest.cfg.supplyDrops={chance:1,entries:[{itemId:"honey",count:1,weight:1}]};
+ f.tick();f.clear();expect(f.guest.session.runSummary().clearedWaves).toBe(1);
+ const pending=(f.guest.session as any).pendingSupplies;expect(pending).toHaveLength(1);
+ f.tick();f.tick();expect(pending).toHaveLength(1);
+});

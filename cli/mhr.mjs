@@ -36,7 +36,7 @@ const HELP = `用法: node cli/mhr.mjs <命令> [选项]
   run retry                              重试原生接取
   run stop                               停止本局
   test invincible <on|off>               无敌开关
-  test tp --to <origin|monster>          TP in the active solo arena; verifies position
+  test tp --to <origin|monster>          传送本机玩家；仅当前受控斗技场，可用于联机验证
   test kill-all                          请求击杀已出场怪物
   shop buy --item <商品ID>               购买/补满/服务
   config validate --file <路径>          本地校验（复用 src/core/config.ts）
@@ -406,6 +406,13 @@ ${v.error}` : "没有记录的脚本错误");
         requireReceipt(receipt);
         const target = receipt.target;
         if (!target || ![target.x, target.y, target.z].every(Number.isFinite)) throw unavailable("Lua did not return a finite TP target");
+        // Arrival can be followed immediately by a faint. The terminal receipt
+        // retains the authoritative local-player observation from that frame.
+        const observed = receipt.position;
+        if (observed && Number.isFinite(receipt.verifiedAt) && [observed.x, observed.y, observed.z].every(Number.isFinite) &&
+            Math.hypot(observed.x-target.x, observed.y-target.y, observed.z-target.z) <= 5) {
+          output.result({ok:true,receipt,target,position:observed,verified:true}); return EXIT.OK;
+        }
         // The warp flow fades out, moves and fades in; arrival lands ~4s after the kick.
         const deadline = Date.now() + 10000;
         let position = null;
@@ -413,7 +420,9 @@ ${v.error}` : "没有记录的脚本错误");
           await sleep(250);
           const state = await snapshot();
           if (state.bridgeId !== identity.bridgeId || state.questUnique !== receipt.questUnique) throw rejected("TP session changed; no retry");
-          position = state.preparation?.players?.[0]?.position;
+          const prep = state.preparation;
+          position = prep?.localPlayerId != null ? prep.players?.find(p => p.id === prep.localPlayerId)?.position
+            : !state.online ? prep?.players?.[0]?.position : null;
           if (position && [position.x, position.y, position.z].every(Number.isFinite) &&
             Math.hypot(position.x-target.x, position.y-target.y, position.z-target.z) <= 5) {
             output.result({ ok: true, receipt, target, position, verified: true }); return EXIT.OK;

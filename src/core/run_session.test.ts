@@ -491,3 +491,89 @@ it("waits for native load completion and the running quest clock before recordin
   expect(session.stage).toBe("Combat");
   expect(session.campSnapshot).toEqual({x:0.1,y:50,z:47});
 });
+
+
+it("prepares each multiplayer wallet once, shops before departure and preserves purchases on entry", () => {
+  const {config, core, game, session, tick, enter, clear} = setup("inPlace");
+  config.quest.id = 900103; game.reading.online = true;
+  let kits = 0, restores = 0;
+  Object.assign(game, {startupPrepare: () => {kits++; return {ok:true};}, startupRestore: () => {restores++;return {ok:true};},
+    multiplayerRole: () => "host", multiplayerValid: () => true, multiplayerCanChoose: () => true});
+  const preview = new RunCore(config, 42); preview.startRun(config.armorOptions[0]!);
+  const wave = preview.generateChoices(2)[0]!;
+  const plan = makeQuestPlan(config, catalog, wave, 1, 1, false);
+  expect(session.prepareMultiplayer(plan, config.armorOptions[0]!).ok).toBe(true);
+  expect(session.canShop()).toBe(true);
+  const item = config.shop.find(i => i.mode === "perUnit" && i.price < config.startPt)!;
+  expect(core.buy(item.id).ok).toBe(true); const paid = core.state.wallet.pt;
+  expect(session.prepareMultiplayer(plan, config.armorOptions[0]!).ok).toBe(true); expect(kits).toBe(1);
+  expect(core.state.wallet.pt).toBe(paid);
+  game.reading.quest = {id:900103,unique:7,status:"ready",playing:false}; tick(); expect(session.canShop()).toBe(true);
+  expect(session.adoptMultiplayerEntry(plan).ok).toBe(true); enter(7);
+  expect(core.state.wallet.pt).toBe(paid); expect(core.state.wallet.purchaseLog).toEqual([item.id]);
+  clear(); expect(core.state.wallet.pt).toBe(paid+wave.rewardPt); expect(wave.rewardPt).toBeGreaterThan(0);
+  session.stop(); game.reading.quest = null; game.reading.canPost = true; tick();
+  expect(restores).toBe(1); expect(session.startupStatus.restorePending).toBe(false);
+});
+
+it.each(["host", "guest"] as const)("observes native failure before the %s selecting/guest early return and restores online", role => {
+  const {config, core, game, session, tick, enter, clear} = setup("inPlace"); config.quest.id=900103; game.reading.online=true;
+  let live=true, restored=0;
+  Object.assign(game,{multiplayerRole:()=>role,multiplayerValid:()=>live,multiplayerCanChoose:()=>true,
+    startupPrepare:()=>({ok:true}),startupRestore:()=>{restored++;return {ok:true};}});
+  const p=new RunCore(config,42);p.startRun(config.armorOptions[0]!);const wave=p.generateChoices(2)[0]!;
+  const plan=makeQuestPlan(config,catalog,wave,1,1,false);
+  expect(session.prepareMultiplayer(plan,config.armorOptions[0]!).ok).toBe(true);
+  game.reading.quest={id:900103,unique:7,playing:true,status:"play"};
+  expect(session.adoptMultiplayerEntry(plan).ok).toBe(true);enter(7);
+  session.stage="Selecting";core.state.phase="Choosing";
+  game.reading.quest!.status="failed";game.reading.quest!.playing=false;live=false;tick();
+  expect(session.stage).toBe("Finished");expect(core.state.phase).toBe("GameOver");
+  expect(game.finishes).toEqual([]);
+  game.reading.quest=null;game.reading.canPost=true;tick();
+  expect(restored).toBe(1);expect(session.startupStatus.restorePending).toBe(false);
+});
+
+it("does not ACK a kit with incomplete pouch isolation and still restores in an online lobby", () => {
+ const {config,game,session,tick}=setup("inPlace");config.quest.id=900103;game.reading.online=true;
+ let restored=0;
+ Object.assign(game,{startupPrepare:()=>({ok:true,notice:"pouch clear failed"}),startupRestore:()=>{restored++;return {ok:true};}});
+ const c=new RunCore(config,42);c.startRun(config.armorOptions[0]!);
+ const plan=makeQuestPlan(config,catalog,c.generateChoices(2)[0]!,1,1,false);
+ expect(session.prepareMultiplayer(plan,config.armorOptions[0]!).ok).toBe(false);
+ expect(session.stage).toBe("Fault");expect(session.startupStatus.prepared).toBe(false);
+ tick();expect(restored).toBe(1);expect(session.startupStatus.restorePending).toBe(false);
+});
+
+
+it("handles three native faints between waves and finishes through the failure path", () => {
+ const {config,core,game,session,tick,enter}=setup("inPlace");config.quest.id=900103;game.reading.online=true;
+ Object.assign(game,{multiplayerRole:()=>"host",multiplayerValid:()=>true,multiplayerCanChoose:()=>true,startupPrepare:()=>({ok:true})});
+ const c=new RunCore(config,42);c.startRun(config.armorOptions[0]!);const plan=makeQuestPlan(config,catalog,c.generateChoices(2)[0]!,1,1,false);
+ session.prepareMultiplayer(plan,config.armorOptions[0]!);game.reading.quest={id:900103,unique:7,playing:true,status:"play"};session.adoptMultiplayerEntry(plan);enter(7);
+ session.stage="Selecting";core.state.phase="Choosing";game.reading.deaths=3;tick();
+ expect(core.state.phase).toBe("GameOver");expect(game.finishes).toEqual([true]);expect(session.stage).toBe("Finished");
+ game.reading.quest!.status="failed";game.reading.quest!.playing=false;tick();expect(session.stage).toBe("Finished");
+});
+
+
+it("queues personal supplies once per native monster and waits for safe native delivery without charging PT", () => {
+ const {config,core,game,session,start,enter,clear,tick}=setup("inPlace");
+ config.supplyDrops={chance:1,entries:[{itemId:"honey",count:1,weight:1}]};let safe=false,granted=0;
+ Object.assign(game,{supplyDrop:()=>safe?{granted:true,actual:++granted>0?1:0}:{granted:false,deferred:true}});
+ start();enter();const balance=core.state.wallet.pt;const reward=session.plan!.wave.rewardPt;clear();
+ tick();expect(granted).toBe(0);safe=true;tick();expect(granted).toBe(2);tick();expect(granted).toBe(2);
+ expect(session.supplyLoot).toHaveLength(2);expect(core.state.wallet.pt).toBe(balance+reward);
+ expect(session.runSummary()).toMatchObject({clearedWaves:1,earnedPt:reward,spentPt:0});
+});
+
+
+it("requests owned native failure on host sync faults but never lets a connected guest end the team quest", () => {
+ const {config,game,session,enter}=setup("inPlace");config.quest.id=900103;game.reading.online=true;
+ let role:"host"|"guest"="host",canFinish=true;
+ Object.assign(game,{multiplayerRole:()=>role,multiplayerValid:()=>true,canFinishLocal:()=>canFinish,startupPrepare:()=>({ok:true})});
+ const c=new RunCore(config,42);c.startRun(config.armorOptions[0]!);const plan=makeQuestPlan(config,catalog,c.generateChoices(2)[0]!,1,1,false);
+ session.prepareMultiplayer(plan,config.armorOptions[0]!);game.reading.quest={id:900103,unique:7,playing:true,status:"play"};session.adoptMultiplayerEntry(plan);enter(7);
+ role="guest";canFinish=false;session.failMultiplayer("lost ACK");expect(game.finishes).toEqual([]);
+ session.stage="Combat";canFinish=true;session.failMultiplayer("disconnected locally");expect(game.finishes).toEqual([true]);
+});

@@ -150,12 +150,15 @@ describe("equip_wear", () => {
     expect(loadStartupState()?.prevPack).toEqual(INITIAL);
   });
 
-  it("已拥有的条目复用，不重复发放", () => {
+  it("开局发全新临时条目，不借用玩家自带同款装备与强化", () => {
     buildWorld(INITIAL, [1, 2]);
     const report = equipStartupSet("铁套（攻高防低）", 9, RULES, pouchPort);
     expect(report.ok).toBe(true);
-    expect(report.granted).toHaveLength(3);
-    expect(report.wornPack![1]).toBe(0);
+    expect(report.granted).toHaveLength(5);
+    expect(report.wornPack![1]).not.toBe(0);
+    expect(restoreStartup(pouchPort).ok).toBe(true);
+    expect(host.entries[0]!._IdType).toBe(2);
+    expect(host.entries[1]!._IdType).toBe(2);
   });
 
   it("回村恢复：pack 写回、新发条目清理、持久化清除、幂等", () => {

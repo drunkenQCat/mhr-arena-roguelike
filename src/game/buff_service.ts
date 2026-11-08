@@ -1,6 +1,6 @@
 /** Purchased bonuses belong to one roguelike wave, not the native quest lifetime. */
 import { findTypeDefinition, getSingleton, hookMethod, toInt64, toPtr, relog,
-  type REManagedObject } from "./sdk";
+  reframework, type REManagedObject } from "./sdk";
 import type { RuntimeReading, SessionStage } from "../core/run_session";
 import type { BuffAmounts } from "../core/config";
 export type BuffKind = "buff_atk" | "buff_def" | "buff_crit";
@@ -23,13 +23,14 @@ export class BuffService {
   private written: Record<string, number> = {};
   private hookInstalled = false;
   private critBonus = 0;
+  private playerAddress: number | null = null;
   private lastStatRead = -1;
   constructor(private readonly amounts: BuffAmounts) {}
   addPending(kind: BuffKind): { ok: boolean; total: number } {
     if (kind === "buff_atk") this.pending.atk += this.amounts.atk;
     else if (kind === "buff_def") this.pending.def += this.amounts.def;
     else if (kind === "buff_crit") {
-      if (!findTypeDefinition("snow.equip.MainWeaponBaseData")?.get_method("get_CriticalRate"))
+      if (!findTypeDefinition("snow.player.PlayerQuestBase")?.get_method("getAdjustCriticalRate"))
         return { ok: false, total: 0 };
       this.pending.crit += 1;
     } else return { ok: false, total: 0 };
@@ -49,7 +50,7 @@ export class BuffService {
     }
     this.data = null; this.previous = {}; this.written = {}; this.appliedUnique = null;
     this.lastStatRead = -1;
-    this.critBonus = 0;
+    this.critBonus = 0; this.playerAddress = null;
   }
   shutdown(): void { this.restoreFields(); this.pending = empty(); this.active = empty(); this.layer = null; }
   tick(reading: RuntimeReading | null, scope: BuffScope): void {
@@ -72,11 +73,15 @@ export class BuffService {
       const data = masterPlayerData();
       if (!data) return;
       if (this.active.crit > 0 && !this.hookInstalled) {
-        const method = findTypeDefinition("snow.equip.MainWeaponBaseData")?.get_method("get_CriticalRate");
+        const method = findTypeDefinition("snow.player.PlayerQuestBase")?.get_method("getAdjustCriticalRate");
         if (!method) throw new Error("Critical-rate getter unavailable");
-        // Pure post hook: no managed-object traversal, player reads, feedback or cross-call state.
-        hookMethod(method, undefined, (retval) => {
-          if (this.critBonus === 0) return retval;
+        // The adjustment belongs to a player actor. Shared weapon definitions are never changed.
+        // Hook storage is per invocation, including recursive/native worker calls.
+        hookMethod(method, (args) => {
+          reframework.getHookStorage().rogueLocalCritical = this.critBonus !== 0 &&
+            this.playerAddress !== null && toInt64(args[2]) === this.playerAddress;
+        }, (retval) => {
+          if (reframework.getHookStorage().rogueLocalCritical !== true || this.critBonus === 0) return retval;
           let original = toInt64(retval) % 4294967296;
           if (original >= 2147483648) original -= 4294967296;
           return toPtr(original + this.critBonus);
@@ -97,6 +102,8 @@ export class BuffService {
       }
       this.appliedUnique = q.unique; this.appliedDeaths = reading!.deaths; this.lastStatRead = reading!.time;
       this.critBonus = this.active.crit * this.amounts.crit;
+      const actor = getSingleton("snow.player.PlayerManager")?.call("findMasterPlayer") as REManagedObject | null;
+      this.playerAddress = actor ? toInt64(actor.get_address()) : null;
       relog.info(`[MhwRogue] wave buff applied: layer=${this.layer} atk=${this.active.atk} def=${this.active.def} crit=${this.critBonus}`);
     } catch (error) {
       this.restoreFields();

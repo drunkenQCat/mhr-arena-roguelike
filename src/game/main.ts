@@ -39,8 +39,7 @@ try {
   const amounts: BuffAmounts = config.buffAmounts ?? DEFAULT_BUFF_AMOUNTS;
   const buffs = new BuffService(amounts);
   const services: ServiceEffects = {
-    buffBuy: (kind: BuffKind) => kind === "buff_crit" && session.multiplayerRole
-      ? { ok:false, total:0 } : buffs.addPending(kind),
+    buffBuy: (kind: BuffKind) => buffs.addPending(kind),
     gachaBuy: (poolId: string) => {
       const result = gacha.roll(poolId);
       if (result.ok && !result.reused) session.armStartupRestore();
@@ -50,10 +49,23 @@ try {
   };
   let shopWindow = new ShopWindow(session.core, () => session.canShop(), () => session.shopQuest(), services);
   let entryAttached = false;
-  const multiplayerEntry = new MultiplayerEntry(config, monsterCatalog, () =>
-    !entryAttached && ["Idle", "Finished", "Fault"].includes(session.stage) && !session.startupStatus.restorePending);
+  let previousRun: ReturnType<RunSession["runSummary"]> | null = null;
+  const multiplayerEntry = new MultiplayerEntry(config, monsterCatalog, () => !entryAttached &&
+    ((session.stage === "Preparing" && session.startupStatus.prepared) ||
+      (["Idle", "Finished", "Fault"].includes(session.stage) && !session.startupStatus.restorePending)), undefined, {
+    prepared: () => session.startupStatus.prepared,
+    prepare: (plan, entryInstaller, armor) => {
+      if (session.stage !== "Preparing") {
+        const entryConfig = { ...config, quest: { ...config.quest, id: plan.questId } };
+        core.replaceConfig(entryConfig); runtime.rebind(entryConfig, entryInstaller);
+      }
+      const result = session.prepareMultiplayer(plan, armor);
+      if (!result.ok) throw new Error(result.message ?? "联机个人开局准备失败");
+    },
+    cancel: () => { if (session.stage === "Preparing") session.stop(); },
+  });
   let webConsole: WebConsoleBridge | null = null;
-  try { webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry); }
+  try { webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun); }
   catch (error) { relog.warn(`[MhwRogue] webconsole unavailable: ${String(error)}`); }
   // 离线队友调研 §6C：混合局的权威人数来自 PartySession 名单（bridge 自建或注入）。
   runtime.setPartySizeSource(() => webConsole?.partyRosterSize() ?? null);
@@ -64,23 +76,16 @@ try {
     try {
       // Production multiplayer: adopt the already ACKed and posted entry on every peer.
       // Only the host owns progression; guests mirror business state and stage native slots.
-      if (!entryAttached && !session.startupStatus.restorePending &&
-          ["Idle", "Finished"].includes(session.stage) && !shopWindow.busy) {
+      if (!entryAttached && (!session.startupStatus.restorePending || session.startupStatus.prepared) &&
+          ["Idle", "Preparing", "Finished"].includes(session.stage) && !shopWindow.busy) {
         const entry = multiplayerEntry.runEntry();
         if (entry) {
           entryAttached = true;
-          runtime.shutdown(); webConsole?.newScriptSession();
-          const entryConfig = { ...config, quest: { ...config.quest, id: entry.plan.questId } };
-          core = new RunCore(entryConfig);
-          runtime = new NativeRuntime(entryConfig, entry.installer, gacha);
-          session = new RunSession(core, monsterCatalog, runtime);
-          multiplayerRun = new MultiplayerRun(entry, entryConfig, monsterCatalog, session, runtime, () => shopWindow.busy);
+          if (!session.startupStatus.prepared || session.stage !== "Preparing") throw new Error("联机个人开局准备未完成");
+          multiplayerRun = new MultiplayerRun(entry, core.config, monsterCatalog, session, runtime, () => shopWindow.busy);
           runtime.setMultiplayer(multiplayerRun);
-          runtime.tick();
           const adopted = session.adoptMultiplayerEntry(entry.plan);
           if (!adopted.ok) throw new Error(adopted.message ?? "Cannot adopt multiplayer entry");
-          shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
-          webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry);
         }
       }
       // Explicit debug-only one-host slice. Never adopts guests, real teams, or
@@ -99,12 +104,24 @@ try {
           const adopted = session.adoptPostedEntry(entry.plan);
           if (!adopted.ok) throw new Error(adopted.message ?? "Cannot adopt entry quest");
           shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
-          webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry);
+          webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun);
         }
       }
       runtime.tick(); shopWindow.tick(); session.tick();
       if (multiplayerRun) multiplayerRun.tick(); else multiplayerEntry.tick();
-      buffs.tick(session.readingSnapshot, { stage: session.stage, layer: core.state.layer, questId: core.config.quest.id, multiplayer: runtime.multiplayerValid() });
+      const r = session.readingSnapshot;
+      if (["Finished", "Fault"].includes(session.stage) && !shopWindow.busy && !session.startupStatus.restorePending &&
+          r?.canPost && !r.quest && r.players.length > 0 && (entryAttached || core.config.quest.id === 900103)) {
+        previousRun = session.runSummary(); runtime.report("run-settlement",previousRun);
+        buffs.shutdown(); multiplayerEntry.resetForNextRun();
+        runtime.rebind(config, installer); multiplayerRun = null; entryAttached = false;
+        core = new RunCore(config); session = new RunSession(core, monsterCatalog, runtime);
+        shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
+        webConsole?.newScriptSession();
+        webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun);
+        runtime.report("multiplayer-ready-for-new-run", { restored: true });
+      }
+      buffs.tick(session.readingSnapshot, { stage: session.stage, layer: core.state.layer, questId: core.config.quest.id, multiplayer: runtime.multiplayerValid() || session.stage === "Preparing" });
       const sampleTime = session.readingSnapshot?.time ?? -1;
       if (sampleTime !== lastBuffPoll) {
         lastBuffPoll = sampleTime;
@@ -113,10 +130,11 @@ try {
       }
     }
     catch (error) {
-      runtime.shutdown();
-      session.stage = "Fault";
-      session.message = String(error);
-      runtime.report("frame-error", session.message);
+      if (session.multiplayerRole) session.failMultiplayer(String(error));
+      else {
+        runtime.shutdown(); session.stage = "Fault"; session.message = String(error);
+        runtime.report("frame-error", session.message);
+      }
     }
   });
   reframework.onDrawUi(() => drawHud(session, runtime, shopWindow));

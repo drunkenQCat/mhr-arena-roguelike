@@ -72,9 +72,6 @@ export class ShopWindow
       if (item.id === "cart_restore" && this.questContext()?.multiplayer && readLobbyIdentity().role !== "host") {
         item.canBuy = false; item.reason = "共享猫车次数由房主购买恢复"; continue;
       }
-      if (item.id === "buff_crit" && this.questContext()?.multiplayer) {
-        item.canBuy = false; item.reason = "联机暴击服务尚未实现个人武器作用域，暂不售卖"; continue;
-      }
       const serviceOpen = item.id === "cart_restore" || item.id.startsWith("buff_") ||
         (item.id.startsWith("gacha_") && this.services !== null && this.services.hasGachaPool(item.id));
       if (item.mode === "service" && !serviceOpen) { item.canBuy = false; item.reason = "游戏效果接线完成前暂不开放"; continue; }

@@ -1,9 +1,10 @@
+export interface RunSummary {layer:number;clearedWaves:number;earnedPt:number;spentPt:number;balance:number;remainingCarts:number;cartRestored:boolean;armor:string|null;durationSeconds:number;restored:boolean;reason:string;purchases:string[]|null;role:string|null}
 export interface ShopEntry { id: string; name: string; category: string; price: number; cap: number; owned: number; mode: string; desc?: string; canBuy: boolean; reason?: string; }
 export interface Choice { index: number; label: string; monsters: string[]; mode?: string; hpMul: number; dmgMul: number; rewardPt: number; }
 export interface ConsoleState {
   ui?: { scene: string; resultNode?: string | null;
     returnFlow?: { state: "waiting" | "complete" | "stopped"; message: string } | null };
-  multiplayerEntry?: { role: string; host: number | null; self: number | null; questId: number;
+  multiplayerEntry?: { armor?: string; armorOptions?: string[]; prepared?: boolean; role: string; host: number | null; self: number | null; questId: number;
     mode: string | null; hash: string | null; revision: number | null;
     transport: string; posting: boolean; canPost: boolean; message: string;
     sync: { available: boolean; reason: string; lobby: string | null; applied: boolean;
@@ -14,6 +15,9 @@ export interface ConsoleState {
     members: { id: string; self: boolean; ready: boolean }[] | null; token: number | null;
     staged: { token: number; ordinal: number; type: number; slot: number; id: number; uid: number } | null;
     commit: boolean; verifiedTwoClients: boolean } | null;
+  runSummary?: RunSummary | null;
+  previousRun?: RunSummary | null;
+  supplyLoot?: {itemId:string;count:number;actual:number;granted:boolean;reason?:string}[] | null;
   testMode?: boolean;
   ok: boolean; protocol: 4; bridgeId: string; counter: number; publishedAt?: number;
   sampledAt?: number; configVersion: number; sessionStage: string; corePhase: string; questId: number | null;
@@ -22,7 +26,7 @@ export interface ConsoleState {
   killedUltimates?: string[] | null; activeWave: string | null; message: string; runtimeStatus?: string;
   choices: Choice[] | null; shop: Record<string, ShopEntry[]> | null;
   shopAvailable?: boolean; shopReason?: string; shopNotice?: string; shopBusy: boolean;
-  preparation?: { waveToken: number | null; seen: number; resolved: number; expected: number;
+  preparation?: { localPlayerId?: number | null; waveToken: number | null; seen: number; resolved: number; expected: number;
     camp: { x: number; y: number; z: number } | null; radius: number; gathered: boolean;
     carveRemaining: number; dwellRemaining: number;
     players: { id: number; position: { x: number; y: number; z: number }; campDistance: number | null }[] | null };

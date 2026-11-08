@@ -9,6 +9,7 @@
 
 import { itemIds } from "./default_config";
 import { multiplayerScope } from "./multiplayer_scope";
+import { readLobbyIdentity } from "./multiplayer_entry";
 import { entryHostTestScope } from "./entry_host_scope";
 import { getSingleton, relog, type REManagedObject } from "./sdk";
 
@@ -63,7 +64,7 @@ export function pouchCanReceive(shopItemId: string): boolean {
   } catch { return false; }
 }
 
-export interface TradeQuest { questId: number; questUnique: number; entryHostTest?: boolean; multiplayer?: boolean }
+export interface TradeQuest { questId: number; questUnique: number; entryHostTest?: boolean; multiplayer?: boolean; preparing?: boolean }
 
 /** An arena context is supplied only by the session's between-wave Selecting stage. */
 export function canTrade(context?: TradeQuest): boolean {
@@ -71,10 +72,14 @@ export function canTrade(context?: TradeQuest): boolean {
     const qm = getSingleton("snow.QuestManager");
     const stage = getSingleton("snow.stage.StageManager");
     const gui = getSingleton("snow.gui.GuiManager");
+    const preparing = context?.multiplayer === true && context.preparing === true && context.questId === 900103 &&
+      ["host", "guest"].includes(readLobbyIdentity().role) && qm?.call("isPlayQuest") === false;
     const entry = context?.questId === 900103 && ((context.entryHostTest === true && entryHostTestScope()) ||
-      (context.multiplayer === true && multiplayerScope()));
+      (context.multiplayer === true && multiplayerScope()) || preparing);
     if (!qm || !stage || !gui || (stage.call("get_IsQuestOnline") && !entry) || gui.call("isOpenYNInfo") || gui.call("isOpenSelectInfo")) return false;
     if (!qm.call("isActiveQuest")) return !!gui.call("IsCanInvokeQuestBoard");
+    if (preparing) return qm.call("get_ActiveQuestNo") === context!.questId &&
+      qm.call("getActiveQuestUniqueNo") === context!.questUnique;
     if (!context || (context.questId !== 900102 && !entry) || qm.call("get_ActiveQuestNo") !== context.questId ||
         qm.call("getActiveQuestUniqueNo") !== context.questUnique || qm.call("isPlayQuest") !== true) return false;
     const em = getSingleton("snow.enemy.EnemyManager");

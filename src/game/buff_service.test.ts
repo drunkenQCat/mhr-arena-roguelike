@@ -1,9 +1,10 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const h = vi.hoisted(() => ({ values: {} as Record<string, number>, hook: null as any, data: null as any }));
+const h = vi.hoisted(() => ({ values: {} as Record<string, number>, hook: null as any, data: null as any, pre: null as any, storage: {} as Record<string, unknown> }));
 vi.mock("./sdk", () => ({
-  getSingleton: () => ({call: () => ({call: () => h.data})}),
+  getSingleton: () => ({call: () => ({call: () => h.data, get_address: () => 100})}),
+  reframework: {getHookStorage: () => h.storage},
   findTypeDefinition: () => ({get_method: () => ({})}),
-  hookMethod: (_m: any, _pre: any, post: any) => { h.hook = post; },
+  hookMethod: (_m: any, _pre: any, post: any) => { h.hook = post; h.pre = _pre; },
   toInt64: (v: number) => v, toPtr: (v: number) => v,
   relog: { info: vi.fn(), error: vi.fn() }
 }));
@@ -15,7 +16,7 @@ const reading = (unique = 42, deaths = 0): RuntimeReading => ({time: unique * 10
   quest: {id: 900102, unique, playing: true, status: "play"}, online: false, deaths,
   players: [], enemies: [], canPost: false});
 beforeEach(() => {
-  h.values = {_AtkUpAlive: 7, _DefUpAlive: 3}; h.hook = null;
+  h.values = {_AtkUpAlive: 7, _DefUpAlive: 3}; h.hook = null; h.storage = {}; h.pre = null;
   h.data = {get_field: (n: string) => h.values[n], set_field: (n: string,v: number) => {h.values[n] = v;}};
 });
 const service = () => new BuffService({atk: 10, def: 15, crit: 10});
@@ -57,7 +58,8 @@ it("does not overwrite a later native potion update on cleanup", () => {
 });
 it("critical post hook is additive, stable on repeated reads, and handles negative int32 values", () => {
   const b=service(); b.addPending("buff_crit"); b.addPending("buff_crit"); b.tick(reading(),scope());
-  expect(h.hook(30)).toBe(50); expect(h.hook(30)).toBe(50);
+  h.pre({2:100}); expect(h.hook(30)).toBe(50); h.pre({2:100}); expect(h.hook(30)).toBe(50);
+  h.pre({2:200}); expect(h.hook(30)).toBe(30); h.pre({2:100});
   expect(h.hook(4294967281)).toBe(5); // -15 + 20
   b.tick(reading(),scope("Carve")); expect(h.hook(30)).toBe(30);
 });

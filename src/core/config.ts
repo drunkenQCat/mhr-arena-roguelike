@@ -112,7 +112,10 @@ export interface QuestSpec {
   mapNo: number;
 }
 
+export interface SupplyDropSpec { chance: number; entries: { itemId: string; count: number; weight: number }[] }
+
 export interface RogueConfig {
+  supplyDrops?: SupplyDropSpec;
   simultaneousBalance?: { reward: number; hp: number; damage: number };
   startPt: number;
   maxCarts: number;
@@ -303,6 +306,19 @@ export function validateConfig(raw: unknown): RogueConfig {
     number(item.cap, `${path}.cap`, item.mode === "service" ? 0 : 1, true);
     if (item.desc !== undefined) text(item.desc, `${path}.desc`);
     if (item.globalLimit !== undefined) number(item.globalLimit, `${path}.globalLimit`, 0, true);
+  }
+
+  if (c.supplyDrops !== undefined) {
+    const drops = object(c.supplyDrops, "supplyDrops");
+    if (number(drops.chance, "supplyDrops.chance", 0) > 1) fail("supplyDrops.chance (0..1)");
+    const entries = array(drops.entries, "supplyDrops.entries", true);
+    for (let i = 0; i < entries.length; i++) {
+      const e = object(entries[i], `supplyDrops.entries[${i}]`);
+      const item = shop.find(v => (v as ShopItem).id === e.itemId) as ShopItem | undefined;
+      if (!item || item.mode === "service") fail("supplyDrops.itemId (must be a physical shop item)");
+      if (number(e.count, "supplyDrops.count", 1, true) > item!.cap) fail("supplyDrops.count (above carry cap)");
+      if (number(e.weight, "supplyDrops.weight", 0) <= 0) fail("supplyDrops.weight");
+    }
   }
 
   const rules = array(c.unlockChain, "unlockChain");

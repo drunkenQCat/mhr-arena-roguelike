@@ -40,6 +40,14 @@ function signal(name: string, argument?: unknown) {
 }
 beforeEach(() => { host.objects = {}; host.hooks.clear(); host.now = 100; host.storage = {}; });
 
+it("disarms pending input when a bridge is retired between runs", () => {
+  const f = fixture(); const v = f.ui.observe();
+  f.ui.request({id:"old",cmd:"title.continue",sceneToken:v.sceneToken});
+  f.ui.shutdown();
+  expect(signal("getDecideButtonTrg")).toBe(0);
+  expect(f.ui.poll()).toBeNull();
+});
+
 it("leaves absent UI unknown and never claims that missing players imply loading", () => {
   const view = new NativeUi("bridge", () => 900103).observe();
   expect(view.scene).toBe("unknown"); expect(view.loading).toBeNull(); expect(view.allowedActions).toEqual([]);

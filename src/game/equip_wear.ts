@@ -143,10 +143,10 @@ export interface GrantReport {
  * 部分写入标 uncertain，绝不自动重试。
  */
 export function grantEquip(box: REManagedObject | null, idVal: number, kind: "armor" | "weapon",
-  beforeGrant?: (entry: GrantedEntry) => boolean): GrantReport {
+  beforeGrant?: (entry: GrantedEntry) => boolean, reuseExisting = true): GrantReport {
   if (!box) return { ok: false, reason: "EquipBox unavailable" };
   const expectType = kind === "armor" ? 2 : 1;
-  const existing = findEquipEntry(box, idVal, expectType);
+  const existing = reuseExisting ? findEquipEntry(box, idVal, expectType) : null;
   if (existing !== null) return { ok: true, reused: true, boxIndex: existing };
   let slot: REManagedObject | null = null;
   try {
@@ -187,17 +187,21 @@ export function grantEquip(box: REManagedObject | null, idVal: number, kind: "ar
     relog.error(`[MhwRogue] grantEquip 原生调用抛出（写入仍可能发生）: ${String(error)}`);
   }
   // 抛错≠未写入：读回裁决
-  const idType = slot.get_field("_IdType") as number;
-  const gotId = slot.get_field("_IdVal") as number;
+  let idType: number, gotId: number, boxIndex: number | null;
+  try {
+    idType = slot.get_field("_IdType") as number;
+    gotId = slot.get_field("_IdVal") as number;
+    const written = boxEntry(box, reservedIndex);
+    boxIndex = written?.get_field("_IdType") === expectType && written.get_field("_IdVal") === idVal ? reservedIndex : null;
+  } catch { return {ok:false,uncertain:true,reason:"发放后装备身份不可读，禁止自动重试"}; }
   let after = -1;
   try {
     after = box.call("countWeaponArmorEmptyNum") as number;
   } catch { /* 同上 */ }
-  const boxIndex = findEquipEntry(box, idVal, expectType);
-  if (idType === expectType && gotId === idVal) {
+  if (idType === expectType && gotId === idVal && boxIndex !== null) {
     const slotCountOk = before < 0 || after === before - 1;
     return {
-      ok: true, uncertain: false, boxIndex: boxIndex ?? undefined,
+      ok: true, uncertain: false, boxIndex,
       ...(slotCountOk ? {} : { reason: "空槽数读回不一致（条目已写入）" }),
     };
   }
@@ -324,7 +328,7 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
 
   for (let part = 1 as 1 | 2 | 3 | 4 | 5; part <= 5; part++) {
     const id = armorId(series, part);
-    const grant = grantEquip(box, id, "armor", reserve);
+    const grant = grantEquip(box, id, "armor", reserve, false);
     if (!grant.ok || grant.boxIndex === undefined) {
       return fail(`防具发放失败（部位 ${part}）: ${grant.reason ?? "未知"}${grant.uncertain ? "［结果不明，禁止自动重试］" : ""}`);
     }
@@ -336,7 +340,7 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
 
   // D1 武器口子：keepPlayerWeapon=false 时按 weaponId 发放并穿上（配置校验保证非空）
   if (!rules.keepPlayerWeapon && rules.weaponId !== null) {
-    const grant = grantEquip(box, rules.weaponId, "weapon", reserve);
+    const grant = grantEquip(box, rules.weaponId, "weapon", reserve, false);
     if (!grant.ok || grant.boxIndex === undefined) {
       return fail(`武器发放失败: ${grant.reason ?? "未知"}`);
     }
@@ -351,7 +355,7 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
     return fail("终态 pack 不可读");
   }
   for (let part = 1; part <= 5; part++) {
-    const expected = findEquipEntry(box, armorId(series, part as 1 | 2 | 3 | 4 | 5), 2);
+    const expected = granted.find(e => e.idVal === armorId(series, part as 1 | 2 | 3 | 4 | 5))?.boxIndex ?? null;
     if (expected === null || finalPack[part] !== expected) {
       return fail(`穿装读回不一致：pack[${part}]=${finalPack[part]} 期望 ${expected}`);
     }
