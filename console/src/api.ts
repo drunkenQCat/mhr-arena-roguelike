@@ -2,7 +2,8 @@ export interface RunSummary {layer:number;clearedWaves:number;earnedPt:number;sp
 export interface ShopEntry { id: string; name: string; category: string; price: number; cap: number; owned: number; mode: string; desc?: string; canBuy: boolean; reason?: string; }
 export interface Choice { index: number; label: string; monsters: string[]; mode?: string; hpMul: number; dmgMul: number; rewardPt: number; }
 export interface ConsoleState {
-  ui?: { scene: string; resultNode?: string | null;
+  ui?: { scene: string; sceneToken?: string; resultNode?: string | null;
+    dialogs?: { token: string; kind: string; text: string; passive?: boolean; supported: boolean; buttons?: string[] | null }[] | null;
     returnFlow?: { state: "waiting" | "complete" | "stopped"; message: string } | null };
   multiplayerEntry?: { armor?: string; armorOptions?: string[]; prepared?: boolean; role: string; host: number | null; self: number | null; questId: number;
     mode: string | null; hash: string | null; revision: number | null;

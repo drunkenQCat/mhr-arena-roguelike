@@ -5,6 +5,7 @@ import PlayWorkspace from "./PlayWorkspace.vue";
 import MultiplayerEntry from "./MultiplayerEntry.vue";
 import ConnectionHelp from "./ConnectionHelp.vue";
 import SupportBar from "./SupportBar.vue";
+import NativeNotice from "./NativeNotice.vue";
 import { Freshness, SubmissionUncertain, downloadJson, getJson, postCommand, waitForReceipt, type ConsoleState, type CommandResult } from "./api";
 
 const state = ref<ConsoleState | null>(null), stale = ref(true), busy = ref(false);
@@ -110,6 +111,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); window.removeEventListen
     </header>
     <p v-if="state?.testMode" class="alert">隔离验证环境：执行编译后的 Lua，玩家、怪物、背包与传输使用测试替身，不会操作实际游戏。</p>
     <p v-if="state && state.protocol !== 4" class="alert">网页与游戏脚本版本不匹配，操作已暂停。请先安全结束任务、回村并完成保存，再更新匹配版本；不要在任务中重载脚本。</p>
+    <NativeNotice :state="state" :connected="connected" :busy="busy" @command="send" />
     <nav class="toolbar topnav" aria-label="控制台导航">
       <button :class="{ selected: page === 'play' }" :aria-pressed="page === 'play'" @click="page = 'play'">当前局</button>
       <button :class="{ selected: page === 'multiplayer' }" :aria-pressed="page === 'multiplayer'" @click="page = 'multiplayer'">联机大厅</button>
@@ -125,7 +127,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); window.removeEventListen
     <template v-if="page === 'help'">
       <ConnectionHelp v-model:developer="developerMode" />
       <SupportBar />
-      <p class="muted">联机测试版 · 本机双客户端已通过续波、个人购物和共享猫车；不同电脑的官方 Steam 联机仍待验收。三／四人实机仍待验收。</p>
+      <p class="muted">联机测试版 · 本机 2／3／4 个真实游戏进程已验证波次、个人购物和三猫恢复，测试使用模拟 Steam 身份。不同电脑的官方 Steam 联机与长局仍待验收。</p>
     </template>
     <MultiplayerEntry v-if="page === 'multiplayer'" :entry="state?.multiplayerEntry" :run="state?.multiplayerRun" :connected="connected" :busy="busy || !connected" @command="send" @play="page = 'play'" />
     <PlayWorkspace v-show="page === 'play'" :state="state" :connected="connected" :busy="busy" :notice="notice" :developer-mode="developerMode" @command="send" @multiplayer="page = 'multiplayer'" />

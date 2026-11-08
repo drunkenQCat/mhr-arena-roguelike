@@ -13,6 +13,7 @@ try {
   const { default: Play } = await server.ssrLoadModule('/src/PlayWorkspace.vue');
   const { default: Entry } = await server.ssrLoadModule('/src/MultiplayerEntry.vue');
   const { default: Balance } = await server.ssrLoadModule('/src/BalancePreview.vue');
+  const { default: NativeNotice } = await server.ssrLoadModule('/src/NativeNotice.vue');
   const { editorConfig } = await server.ssrLoadModule('/src/editor-model.ts');
   const render = (component, props) => renderToString(createSSRApp(component, props));
   const state = {
@@ -29,6 +30,23 @@ try {
   assert.match(guest, /购买 1 件/);
   assert.doesNotMatch(guest, /选择单怪并开始/);
   assert.match(guest, /同步状态不代表玩家已经准备好/);
+  checked++;
+  const networkState = { ...state, ui: { scene: 'village', sceneToken: 'scene-current', dialogs: [{
+    token: 'scene-current:dialog:0', kind: 'network_error', supported: true, buttons: ['close'],
+    text: '经过一定时间未进行操作。\n已断开连接。', passive: false,
+  }] } };
+  const disconnected = await render(NativeNotice, { state: networkState, connected: true, busy: false });
+  assert.match(disconnected, /已断开连接/);
+  assert.match(disconnected, /重新创建或加入大厅/);
+  assert.match(disconnected, /关闭游戏提示/);
+  assert.doesNotMatch(disconnected, /<button[^>]*disabled/);
+  checked++;
+  const offlineNotice = await render(NativeNotice, { state: networkState, connected: false, busy: false });
+  assert.match(offlineNotice, /<button[^>]*disabled/);
+  const unknownNotice = await render(NativeNotice, { state: { ...networkState, ui: { ...networkState.ui,
+    dialogs: [{ ...networkState.ui.dialogs[0], supported: false }] } }, connected: true, busy: false });
+  assert.doesNotMatch(unknownNotice, /<button/);
+  assert.match(unknownNotice, /在游戏窗口中确认/);
   checked++;
 
   const host = await render(Play, { ...props, state: { ...state, multiplayerRun: { ...state.multiplayerRun, role: 'host' } } });
