@@ -181,3 +181,11 @@ it("does not refund a verified equipment grant just because its display-name loo
  const r=new GachaService(POOLS,{rollIndex:()=>0}).roll("gacha_1");
  expect(r.ok).toBe(true);expect(host.entries.filter(e=>e._IdType!==0)).toHaveLength(1);
 });
+
+it("uses the newly configured run pool rather than its boot-time pool",()=>{
+ const g=new GachaService(POOLS,{rollIndex:()=>0});
+ g.configure({newPool:{entries:[{kind:"armor",id:0x0c500092,w:1}]}});
+ expect(g.hasPool("gacha_1")).toBe(false);expect(g.hasPool("newPool")).toBe(true);
+ const r=g.roll("newPool");expect(r.ok).toBe(true);expect(r.id).toBe(0x0c500092);
+ expect(POOLS.gacha_1.entries).toHaveLength(2);
+});

@@ -71,9 +71,13 @@ export class MultiplayerEntry {
   private previewSeed = Math.floor(Math.random() * 0x7fffffff);
   private armor: string;
   private retired: string[] = [];
-  constructor(private readonly config: RogueConfig, private readonly catalog: MonsterCatalog,
+  constructor(private readonly configuration: RogueConfig | (() => RogueConfig), private readonly catalog: MonsterCatalog,
     private readonly canPrepare: () => boolean, private readonly network = bridge(), private readonly lifecycle?: EntryLifecycle) {
-    this.armor = config.armorOptions[0]!;
+    this.armor = this.config.armorOptions[0]!;
+  }
+  private get config(): RogueConfig { return typeof this.configuration==="function" ? this.configuration() : this.configuration; }
+  private normalizeArmor(): void {
+    if (!this.lifecycle?.prepared() && !this.config.armorOptions.includes(this.armor)) this.armor=this.config.armorOptions[0]!;
   }
 
   setArmor(armor: string): void {
@@ -104,6 +108,7 @@ export class MultiplayerEntry {
     if (!this.canPrepare()) throw new Error("请先结束当前局并等待装备与背包恢复。");
     if (questManager()?.call("isActiveQuest") !== false) throw new Error("请先取消或完成当前已承接任务。");
     if (this.pendingPost || this.transport?.isActive()) throw new Error("正在确认或承接任务，请等待。");
+    this.normalizeArmor();
   }
   private choices(seed: number, players: number) {
     const core = new RunCore(this.config, seed);
@@ -245,7 +250,8 @@ export class MultiplayerEntry {
         if (this.lobby && this.plan && this.lobby.plan === this.wire && this.acknowledged(this.lobby, this.plan)) {
           this.pendingPost = false;
           if (this.digest() !== this.plan.hash) throw new Error("本机任务表已变化，未承接。");
-          if (!this.transport) this.transport = new QuestTransport(() => this.installer?.getQuest() ?? null, 60);
+          if (!this.transport) this.transport = new QuestTransport(() => this.installer?.getQuest() ?? null,
+            () => this.config.runtime?.postTimeoutSeconds ?? 60);
           this.transport.request(ENTRY_QUEST_ID, true);
           this.message = "全队已确认，正在承接。等队友在原生任务板加入，再手动出发。";
         }
@@ -275,6 +281,7 @@ export class MultiplayerEntry {
       session: this.plan.session, members: l.members.map(m => m.id).sort() };
   }
   snapshot(): Record<string, unknown> {
+    if (this.canPrepare()) this.normalizeArmor();
     const identity = readLobbyIdentity(), qm = questManager(), lobby = this.lobby;
     const ready = !!lobby && !!this.plan && lobby.plan === this.wire && this.acknowledged(lobby, this.plan);
     return { ...identity, questId: ENTRY_QUEST_ID, mode: this.plan ? modes[this.plan.index] : null,

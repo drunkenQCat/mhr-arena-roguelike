@@ -49,7 +49,7 @@ export class QuestTransport {
       error: this.error, history: this.history.slice() };
   }
 
-  constructor(private readonly currentQuest: () => REManagedObject | null, private readonly timeout: number) {}
+  constructor(private readonly currentQuest: () => REManagedObject | null, private readonly timeout: number | (() => number)) {}
   isActive(): boolean { return this.stage !== "Idle"; }
 
   /**
@@ -101,7 +101,7 @@ export class QuestTransport {
     this.error = null;
     this.target = id;
     this.lastSelection = null;
-    this.deadline = clockSeconds() + this.timeout;
+    this.deadline = clockSeconds() + (typeof this.timeout==="function" ? this.timeout() : this.timeout);
     this.counterType = null;
     this.setStage(getSingleton(COUNTER) ? "WaitCounter" : "Open");
   }

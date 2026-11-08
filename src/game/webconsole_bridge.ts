@@ -20,26 +20,13 @@ interface Command {
 }
 type Outcome = Record<string, unknown>;
 
-/** 评审二轮 #3：规范载荷指纹——覆盖全部影响语义的字段，
- * 含会话/场景/波次/配置身份。config 是对象：序列化其 startPt/maxCarts
- * 与整体键数即可区分测试反例（完整 JSON 序列化在游戏环境不可用，
- * 无 JSON.stringify 全局；config 改变必然触碰 startPt/maxCarts 之外的
- * 键集合变化，键数是兜底区分）。同 id 异载荷在 consume 直接拒绝，
- * 本指纹是拒绝判定的依据。 */
-function commandFingerprint(cmd: Command): string {
-  const cfg = cmd.config as Record<string, unknown> | null | undefined;
-  const cfgKeys = cfg ? Object.keys(cfg).length : -1;
-  return `cmd=${cmd.cmd ?? ""}|sub=${cmd.sub ?? ""}|player=${cmd.playerId ?? ""}` +
-    `|item=${cmd.itemId ?? ""}|armor=${cmd.armor ?? ""}|index=${cmd.index ?? ""}` +
-    `|value=${String(cmd.value)}|route=${cmd.route ?? ""}|to=${cmd.to ?? ""}` +
-    `|mock=${String(cmd.mockPlayers)}|slot=${String(cmd.slot)}` +
-    `|testLayer=${String(cmd.testLayer)}|configVersion=${String(cmd.configVersion)}` +
-    `|questUnique=${String(cmd.questUnique)}|waveToken=${String(cmd.waveToken)}` +
-    `|scene=${cmd.sceneToken ?? ""}|dialog=${cmd.dialogToken ?? ""}` +
-    `|cfgKeys=${cfgKeys}` +
-    `|startPt=${String((cfg as { startPt?: unknown } | null | undefined)?.startPt)}` +
-    `|maxCarts=${String((cfg as { maxCarts?: unknown } | null | undefined)?.maxCarts)}` +
-    `|entryCode=${cmd.entryCode ?? ""}|partyGen=${String((cmd as Command & { generation?: number }).generation)}`;
+/** Transport IDs identify exact request bytes. A changed nested config, JSON
+ * shape or field delimiter cannot be mistaken for a replay. Re-encoded requests
+ * must use a fresh ID; business purchase dedupe is independent of this cache. */
+function commandFingerprint(text:string, transport:NativeWebconsole):string {
+  const hash=transport.steam_digest?.(text);
+  if (typeof hash!=="string" || hash.length!==64) throw new Error("完整请求摘要不可用，请更新 webconsole DLL 并重启游戏");
+  return hash;
 }
 
 export class WebConsoleBridge {
@@ -163,7 +150,9 @@ export class WebConsoleBridge {
     // 评审二轮 #1：party 业务身份在缓存之前校验——旧代命令连缓存
     // 都不允许命中（重放者拿不到上一代成功回执）。
     const staleBridge = cmd.bridgeId !== this.bridgeId;
-    const fingerprint = commandFingerprint(cmd);
+    let fingerprint:string;
+    try { fingerprint=commandFingerprint(text,this.transport); }
+    catch(error) {this.writeResults({id:cmd.id,status:"rejected",message:String(error)});return;}
     const isParty = cmd.cmd === "party";
     if (isParty && (cmd.sub === "buy" || cmd.sub === "state")) {
       const gen = this.party.checkGeneration(cmd.generation);
@@ -259,7 +248,7 @@ export class WebConsoleBridge {
         if (refFs.read("mhw_rogue_config.json") !== text) throw new Error("配置保存验证失败，未应用");
         s.applyConfig(cfg); this.configVersion++;
         return { status: "applied", configVersion: this.configVersion,
-          message: "已保存：商店下次交易、曲线与怪池下次生成选择时生效；开局规则和节奏下一局生效。当前波次保持原计划。" };
+          message: "已保存：商店下次交易、曲线与怪池下次生成选择时生效；开局装备、抽取池、增益数值与节奏下一局生效。当前波次保持原计划。" };
       }
       case "startRun": {
         if (cmd.testLayer !== undefined && (!Number.isInteger(cmd.testLayer) || cmd.testLayer < 1 ||

@@ -145,6 +145,7 @@ const transactionText = computed(() => {
 
     <section v-if="!idle || finished" class="panel compact-panel"><div class="section-heading"><h2>{{ finished ? '本局购买与讨伐' : '本局成长' }}</h2><span class="muted">{{ routeName(state?.route) }} · {{ state?.armor ?? '保留原装备' }}</span></div>
       <p v-if="buffs && !finished">生效增益：攻击 +{{ stat(buffs.active.atk) }} · 防御 +{{ stat(buffs.active.def) }} · 会心 +{{ stat(buffs.critBonus) }}%</p>
+      <p v-if="buffs && !finished && buffs.critBonus > 0" class="muted">{{ buffs.nativeCritical ? `最近一次本机命中会心：${stat(buffs.nativeCritical.base)}% → ${stat(buffs.nativeCritical.result)}%` : '会心强化已就绪，尚未记录本波本机命中。' }}</p>
       <p v-if="buffs && (buffs.pending.atk || buffs.pending.def || buffs.pending.crit)" class="muted">待应用：攻击 +{{ stat(buffs.pending.atk) }} · 防御 +{{ stat(buffs.pending.def) }} · 会心服务 {{ buffs.pending.crit }} 次</p>
       <p class="muted">猫车恢复：{{ state?.services?.cartRestoreUsed ? '本局已使用' : '本局尚未使用' }}</p>
       <p>终盘讨伐：{{ state?.killedUltimates?.join('、') || '暂无' }}</p>

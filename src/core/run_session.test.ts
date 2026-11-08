@@ -601,3 +601,13 @@ it("does not reclaim equipment at a continuing reentry wave's native save",()=>{
  session.prepareForNativeSave();expect(restored).toBe(0);
  game.reading.quest=null;game.reading.canPost=true;session.prepareForNativeSave();expect(restored).toBe(0);
 });
+
+it("configures new-run services before solo preparation and freezes active equipment/service rules",()=>{
+ const f=setup("inPlace");const order:string[]=[];
+ Object.assign(f.game,{configureRun:()=>order.push("config"),startupPrepare:()=>{order.push("prepare");return {ok:true};}});
+ f.start(true);expect(order).toEqual(["config","prepare"]);
+ const original=f.core.config;const edited={...original,startupRules:{...original.startupRules!,stripTalismans:false},
+  buffAmounts:{atk:23,def:34,crit:45},gachaPools:{only:{entries:[{kind:"armor" as const,id:202375177,w:1}]}}};
+ f.session.applyConfig(edited);expect(f.core.config.startupRules).toEqual(original.startupRules);
+ expect(f.core.config.buffAmounts).toEqual(original.buffAmounts);expect(f.session.configForEditing().buffAmounts).toEqual(edited.buffAmounts);
+});

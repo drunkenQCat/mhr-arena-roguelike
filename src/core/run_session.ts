@@ -34,6 +34,8 @@ export interface SessionPort {
   now?(): number;
   ready(): boolean;
   read(): RuntimeReading;
+  /** Freeze services/native preparation to this run's rules before any grant. */
+  configureRun?(config: RogueConfig): void;
   publish(plan: QuestPlan, inPlace: boolean): void;
   policy(plan: QuestPlan | null, holdClear: boolean): void;
   post(questId: number): void;
@@ -117,6 +119,7 @@ export class RunSession {
     this.settings.route = route; this.route = route;
     const next = this.configForEditing();
     this.nextRunConfig = { ...next, runtime: { ...(next.runtime ?? DEFAULT_RUNTIME), route } };
+    this.configSubmitted?.(this.nextRunConfig);
   }
 
 
@@ -143,7 +146,9 @@ export class RunSession {
     const active = !["Idle", "Finished", "Fault"].includes(this.stage);
     this.core.replaceConfig(active ? { ...config, maxCarts: old.maxCarts,
       startPt: old.startPt, armorOptions: old.armorOptions, runtime: old.runtime,
+      armorSets:old.armorSets, startupRules:old.startupRules, gachaPools:old.gachaPools, buffAmounts:old.buffAmounts,
       cartRestorePrice: old.cartRestorePrice, cartRestoreLimit: old.cartRestoreLimit } : config);
+    this.configSubmitted?.(config);
   }
   private requestedAt = 0;
   private progressAt = 0;
@@ -260,6 +265,9 @@ export class RunSession {
     if (!["Idle", "Finished", "Fault"].includes(this.stage) || this.startupRestorePending)
       return fail("上局恢复尚未完成");
     if (!this.core.config.armorOptions.includes(armor)) return fail("未知初始装备");
+    Object.assign(this.settings,this.core.config.runtime ?? DEFAULT_RUNTIME);
+    this.nextRunConfig=null;
+    this.port.configureRun?.(this.core.config);
     const prepared = this.port.startupPrepare?.(armor);
     if (!prepared?.ok || prepared.notice) {
       this.startupRestorePending = true;
@@ -303,7 +311,8 @@ export class RunSession {
     this.port.policy(frame.plan, !["Finished", "Fault"].includes(frame.stage));
   }
 
-  constructor(readonly core: RunCore, private readonly catalog: MonsterCatalog, private readonly port: SessionPort) {
+  constructor(readonly core: RunCore, private readonly catalog: MonsterCatalog, private readonly port: SessionPort,
+    private readonly configSubmitted?: (config: RogueConfig) => void) {
     this.settings = { ...(core.config.runtime ?? DEFAULT_RUNTIME) };
     this.route = this.settings.route;
   }
@@ -363,6 +372,7 @@ export class RunSession {
         this.nextRunConfig = null;
       }
       // M3.5 开局准备（穿装+袋隔离）必须在接任务之前：任务装备包在接任务时快照。
+      this.port.configureRun?.(this.core.config);
       if (this.port.startupPrepare) {
         const prep = this.port.startupPrepare(armor);
         this.startupNotice = prep.ok ? prep.notice ?? null : null;

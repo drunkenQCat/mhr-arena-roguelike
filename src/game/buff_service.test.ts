@@ -5,7 +5,9 @@ vi.mock("./sdk", () => ({
   reframework: {getHookStorage: () => h.storage},
   findTypeDefinition: () => ({get_method: () => ({})}),
   hookMethod: (_m: any, _pre: any, post: any) => { h.hook = post; h.pre = _pre; },
-  toInt64: (v: number) => v, toPtr: (v: number) => v,
+  // Match sol2's void* conversion: Lua numbers are not pointer userdata.
+  toInt64: (v: number | {ptr:number}) => typeof v === "number" ? 0 : v.ptr,
+  toPtr: (v: number) => ({ptr:v}),
   relog: { info: vi.fn(), error: vi.fn() }
 }));
 import { BuffService } from "./buff_service";
@@ -20,6 +22,7 @@ beforeEach(() => {
   h.data = {get_field: (n: string) => h.values[n], set_field: (n: string,v: number) => {h.values[n] = v;}};
 });
 const service = () => new BuffService({atk: 10, def: 15, crit: 10});
+const ptr = (value:number) => ({ptr:value});
 it("stacks purchases without writing during preparation", () => {
   const b = service(); b.addPending("buff_atk"); expect(b.addPending("buff_atk").total).toBe(20);
   b.tick(reading(),scope("Selecting")); expect(h.values._AtkUpAlive).toBe(7);
@@ -58,10 +61,13 @@ it("does not overwrite a later native potion update on cleanup", () => {
 });
 it("critical post hook is additive, stable on repeated reads, and handles negative int32 values", () => {
   const b=service(); b.addPending("buff_crit"); b.addPending("buff_crit"); b.tick(reading(),scope());
-  h.pre({2:100}); expect(h.hook(30)).toBe(50); h.pre({2:100}); expect(h.hook(30)).toBe(50);
-  h.pre({2:200}); expect(h.hook(30)).toBe(30); h.pre({2:100});
-  expect(h.hook(4294967281)).toBe(5); // -15 + 20
-  b.tick(reading(),scope("Carve")); expect(h.hook(30)).toBe(30);
+  expect(b.diagnostic().nativeCritical).toBeNull();
+  h.pre({2:ptr(100)}); expect(h.hook(ptr(30))).toEqual(ptr(50)); h.pre({2:ptr(100)}); expect(h.hook(ptr(30))).toEqual(ptr(50));
+  expect(b.diagnostic().nativeCritical).toEqual({base:30,result:50});
+  h.pre({2:ptr(200)}); expect(h.hook(ptr(30))).toEqual(ptr(30)); h.pre({2:ptr(100)});
+  expect(h.hook(ptr(4294967281))).toEqual(ptr(5)); // -15 + 20
+  b.tick(reading(),scope("Carve")); expect(h.hook(ptr(30))).toEqual(ptr(30));
+  expect(b.diagnostic().nativeCritical).toBeNull();
 });
 it("canceled preparation drops pending purchases and unrelated/online quests get no buff", () => {
   const b=service(); b.addPending("buff_atk"); b.tick(null,scope("Finished")); b.tick(reading(),scope());
@@ -73,4 +79,14 @@ it("applies personal attack/defense in an authorized multiplayer scope and resto
  const b=service(); b.addPending("buff_atk");const r={...reading(),online:true};
  b.tick(r,{...scope(),multiplayer:true});expect(b.diagnostic().active.atk).toBeGreaterThan(0);
  b.tick(r,{...scope("Fault"),multiplayer:true});expect(b.diagnostic().active.atk).toBe(0);
+});
+
+it("freezes new-run amounts, restores old stats and reuses the critical-rate hook",()=>{
+ const b=service();b.addPending("buff_atk");b.addPending("buff_crit");b.tick(reading(),scope());
+ const hook=h.hook;expect(h.values._AtkUpAlive).toBe(17);
+ const amounts={atk:23,def:34,crit:45};b.configure(amounts);amounts.crit=999;
+ expect(h.values._AtkUpAlive).toBe(7);expect(b.snapshot()).toEqual({atk:0,def:0,crit:0});
+ b.addPending("buff_atk");b.addPending("buff_crit");b.tick(reading(43),scope());
+ expect(h.values._AtkUpAlive).toBe(30);expect(h.hook).toBe(hook);
+ h.pre({2:ptr(100)});expect(h.hook(ptr(5))).toEqual(ptr(50));
 });

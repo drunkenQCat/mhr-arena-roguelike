@@ -23,9 +23,12 @@ export class BuffService {
   private written: Record<string, number> = {};
   private hookInstalled = false;
   private critBonus = 0;
+  private nativeCritical: { base: number; result: number } | null = null;
   private playerAddress: number | null = null;
   private lastStatRead = -1;
-  constructor(private readonly amounts: BuffAmounts) {}
+  constructor(private amounts: BuffAmounts) {}
+  /** New-run boundary; retain the already installed native critical-rate hook. */
+  configure(amounts: BuffAmounts): void { this.shutdown();this.amounts={...amounts}; }
   addPending(kind: BuffKind): { ok: boolean; total: number } {
     if (kind === "buff_atk") this.pending.atk += this.amounts.atk;
     else if (kind === "buff_def") this.pending.def += this.amounts.def;
@@ -39,7 +42,7 @@ export class BuffService {
   }
   snapshot(): BuffPending { return { ...this.pending }; }
   diagnostic() { return { pending: { ...this.pending }, active: { ...this.active }, layer: this.layer,
-    appliedUnique: this.appliedUnique, critBonus: this.critBonus }; }
+    appliedUnique: this.appliedUnique, critBonus: this.critBonus, nativeCritical: this.nativeCritical }; }
   private restoreFields(): void {
     const data = this.data;
     if (data) for (const field of Object.keys(this.written)) {
@@ -51,6 +54,7 @@ export class BuffService {
     this.data = null; this.previous = {}; this.written = {}; this.appliedUnique = null;
     this.lastStatRead = -1;
     this.critBonus = 0; this.playerAddress = null;
+    this.nativeCritical = null;
   }
   shutdown(): void { this.restoreFields(); this.pending = empty(); this.active = empty(); this.layer = null; }
   tick(reading: RuntimeReading | null, scope: BuffScope): void {
@@ -84,7 +88,11 @@ export class BuffService {
           if (reframework.getHookStorage().rogueLocalCritical !== true || this.critBonus === 0) return retval;
           let original = toInt64(retval) % 4294967296;
           if (original >= 2147483648) original -= 4294967296;
-          return toPtr(original + this.critBonus);
+          const result = original + this.critBonus;
+          // Observe the real hit calculation; this method requires hit data and
+          // a target, so an argumentless reflection call is not verification.
+          this.nativeCritical = { base: original, result };
+          return toPtr(result);
         });
         this.hookInstalled = true;
       }
@@ -103,7 +111,9 @@ export class BuffService {
       this.appliedUnique = q.unique; this.appliedDeaths = reading!.deaths; this.lastStatRead = reading!.time;
       this.critBonus = this.active.crit * this.amounts.crit;
       const actor = getSingleton("snow.player.PlayerManager")?.call("findMasterPlayer") as REManagedObject | null;
-      this.playerAddress = actor ? toInt64(actor.get_address()) : null;
+      // get_address() is already an integer. sdk.to_int64 accepts pointer
+      // userdata; passing this number to it becomes NULL in the host binding.
+      this.playerAddress = actor ? actor.get_address() : null;
       relog.info(`[MhwRogue] wave buff applied: layer=${this.layer} atk=${this.active.atk} def=${this.active.def} crit=${this.critBonus}`);
     } catch (error) {
       this.restoreFields();

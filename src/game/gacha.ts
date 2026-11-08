@@ -50,7 +50,9 @@ function entryName(entry: REManagedObject | null): string | null {
 }
 
 export class GachaService {
-  constructor(private readonly pools: Record<string, GachaPoolSpec>, private readonly deps: GachaDeps) {}
+  constructor(private pools: Record<string, GachaPoolSpec>, private readonly deps: GachaDeps) {}
+  /** Called only before personal preparation, never during an in-flight purchase. */
+  configure(pools: Record<string,GachaPoolSpec>): void { this.pools=pools; }
 
   hasPool(poolId: string): boolean {
     const pool = this.pools[poolId];

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { beforeEach, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { validateConfig } from "../core/config";
@@ -8,7 +9,7 @@ import { ShopWindow } from "./shop_window";
 
 const host = vi.hoisted(() => ({ now: 10, files: {} as Record<string, any>, count: 0, failWrite: "", commands: [] as string[] }));
 vi.mock("./sdk", () => ({ loadWebconsole: () => ({
-  epoch: () => 1,
+  epoch: () => 1, steam_digest:(text:string)=>createHash("sha256").update(text).digest("hex"),
   take_commands: (limit: number) => host.commands.splice(0, limit),
   publish_state: (text: string) => { host.files["webconsole_state.json"] = JSON.parse(text); },
   publish_results: (text: string) => { if (host.failWrite === "webconsole_results.json") throw new Error("publish failed"); host.files["webconsole_results.json"] = JSON.parse(text); }
@@ -291,4 +292,13 @@ it("verifies multiplayer teleport against the local guest and preserves arrival 
  expect(host.files["webconsole_results.json"].last).toMatchObject({status:"applied",position:{x:104,y:5,z:80},verifiedAt:host.now});
  f.reading.players[1]!.position={x:0,y:50,z:47};f.tick();
  expect(host.files["webconsole_results.json"].last.position).toEqual({x:104,y:5,z:80});
+});
+
+it("rejects same-ID nested rule changes even when counts, start PT and carts match",()=>{
+ const f=fixture();f.tick();const initial=structuredClone(f.cfg);
+ expect(f.command("submitConfig",{config:initial,configVersion:0},"nested-config").status).toBe("applied");
+ const changed={...initial,buffAmounts:{...initial.buffAmounts!,atk:999}};
+ expect(f.command("submitConfig",{config:changed,configVersion:0},"nested-config").status).toBe("rejected");
+ expect(f.session.configForEditing().buffAmounts?.atk).toBe(initial.buffAmounts?.atk);
+ expect(host.files["webconsole_results.json"].last.__fp).toHaveLength(64);
 });

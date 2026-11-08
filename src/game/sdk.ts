@@ -105,7 +105,8 @@ export interface REManagedObject {
   call(name: string, ...args: unknown[]): unknown;
   add_ref(): void;
   release(): void;
-  get_address(): unknown;
+  /** REFramework returns uintptr_t as a Lua integer, not lightuserdata. */
+  get_address(): number;
   get_type_definition(): RETypeDefinition;
 }
 

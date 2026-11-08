@@ -16,22 +16,29 @@ import { RecoverySave } from "./recovery_save";
 import { captureRecoveryCommit, commitRecovery } from "./recovery_commit";
 import { BuffService } from "./buff_service";
 import { GachaService } from "./gacha";
-import { DEFAULT_BUFF_AMOUNTS, type BuffAmounts } from "../core/config";
+import { DEFAULT_BUFF_AMOUNTS, type RogueConfig } from "../core/config";
 import type { ServiceEffects } from "./shop_window";
 import type { BuffKind } from "./buff_service";
 import { clockSeconds, reframework, rejson, relog } from "./sdk";
 import { entryHostTestScope } from "./entry_host_scope";
 
 try {
-  const config = loadConfig();
+  let config = loadConfig();
+  // Retained across coordinator/session replacement; internal entry quest IDs
+  // never overwrite the user's base configuration.
+  const configSubmitted=(next: RogueConfig) => {
+    config=next.quest.id===config.quest.id ? next : {...next,quest:{...next.quest,id:config.quest.id}};
+  };
   let core = new RunCore(config);
   const spike: WaveOption = { index: 0, typeTag: "M2a", label: "Great Izuchi -> Great Baggi",
     monsters: ["Great Izuchi", "Great Baggi"], tier: "weak", hpMul: 1, dmgMul: 1, rewardMul: 0, rewardPt: 0 };
   const initial = makeQuestPlan(config, monsterCatalog, spike, 1, 0, true);
   const installer = new QuestInstaller(config, initial);
   const gacha = new GachaService(config.gachaPools ?? {}, { rollIndex: (w) => core.rollWeighted(w) });
-  let runtime = new NativeRuntime(config, installer, gacha);
-  let session = new RunSession(core, monsterCatalog, runtime);
+  const buffs = new BuffService(config.buffAmounts ?? DEFAULT_BUFF_AMOUNTS);
+  const configureServices=(next:RogueConfig) => buffs.configure(next.buffAmounts ?? DEFAULT_BUFF_AMOUNTS);
+  let runtime = new NativeRuntime(config, installer, gacha, false, configureServices);
+  let session = new RunSession(core, monsterCatalog, runtime, configSubmitted);
   const recoverySave=new RecoverySave({prepare:()=>session.prepareForNativeSave(),
     capture:captureRecoveryCommit,commit:commitRecovery,report:(event,detail)=>runtime.report(event,detail)});
   // 上局中断留下的未恢复状态（重载/崩溃）：回到村庄后由 session tick 自动恢复。
@@ -40,8 +47,6 @@ try {
     relog.warn("[MhwRogue] 检测到未恢复的上局开局状态；回到村庄后自动恢复原装备");
   }
   // M3.6 翻盘服务：单轮增益（叠加购买）+ 装备抽取（发件并入局末清理）
-  const amounts: BuffAmounts = config.buffAmounts ?? DEFAULT_BUFF_AMOUNTS;
-  const buffs = new BuffService(amounts);
   const services: ServiceEffects = {
     buffBuy: (kind: BuffKind) => buffs.addPending(kind),
     gachaBuy: (poolId: string) => {
@@ -54,7 +59,7 @@ try {
   let shopWindow = new ShopWindow(session.core, () => session.canShop(), () => session.shopQuest(), services);
   let entryAttached = false;
   let previousRun: ReturnType<RunSession["runSummary"]> | null = null;
-  const multiplayerEntry = new MultiplayerEntry(config, monsterCatalog, () => !entryAttached &&
+  const multiplayerEntry = new MultiplayerEntry(() => config, monsterCatalog, () => !entryAttached &&
     ((session.stage === "Preparing" && session.startupStatus.prepared) ||
       (["Idle", "Finished", "Fault"].includes(session.stage) && !session.startupStatus.restorePending)), undefined, {
     prepared: () => session.startupStatus.prepared,
@@ -103,9 +108,9 @@ try {
           runtime.shutdown(); const nativeUi = webConsole?.newScriptSession();
           const entryConfig = { ...config, quest: { ...config.quest, id: entry.plan.questId } };
           core = new RunCore(entryConfig);
-          runtime = new NativeRuntime(entryConfig, entry.installer, gacha, true);
+          runtime = new NativeRuntime(entryConfig, entry.installer, gacha, true, configureServices);
           runtime.tick();
-          session = new RunSession(core, monsterCatalog, runtime);
+          session = new RunSession(core, monsterCatalog, runtime, configSubmitted);
           const adopted = session.adoptPostedEntry(entry.plan);
           if (!adopted.ok) throw new Error(adopted.message ?? "Cannot adopt entry quest");
           shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
@@ -120,7 +125,7 @@ try {
         previousRun = session.runSummary(); runtime.report("run-settlement",previousRun);
         buffs.shutdown(); multiplayerEntry.resetForNextRun();
         runtime.rebind(config, installer); multiplayerRun = null; entryAttached = false;
-        core = new RunCore(config); session = new RunSession(core, monsterCatalog, runtime);
+        core = new RunCore(config); session = new RunSession(core, monsterCatalog, runtime, configSubmitted);
         shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
         const nativeUi = webConsole?.newScriptSession();
         webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun, nativeUi);

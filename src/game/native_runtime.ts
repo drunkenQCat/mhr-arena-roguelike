@@ -65,10 +65,17 @@ export class NativeRuntime implements SessionPort {
   private partySizeSource: (() => number | null) | null = null;
 
   constructor(private cfg: RogueConfig, public installer: QuestInstaller,
-    private readonly gacha?: GachaService, private readonly entryHostTest = false) {
+    private readonly gacha?: GachaService, private readonly entryHostTest = false,
+    private readonly configureServices?: (config: RogueConfig) => void) {
     this.transport = new QuestTransport(() => this.installer.getQuest(),
-      (cfg.runtime ?? DEFAULT_RUNTIME).postTimeoutSeconds);
+      () => (this.cfg.runtime ?? DEFAULT_RUNTIME).postTimeoutSeconds);
     this.questTransport = this.transport;
+  }
+
+  configureRun(config: RogueConfig): void {
+    this.cfg=config;
+    this.gacha?.configure(config.gachaPools ?? {});
+    this.configureServices?.(config);
   }
 
   /** Reuse the installed hooks across runs; callbacks read this current context. */

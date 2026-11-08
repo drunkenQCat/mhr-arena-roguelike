@@ -213,3 +213,9 @@ it("does not recreate an already registered room or silently accept a wrong ques
   expect(lobby.call.mock.calls.some(([name]) => name === "createRoom")).toBe(false);
   expect(transport.getError()).toContain("registration was not confirmed");
 });
+
+it("captures the latest configured timeout for each new post",()=>{
+ fixture();let timeout=5;const t=new QuestTransport(()=>({})as any,()=>timeout);
+ t.request(900102);mock.now=106;t.tick();expect(t.getError()).toContain("timed out");
+ timeout=20;t.request(900102);mock.now=112;t.tick();expect(t.getError()).toBeNull();
+});

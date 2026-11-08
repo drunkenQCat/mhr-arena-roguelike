@@ -188,3 +188,17 @@ it("posts the displayed choice and preserves the shared pair when comparing sequ
  f.as(0,()=>f.host.choose(2));expect(JSON.parse(f.server.plan).seed).toBe(seed);
  expect((mock.publish.mock.calls.at(-1)![0] as any).wave.monsters).toEqual(options[2]!.monsters);
 });
+
+it("uses current saved rules for previews and ACKs after resetting the entry, without replacing native hooks",()=>{
+ const f=fixture();let cfg=validateConfig(structuredClone(defaultConfig));
+ const host=new MultiplayerEntry(()=>cfg,monsterCatalog,()=>true,f.port("100"));
+ const guest=new MultiplayerEntry(()=>cfg,monsterCatalog,()=>true,f.port("200"));
+ f.as(0,()=>host.choose(0));f.tick(1,guest);f.tick(0,host);
+ f.as(0,()=>host.resetForNextRun());f.as(1,()=>guest.resetForNextRun());
+ cfg=validateConfig({...structuredClone(cfg),startPt:321,armorOptions:[cfg.armorOptions[1]!],
+   reward:{...cfg.reward,weakBase:133},buffAmounts:{atk:23,def:34,crit:45}});
+ f.as(0,()=>host.choose(0));f.tick(1,guest);f.tick(0,host);
+ expect(host.snapshot().armor).toBe(cfg.armorOptions[0]);expect(host.snapshot().canPost).toBe(true);
+ const preview=host.snapshot().options as {rewardPt:number}[];expect(preview[0]!.rewardPt).toBe(133);
+ const plans=mock.publish.mock.calls.map(c=>c[0]);expect(plans.at(-1).wave.rewardPt).toBe(133);
+});

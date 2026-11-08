@@ -40,7 +40,7 @@ export interface ConsoleState {
     testLayers: number[] | null; activeWave: (Choice & { token: number; layer: number; monsterIds: number[] }) | null;
     testMessage: string; effectPending: boolean };
   services?: { buffs: { pending: { atk: number; def: number; crit: number }; active: { atk: number; def: number; crit: number };
-    layer: number | null; critBonus: number } | null; lastTransaction: Pick<CommandResult, "status" | "message"> | null;
+    layer: number | null; critBonus: number; nativeCritical?: {base: number; result: number} | null } | null; lastTransaction: Pick<CommandResult, "status" | "message"> | null;
     cartRestoreUsed: boolean; purchases: string[] | null };
   enemies?: { uid: number; typeId: number; dead: boolean; captured: boolean }[] | null;
 }

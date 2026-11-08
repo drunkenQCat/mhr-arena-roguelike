@@ -156,7 +156,7 @@ function submit() {
 <template>
   <section class="editor panel">
     <div class="section-heading"><div><p class="eyebrow">DESIGN WORKBENCH</p><h2>策划工作台</h2>
-      <p class="muted">编辑草稿并与已载入方案比较。当前战斗和奖励不会中途重算。</p><p class="muted">装备、抽装池、增益数值保存后需在安全回村后 Reset scripts；单人其他设置按各项提示生效。联机配置必须全队一致；修改后全队先回村、保存同一方案，再 Reset scripts 开新局，当前联机局不会热换规则。</p></div>
+      <p class="muted">编辑草稿并与已载入方案比较。当前战斗和奖励不会中途重算。</p><p class="muted">开局装备、抽装池与增益数值下一局生效；单人其他设置按各项提示生效。联机配置必须全队一致；修改时全队先回村并完成恢复，再分别保存同一方案；之后可直接准备新局，无需重载脚本。当前联机局不会热换规则。</p></div>
       <span class="badge">已载入 v{{ version }} · 游戏 v{{ serverVersion }}</span></div>
     <div class="toolbar">
       <button :disabled="busy || !connected || diff.length > 0" @click="emit('load')">载入游戏配置</button>
@@ -193,13 +193,13 @@ function submit() {
         <p class="muted">普通层固定提供 Single / Sequential / Simultaneous；终盘单怪池保持单怪限制。当前选择数：{{ draft.choiceCount }}。</p>
       </div>
       <div v-if="tab === 'equipment'" class="editor-body">
-        <h3>开局装备 <span class="badge">保存后重载脚本生效</span></h3>
+        <h3>开局装备 <span class="badge">下一局生效</span></h3>
         <p class="muted">系列号对应游戏内防具系列；请使用已验证的编号。开局前会保存并在结束后恢复原装备。</p>
         <div v-for="(name, i) in draft.armorOptions" :key="i" class="subpanel">
           <div class="fields"><label class="text-field">方案名称<input :value="name" @change="renameOption(i, $event)" /></label>
           <NumberField v-if="draft.armorSets?.[name]" v-model="draft.armorSets[name].series" label="防具系列号" />
           <label v-if="draft.armorSets?.[name]" class="text-field">方案说明<input :value="draft.armorSets[name].desc ?? ''" placeholder="可留空" @change="($event.target as HTMLInputElement).value.trim() ? draft.armorSets![name].desc = ($event.target as HTMLInputElement).value.trim() : delete draft.armorSets![name].desc" /></label></div>
-          <p v-if="!draft.armorSets?.[name]" class="notice">此方案没有防具定义，当前会保留已有防具。新增定义后重载生效。</p>
+          <p v-if="!draft.armorSets?.[name]" class="notice">此方案没有防具定义，将拒绝准备。请补齐定义并保存后再开局。</p>
           <button v-if="!draft.armorSets?.[name]" @click="(draft.armorSets ??= {})[name] = {series: 0}">设置防具系列</button>
           <button :disabled="draft.armorOptions.length <= 1" @click="removeArmor(i)">移除此方案</button>
         </div>
@@ -221,9 +221,9 @@ function submit() {
             <button :disabled="draft.supplyDrops.entries.length<=1" @click="draft.supplyDrops.entries.splice(index,1)">移除</button>
           </div><button @click="draft.supplyDrops.entries.push({itemId:'honey',count:1,weight:1})">添加掉落道具</button>
         </template>
-        <h3>单波增益 <span class="badge">保存后重载脚本生效</span></h3>
+        <h3>单波增益 <span class="badge">下一局生效</span></h3>
         <div v-if="draft.buffAmounts" class="fields"><NumberField v-model="draft.buffAmounts.atk" label="每次购买攻击增加" /><NumberField v-model="draft.buffAmounts.def" label="每次购买防御增加" /><NumberField v-model="draft.buffAmounts.crit" label="每次购买会心增加（%）" /></div>
-        <h3>装备抽取池 <span class="badge">保存后重载脚本生效</span></h3>
+        <h3>装备抽取池 <span class="badge">下一局生效</span></h3>
         <p class="muted">ID 须是游戏的武器 / 防具 ID；权重决定池内相对概率，并非百分比。未知 ID 未验证能否发放。</p>
         <details v-for="id in ['gacha_1','gacha_2','gacha_3','gacha_4']" :key="id" class="subpanel"><summary>{{ draft.shop.find(item => item.id === id)?.name ?? id }} · {{ draft.gachaPools?.[id]?.entries.length ?? 0 }} 件</summary>
           <div v-for="(entry, index) in draft.gachaPools?.[id]?.entries ?? []" :key="index" class="equipment-entry">
@@ -262,7 +262,7 @@ function submit() {
       </div>
       <div v-if="tab === 'shop'" class="editor-body">
         <label>查找商品 <input v-model="search" placeholder="名称 / 分类 / 商品 ID" /></label>
-        <p class="muted">单人价格下次交易生效；联机需全队统一配置并回村重载。猫车恢复价格以本表为准，当前最多恢复一次；限购设 0 可禁用。商品 ID 与交付方式保持已有映射；未接入游戏效果的服务仍不可购买。</p>
+        <p class="muted">单人价格下次交易生效；联机需全队回村并在准备前保存同一配置。猫车恢复价格以本表为准，当前最多恢复一次；限购设 0 可禁用。商品 ID 与交付方式保持已有映射；未接入游戏效果的服务仍不可购买。</p>
         <div class="table-scroll"><table><thead><tr><th>商品</th><th>分类</th><th>价格（PT）</th><th>持有上限</th><th>全局限购</th><th>交付方式</th></tr></thead><tbody>
           <tr v-for="item in filteredShop" :key="item.id"><td>{{ item.name }}<small>{{ item.desc || item.id }}</small><small v-if="previewResult.choices[0]?.rewardPt">约 {{ (item.price / previewResult.choices[0].rewardPt).toFixed(1) }} 次预览单怪奖励</small></td><td>{{ item.category }}</td>
             <td><input v-model.number="item.price" type="number" min="0" step="1" :aria-label="`${item.name}价格`" /></td>
@@ -291,7 +291,7 @@ function submit() {
       </div>
       </div><BalancePreview :draft="draft" :baseline="baseline" v-model:layer="previewLayer" v-model:players="players" v-model:unlocked="unlockAll" /></div>
       <details class="advanced"><summary @click="rawText = JSON.stringify(draft, null, 2)">高级：JSON 草稿</summary><textarea v-model="rawText" rows="12" aria-label="高级 JSON 草稿" spellcheck="false" /><button @click="applyRaw">将 JSON 应用到表单草稿</button></details>
-      <div class="submit-bar"><span>{{ error ? '请先修正上方配置错误' : '价格下次交易生效；曲线和怪池下次生成生效；装备、抽装池与增益保存后需重载脚本' }}</span>
+      <div class="submit-bar"><span>{{ error ? '请先修正上方配置错误' : '价格下次交易生效；曲线和怪池下次生成生效；装备、抽装池与增益下一局生效' }}</span>
         <button class="primary" :disabled="!!error || !diff.length || busy || !connected || conflict" @click="submit">{{ busy ? '等待游戏确认…' : '校验并提交到游戏' }}</button></div>
     </template>
   </section>
