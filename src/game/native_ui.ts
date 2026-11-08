@@ -61,7 +61,14 @@ export class NativeUi {
       dialogToken: action === "dialog.close" ? view.dialogs.find(d => d.supported)?.token : undefined }, true);
     r.message = action === "result.receive" ? "领取原生任务奖励" : action === "result.next" ? "确认原生结算" : "关闭连接结束提示";
   }
-  constructor(private readonly bridge: string, private readonly ownedQuestId: () => number) {}
+  constructor(private bridge: string, private ownedQuestId: () => number) {}
+
+  /** A new business run rotates tokens, while native hooks stay installed once. */
+  rebind(bridge: string, ownedQuestId: () => number): void {
+    this.shutdown();
+    this.bridge = bridge; this.ownedQuestId = ownedQuestId;
+    this.fingerprint = ""; this.revision = 0; this.contexts = {}; this.diagnostics = {};
+  }
 
   observe(): UiSnapshot {
     const gm = getSingleton("snow.gui.GuiManager");

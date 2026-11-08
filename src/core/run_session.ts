@@ -41,6 +41,8 @@ export interface SessionPort {
   postingError(): string | null;
   waitingForSpawnCapacity?(): boolean;
   finish(failed: boolean): void;
+  /** Pin the owned native instance against success while the host queues failure. No native finish call. */
+  guardFailure?(): void;
   takeDeaths(): DeathReading[];
   report(event: string, detail: unknown): void;
   /** M3.5 开局准备（穿装+袋隔离）；实现方保证不抛异常。缺省=测试假 port。notice=非阻断警告。 */
@@ -77,6 +79,7 @@ export class RunSession {
   /** 本会话成功执行过开局准备（fault/stop 时据此决定是否需要恢复）。 */
   private startupPrepared = false;
   private preparationQuest: number | null = null;
+  private abortQuest: { id: number; unique: number } | null = null;
   private startupNotice: string | null = null;
 
   /** 脚本重载后恢复"上局未恢复"状态（main.ts 读持久化文件后调用）。 */
@@ -130,6 +133,19 @@ export class RunSession {
 
   /** 当前任务实例号快照（状态发布用；null=未在任务中）。 */
   get questUniqueSnapshot(): number | null { return this.questUnique; }
+
+  get multiplayerAbortPending(): boolean {
+    const q = this.readingSnapshot?.quest, abort = this.abortQuest;
+    return !!abort && !!q?.playing && q.id === abort.id && q.unique === abort.unique;
+  }
+
+  private requestMultiplayerAbort(reading: RuntimeReading): void {
+    const q = reading.quest;
+    if (!this.multiplayerRole || !q?.playing || q.id !== this.plan?.questId ||
+        (this.questUnique !== null && q.unique !== this.questUnique)) return;
+    this.port.guardFailure?.();
+    this.abortQuest = { id: q.id, unique: q.unique };
+  }
 
   /** 入场时记录的起始点位置（tp-to-camp 用；null=本局尚无记录）。 */
   get campSnapshot(): { x: number; y: number; z: number } | null { return this.camp; }
@@ -456,7 +472,9 @@ export class RunSession {
   stop(): void {
     const reading = this.port.read();
     this.port.cancelPost();
-    if ((this.port.canFinishLocal?.() ?? this.multiplayerRole !== "guest") && this.plan && reading.quest?.id === this.plan.questId && reading.quest.playing) this.port.finish(true);
+    this.requestMultiplayerAbort(reading);
+    if ((this.port.canFinishLocal?.() ?? this.multiplayerRole !== "guest") && this.plan && reading.quest?.id === this.plan.questId && reading.quest.playing &&
+        (this.questUnique === null || this.questUnique === reading.quest.unique)) this.port.finish(true);
     this.port.policy(null, false);
     this.core.abortRun("Run stopped");
     if (this.startupPrepared) this.startupRestorePending = true;
@@ -710,6 +728,10 @@ export class RunSession {
   private fault(error: unknown): Result {
     if (this.stage === "Fault" && this.message === String(error)) return fail(this.message);
     const q = this.readingSnapshot?.quest;
+    if (this.readingSnapshot) {
+      try { this.requestMultiplayerAbort(this.readingSnapshot); }
+      catch (guardError) { this.announce("fault-failure-guard-error", String(guardError)); }
+    }
     if (this.multiplayerRole && (this.port.canFinishLocal?.() ?? this.multiplayerRole === "host") && q?.playing && this.plan?.questId === q.id &&
         (this.questUnique === null || this.questUnique === q.unique)) {
       try { this.port.finish(true); }

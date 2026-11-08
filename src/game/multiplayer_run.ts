@@ -35,6 +35,7 @@ export class MultiplayerRun implements SpawnSync {
   readonly role: "host" | "guest";
   private readonly hash: string;
   private live = true;
+  private abortPending = false;
   private lastPoll = -1;
   private lastSeen = clockSeconds();
   private sequence = 0;
@@ -173,12 +174,13 @@ export class MultiplayerRun implements SpawnSync {
   }
   tick(): void {
     const now = clockSeconds();
-    if (!this.live || this.lastPoll === now) return;
+    if ((!this.live && !this.abortPending) || this.lastPoll === now) return;
     this.lastPoll = now;
     // Native return can finish locally before the last Steam frame or lobby teardown.
     // Never turn an already-ended local run back into a synchronization fault.
     if (["Finished", "Fault"].includes(this.session.stage)) {
       if (this.role === "host") { try { this.publish(); } catch { /* native lobby may already be retired */ } }
+      else this.publishAbort();
       this.live = false; this.message = "本局已结束，等待回村恢复后重新开局";
       return;
     }
@@ -207,9 +209,18 @@ export class MultiplayerRun implements SpawnSync {
     if (!this.live) return;
     this.message = reason;
     if (this.role === "host") { try { this.session.failMultiplayer(reason); this.publish(); } catch { /* scope may already be gone */ } }
-    else { this.network.steam_ack?.(this.context.lobby, `R4ERR|${this.context.session}|${reason.slice(0,256)}`); this.session.failMultiplayer(reason); }
+    else { this.session.failMultiplayer(reason); this.publishAbort(); }
     this.live = false;
     this.runtime.report("multiplayer-run-error", { role:this.role, reason });
+  }
+  private publishAbort(): void {
+    this.abortPending = this.session.multiplayerAbortPending;
+    if (!this.abortPending) return;
+    // The persistent member value is retried while this exact local quest is live.
+    // A failed publication must not strand the host until its 120-second timeout.
+    try {
+      this.network.steam_ack?.(this.context.lobby, `R4ERR|${this.context.session}|${this.session.message.slice(0,256)}`);
+    } catch { /* Retry on the next poll; native return cancels the pending intent. */ }
   }
   snapshot(): Record<string, unknown> { return { role:this.role, live:this.live, message:this.message,
     lobby:this.context.lobby, session:this.context.session, members:this.members.map(m => ({ id:m.id, self:m.id === this.context.self,

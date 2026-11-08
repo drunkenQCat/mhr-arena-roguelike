@@ -1,10 +1,10 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const host = vi.hoisted(() => ({ objects: {} as Record<string, any>, hooks: new Map<string, any>(),
+const host = vi.hoisted(() => ({ objects: {} as Record<string, any>, hooks: new Map<string, any>(), installations: 0,
   now: 100, storage: {} as Record<string, unknown> }));
 vi.mock("./sdk", () => ({
   clockSeconds: () => host.now, getSingleton: (n: string) => host.objects[n] ?? null,
   findTypeDefinition: (type: string) => ({ get_method: (name: string) => ({ key: `${type}.${name}` }) }),
-  hookMethod: (method: any, pre: any, post: any) => host.hooks.set(method.key, { pre, post }),
+  hookMethod: (method: any, pre: any, post: any) => { host.installations++; host.hooks.set(method.key, { pre, post }); },
   PRE_HOOK: { CALL_ORIGINAL: 0 }, toPtr: (v: unknown) => v, toManagedObject: (v: unknown) => v,
   reframework: { getThreadId: () => 1, getHookStorage: () => host.storage },
 }));
@@ -38,7 +38,21 @@ function signal(name: string, argument?: unknown) {
   hook.pre([undefined, undefined, argument]);
   return hook.post(0);
 }
-beforeEach(() => { host.objects = {}; host.hooks.clear(); host.now = 100; host.storage = {}; });
+beforeEach(() => { host.objects = {}; host.hooks.clear(); host.installations = 0; host.now = 100; host.storage = {}; });
+
+it("rotates UI identity without accumulating hooks or replaying old input across runs", () => {
+ const f=fixture();const previous=f.ui.observe();
+ f.ui.request({id:"old",cmd:"title.continue",sceneToken:previous.sceneToken});
+ const count=host.installations;expect(count).toBeGreaterThan(0);
+ f.ui.rebind("epoch-2",()=>900102);
+ expect(signal("getDecideButtonTrg")).toBe(0);expect(f.ui.poll()).toBeNull();
+ expect(()=>f.ui.request({id:"stale",cmd:"title.continue",sceneToken:previous.sceneToken})).toThrow();
+ for(let i=0;i<5;i++) {
+  f.ui.rebind(`epoch-${i+3}`,()=>900103);
+  f.ui.request({id:`new-${i}`,cmd:"title.continue",sceneToken:f.ui.observe().sceneToken});
+ }
+ expect(host.installations).toBe(count);
+});
 
 it("disarms pending input when a bridge is retired between runs", () => {
   const f = fixture(); const v = f.ui.observe();

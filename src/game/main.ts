@@ -95,7 +95,7 @@ try {
         const entry = multiplayerEntry.hostTestEntry();
         if (entry) {
           entryAttached = true;
-          runtime.shutdown(); webConsole?.newScriptSession();
+          runtime.shutdown(); const nativeUi = webConsole?.newScriptSession();
           const entryConfig = { ...config, quest: { ...config.quest, id: entry.plan.questId } };
           core = new RunCore(entryConfig);
           runtime = new NativeRuntime(entryConfig, entry.installer, gacha, true);
@@ -104,7 +104,7 @@ try {
           const adopted = session.adoptPostedEntry(entry.plan);
           if (!adopted.ok) throw new Error(adopted.message ?? "Cannot adopt entry quest");
           shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
-          webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun);
+          webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun, nativeUi);
         }
       }
       runtime.tick(); shopWindow.tick(); session.tick();
@@ -117,8 +117,8 @@ try {
         runtime.rebind(config, installer); multiplayerRun = null; entryAttached = false;
         core = new RunCore(config); session = new RunSession(core, monsterCatalog, runtime);
         shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
-        webConsole?.newScriptSession();
-        webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun);
+        const nativeUi = webConsole?.newScriptSession();
+        webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun, nativeUi);
         runtime.report("multiplayer-ready-for-new-run", { restored: true });
       }
       buffs.tick(session.readingSnapshot, { stage: session.stage, layer: core.state.layer, questId: core.config.quest.id, multiplayer: runtime.multiplayerValid() || session.stage === "Preparing" });

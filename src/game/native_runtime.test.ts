@@ -78,6 +78,18 @@ it("defers finish to native quest update, allows native failure first, and never
   updated.post(0); expect(failures()).toBe(1);
 });
 
+it("lets a guest pin failure without calling native finish and releases the pin for a different quest instance", () => {
+ const {runtime,qm,plan,hooks}=fixture();let unique=12;
+ qm.call.mockImplementation((name:string)=>name==="isActiveQuest" || name==="isPlayQuest" ? true :
+   name==="get_ActiveQuestNo" ? plan.questId : name==="getActiveQuestUniqueNo" ? unique : null);
+ runtime.policy(plan,true);runtime.guardFailure();runtime.policy(null,false);
+ expect(hooks("snow.QuestManager","setQuestClear").pre()).toBe(1);
+ expect(hooks("snow.QuestManager","setQuestClearSub").pre()).toBe(1);
+ hooks("snow.QuestManager","update").post(0);
+ expect(qm.call).not.toHaveBeenCalledWith("setQuestFail",expect.anything());
+ unique++;expect(hooks("snow.QuestManager","setQuestClear").pre()).toBe(0);
+});
+
 describe("native runtime hook scope", () => {
   it("blocks settlement/timeouts only while owning the prepared custom quest", () => {
     const { runtime, plan, hooks, foreign } = fixture();

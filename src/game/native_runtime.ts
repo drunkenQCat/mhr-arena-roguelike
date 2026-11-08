@@ -316,6 +316,15 @@ export class NativeRuntime implements SessionPort {
     return report.ok ? { ok: true } : { ok: false, reason: report.reason };
   }
 
+  guardFailure(): void {
+    const qm = questManager();
+    if (!qm || callNative(qm, "get_ActiveQuestNo") !== this.cfg.quest.id || !callNative(qm, "isActiveQuest"))
+      throw new Error("Refusing to guard an unrelated quest");
+    const unique = callNative(qm, "getActiveQuestUniqueNo") as number;
+    if (!Number.isInteger(unique)) throw new Error("Native quest identity unavailable");
+    this.failedEnding = { questId: this.cfg.quest.id, unique };
+  }
+
   finish(failed: boolean): void {
     const qm = questManager();
     if (!qm || callNative(qm, "get_ActiveQuestNo") !== this.cfg.quest.id || !callNative(qm, "isActiveQuest")) {
@@ -325,7 +334,7 @@ export class NativeRuntime implements SessionPort {
       throw new Error("Only the quest host may finish a multiplayer run");
     // Completed original objectives are still true during inPlace waves. Releasing
     // their clear gate before native failure runs lets success win the next update.
-    if (failed) this.failedEnding = {questId: this.cfg.quest.id, unique: callNative(qm, "getActiveQuestUniqueNo") as number};
+    if (failed) this.guardFailure();
     else this.holdClear = false;
     // netSendQuestDone allocates a managed message retained by QuestManager.
     // Run from the engine's update context, after native faint/failure processing,

@@ -20,9 +20,9 @@ function fixture(size=2) {
     let run:MultiplayerRun;
     const reading:RuntimeReading={time:mock.now,quest:{id:900103,unique:7,playing:true,status:"play"},
       online:true,canPost:false,deaths:0,players:[{id:0,position:{x:10,y:20,z:30}},{id:1,position:{x:10,y:20,z:30}}],enemies:[]};
-    const publish=vi.fn(), policy=vi.fn(), finish=vi.fn();
+    const publish=vi.fn(), policy=vi.fn(), finish=vi.fn(), guardFailure=vi.fn();
     const port:SessionPort={now:()=>mock.now,ready:()=>true,read:()=>({...reading,time:mock.now}),publish,policy,
-      post:vi.fn(),cancelPost:vi.fn(),postingError:()=>null,takeDeaths:()=>[],finish,report:vi.fn(),
+      post:vi.fn(),cancelPost:vi.fn(),postingError:()=>null,takeDeaths:()=>[],finish,guardFailure,report:vi.fn(),
       multiplayerRole:()=>run?.role ?? null, multiplayerValid:()=>run?.valid() ?? false, multiplayerCanChoose:()=>run?.canChoose() ?? false};
     const session=new RunSession(core,monsterCatalog,port);
     const network:NativeWebconsole={ping:s=>s,epoch:()=>1,take_commands:()=>[],publish_state:()=>{},publish_results:()=>{},
@@ -37,7 +37,7 @@ function fixture(size=2) {
     const wave={index:0,mode:"single" as const,typeTag:"A",label:"entry",monsters:["Great Izuchi"],tier:"weak",hpMul:1,dmgMul:1,rewardMul:0,rewardPt:0};
     expect(session.adoptMultiplayerEntry(makeQuestPlan(cfg,monsterCatalog,wave,1,1,false)).ok).toBe(true);
     session.tick();
-    return {run,session,core,cfg,reading,publish,policy,finish,mirrorCartRestore,setBusy:(v:boolean)=>busy=v};
+    return {run,session,core,cfg,reading,publish,policy,finish,guardFailure,network,mirrorCartRestore,setBusy:(v:boolean)=>busy=v};
   };
   const host=make("h"),guests=bus.members.slice(1).map(make),guest=guests[0]!;
   const tick=()=>{mock.now++;host.session.tick();host.run.tick();for(const peer of guests){peer.session.tick();peer.run.tick();}};
@@ -114,6 +114,47 @@ it("requires all four fixed members to stage and activate the same native ticket
 it("follows host stop without a guest issuing native failure",()=>{
  const f=fixture();f.tick();f.host.session.stop();f.tick();
  expect(f.guest.session.stage).toBe("Finished");expect(f.guest.run.valid()).toBe(false);expect(f.guest.finish).not.toHaveBeenCalled();
+});
+
+it("propagates guest stop immediately and guards success before releasing local policy",()=>{
+ const f=fixture();f.tick();f.guest.session.stop();
+ expect(f.guest.guardFailure).toHaveBeenCalledOnce();
+ expect(f.guest.guardFailure.mock.invocationCallOrder[0]).toBeLessThan(f.guest.policy.mock.invocationCallOrder.at(-1)!);
+ f.tick();expect(f.bus.acks.g).toMatch(/^R4ERR\|s\|/);
+ expect(f.guest.run.valid()).toBe(false);expect(f.guest.finish).not.toHaveBeenCalled();
+ f.tick();expect(f.host.session.stage).toBe("Fault");expect(f.host.finish).toHaveBeenCalledWith(true);
+});
+
+it("propagates a guest fault outside the coordinator instead of waiting for a timeout",()=>{
+ const f=fixture();f.tick();f.guest.session.failMultiplayer("frame callback failed");
+ f.tick();f.tick();expect(f.host.session.stage).toBe("Fault");
+ expect(f.host.finish).toHaveBeenCalledWith(true);expect(f.guest.finish).not.toHaveBeenCalled();
+});
+
+it("retries a lost guest abort publication and retires it when native failure arrives",()=>{
+ const f=fixture();f.tick();const ack=f.guest.network.steam_ack!;
+ const publish=vi.fn().mockImplementationOnce(()=>{throw new Error("temporary Steam failure");}).mockImplementation(ack);
+ f.guest.network.steam_ack=publish;f.guest.session.stop();f.tick();
+ expect(f.host.session.stage).not.toBe("Fault");f.tick();f.tick();expect(f.host.session.stage).toBe("Fault");
+ f.guest.reading.quest!.status="failed";f.guest.reading.quest!.playing=false;f.tick();
+ const calls=publish.mock.calls.length;f.tick();expect(publish).toHaveBeenCalledTimes(calls);
+});
+
+it("does not turn an already-ended native guest quest into an abort of the host",()=>{
+ const f=fixture();f.tick();f.guest.reading.quest!.playing=false;f.guest.reading.quest!.status="failed";
+ f.tick();expect(f.guest.session.stage).toBe("Finished");expect(f.bus.acks.g).not.toContain("R4ERR|");
+ expect(f.guest.guardFailure).not.toHaveBeenCalled();expect(f.host.finish).not.toHaveBeenCalled();
+});
+
+it("never guards or aborts a different native instance when an old guest is stopped",()=>{
+ const f=fixture();f.tick();f.guest.reading.quest!.unique=999;f.guest.session.stop();f.tick();
+ expect(f.guest.guardFailure).not.toHaveBeenCalled();expect(f.bus.acks.g).not.toContain("R4ERR|");
+ expect(f.host.finish).not.toHaveBeenCalled();
+});
+
+it("does not let host stop finish a newly accepted instance with the same quest number",()=>{
+ const f=fixture();f.tick();f.host.reading.quest!.unique=999;f.host.session.stop();
+ expect(f.host.finish).not.toHaveBeenCalled();expect(f.host.guardFailure).not.toHaveBeenCalled();
 });
 
 it("does not let stale one-host-test text appear as production multiplayer semantics",()=>{

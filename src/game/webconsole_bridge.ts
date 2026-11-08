@@ -64,18 +64,22 @@ export class WebConsoleBridge {
 
   constructor(private readonly session: RunSession, private readonly runtime: NativeRuntime,
     private readonly shop: ShopWindow, private readonly serviceStatus: () => unknown = () => null,
-    party?: PartySession, private readonly multiplayerEntry?: MultiplayerEntry, private readonly previousRun: () => unknown = () => null) {
+    party?: PartySession, private readonly multiplayerEntry?: MultiplayerEntry, private readonly previousRun: () => unknown = () => null,
+    nativeUi?: NativeUi) {
     this.party = party ?? new PartySession(this.session.configForEditing(), { layer: () => this.session.core.state.layer }, `run-${clockSeconds()}`);
     this.transport = loadWebconsole();
     this.bridgeId = `${this.transport.epoch()}-${clockSeconds()}-${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
-    this.nativeUi = new NativeUi(this.bridgeId, () => this.session.plan?.questId ?? this.session.core.config.quest.id);
+    const ownedQuestId = () => this.session.plan?.questId ?? this.session.core.config.quest.id;
+    this.nativeUi = nativeUi ?? new NativeUi(this.bridgeId, ownedQuestId);
+    if (nativeUi) nativeUi.rebind(this.bridgeId, ownedQuestId);
     this.writeResults({ id: "", status: "ready" });
   }
 
-  newScriptSession(): void {
+  newScriptSession(): NativeUi {
     this.closed = true;
     this.nativeUi.shutdown();
     this.transport.publish_state(rejson.dump_string({ ok: false, closed: true, bridgeId: this.bridgeId }, 0));
+    return this.nativeUi;
   }
 
   tick(): void {

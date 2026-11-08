@@ -118,3 +118,6 @@ HTTP 线程成功绑定端口后，游戏插件用系统默认浏览器打开 `h
 验证按层推进：纯 TypeScript 规则 → 编译后的 Lua 沙箱与双进程协议 → 原生桥接 → 两个真实游戏引擎 → 不同电脑官方 Steam。单测通过不替代后两层。当前自动检查命令和[本地双客户端步骤](local-multiplayer-testing.md)共同维护；不要为低风险文字修改重复启动游戏。
 
 2026-11-05 临时现场探针已保留在本地 `.local/archived-probes/2026-11-05/`，不提交、不打包；可用 `rg --no-ignore-vcs` 按内容查找。受控网页预览可运行 `python scripts/review-webconsole.py --port 11877 --seconds 120`，只绑定回环地址，使用有界内存队列；它模拟游戏 API，不能用作原生桥或联机验收。
+
+
+NativeUi也必须跨业务重开复用：WebConsoleBridge.newScriptSession返回已清空输入的适配器，下一Bridge用它rebind新身份和任务读取器。仅换token，不重复注册原生输入钩子；旧sceneToken必须被拒绝。测试钩子数量时应剔除按需执行的实验脚本自身注册，或直接在原生操作前后测量差额。具体生产门槛与尚缺条款的实施顺序见[策划对照](design-coverage.md)。
