@@ -137,6 +137,38 @@ it("initializes reused slots from real boss parameters, including resized init-n
  expect(live.fields._VitalTbl.elements[2]).toBe(68);
 });
 
+it("reuses spare native parameter capacity and preserves old entries when it grows",()=>{
+ const f=fixture();f.installer.publish(f.plan,false);f.play();
+ const live=f.dictionary.get(f.plan.questId)!.fields.enemy;
+ const ultimate={...f.plan,wave:{...f.plan.wave,tier:"ultimate" as const}};
+ f.installer.prepareInplaceSlot(ultimate,2,1369,119);
+ const first=live.fields._VitalTbl;
+ expect(first.get_size()).toBe(128);expect(first.elements[119]).toBe(80);
+ const allocated=mock.array.mock.calls.length;
+ f.installer.prepareInplaceSlot(f.plan,3,92,120);
+ expect(mock.array).toHaveBeenCalledTimes(allocated);
+ expect(live.fields._VitalTbl).toBe(first);
+ expect(live.fields._VitalTbl.elements[119]).toBe(80);
+ f.installer.prepareInplaceSlot(f.plan,4,60,200);
+ expect(live.fields._VitalTbl.get_size()).toBe(256);
+ expect(live.fields._VitalTbl.elements[119]).toBe(80);
+ expect(live.fields._VitalTbl.elements[120]).toBe(f.enemy.fields._VitalTbl.elements[0]);
+ expect(live.fields._InitSetName.get_size()).toBe(256);
+ expect(f.enemy.fields._VitalTbl.get_size()).toBe(7);
+});
+
+it("keeps the native parameter guard while supporting the last valid index",()=>{
+ const f=fixture();f.installer.publish(f.plan,false);f.play();
+ f.installer.prepareInplaceSlot(f.plan,2,60,511);
+ const live=f.dictionary.get(f.plan.questId)!.fields.enemy;
+ expect(live.fields._VitalTbl.get_size()).toBe(512);
+ expect(live.fields._VitalTbl.elements[511]).toBe(f.enemy.fields._VitalTbl.elements[0]);
+ const allocated=mock.array.mock.calls.length;
+ for(const id of [-1,512,65536,NaN,1.5])expect(()=>f.installer.prepareInplaceSlot(f.plan,3,60,id)).toThrow("Invalid native enemy parameter index");
+ expect(mock.array).toHaveBeenCalledTimes(allocated);
+ expect(live.fields._VitalTbl.get_size()).toBe(512);
+});
+
 it("keeps hub rank and enemy level for the independent multiplayer entry table", () => {
   const f = fixture();
   const cfg = { ...f.config, quest: { ...f.config.quest, id: 900103 } };

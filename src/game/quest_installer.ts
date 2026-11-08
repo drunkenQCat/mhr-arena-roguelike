@@ -11,6 +11,7 @@ import {
 } from "./sdk";
 
 const MARKER = "MhwRogue_BossRush_v2";
+const MAX_NATIVE_PARAMETER_ENTRIES = 512;
 const TEXT: Record<number, string> = {
   0: "Arena Roguelike / 斗技场肉鸽", 1: "Arena Research",
   2: "BOSSRUSH roguelike. Bring your equipment. Return to the starting point after carving.",
@@ -170,7 +171,7 @@ export class QuestInstaller {
    * getQuestEnemyNando indexes these arrays directly by EmSetId (native read
    * uses r13 = emSetId with no bounds check), not by reusable task slot. */
   prepareInplaceSlot(plan: QuestPlan, slot: number, type: number, emSetId = slot): void {
-    if (!Number.isInteger(emSetId) || emSetId < 0 || emSetId >= 512) throw new Error("Invalid native enemy parameter index");
+    if (!Number.isInteger(emSetId) || emSetId < 0 || emSetId >= MAX_NATIVE_PARAMETER_ENTRIES) throw new Error("Invalid native enemy parameter index");
     const qm = questManager();
     if (!qm || !this.enemy || !this.normal || qm.call("get_ActiveQuestNo") !== plan.questId || !qm.call("isPlayQuest")) throw new Error("Cannot configure an unrelated inPlace slot");
     const source = (qm.call("getQuestData(System.Int32)", plan.baseId) as REManagedObject).call("get_RawEnemy") as REManagedObject;
@@ -179,8 +180,13 @@ export class QuestInstaller {
       let target = this.enemy.get_field(name) as REManagedArray;
       if (!base || !target) throw new Error(`Missing boss parameter array ${name}`);
       if (target.get_size() <= emSetId) {
-        const expanded = retain(createManagedArray(target.get_type_definition().get_full_name().slice(0, -2), emSetId + 1), this.retained);
-        for (let i = 0; i <= emSetId; i++) expanded.call("Set", i, i < target.get_size() ? target.call("Get", i) : base.call("Get", 0));
+        // Old arrays stay retained until quest teardown: native readers can still
+        // hold them. Doubling bounds the sum of those old capacities instead of
+        // retaining another nearly identical array for every newly assigned ID.
+        let capacity = Math.max(16, target.get_size());
+        while (capacity <= emSetId) capacity = Math.min(MAX_NATIVE_PARAMETER_ENTRIES, capacity * 2);
+        const expanded = retain(createManagedArray(target.get_type_definition().get_full_name().slice(0, -2), capacity), this.retained);
+        for (let i = 0; i < capacity; i++) expanded.call("Set", i, i < target.get_size() ? target.call("Get", i) : base.call("Get", 0));
         this.enemy.set_field(name, expanded); target = expanded;
       }
       let value = base.call("Get", 0);
