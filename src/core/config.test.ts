@@ -26,6 +26,9 @@ describe("configuration boundary", () => {
     ["invalid rule", (c: any) => { c.UnlockChain[0].RequiresKilling = null; }],
     ["armor ID with missing body part", (c: any) => { c.GachaPools.gacha_1.Entries[0].Id = 0x0c000009; }],
     ["armor ID with invalid body part", (c: any) => { c.GachaPools.gacha_1.Entries[0].Id = 0x0c600009; }],
+    ["armor series spilling into the body-part bits", (c: any) => { c.ArmorSets[c.ArmorOptions[0]].Series = 0x100000; }],
+    ["gacha ID overflowing a native uint32", (c: any) => { c.GachaPools.gacha_4.Entries[0].Id = 0x100000000 + 139461048; }],
+    ["startup weapon overflowing a native uint32", (c: any) => { c.StartupRules.WeaponId = 0x100000000 + 139461048; }],
   ])("rejects %s before runtime", (_name, mutate) => {
     const c = config();
     mutate(c);

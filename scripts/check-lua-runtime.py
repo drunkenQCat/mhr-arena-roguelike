@@ -219,6 +219,43 @@ for expected in (1, 2):
 assert host.globals().item_writes == 2
 print("PASS Lua 5.4: explicit native grant overload, first stack and stacking, void return readback")
 
+# The equipment gate must invoke static reflection with a nil instance and the
+# complete overload, including after a temporarily unavailable native table.
+host.execute('''
+  catalog_api=true;catalog_valid=true;catalog_present=true;catalog_lookups=0;catalog_actual=nil
+  sdk.find_type_definition=function(name)
+    if not catalog_api or name~="snow.data.DataShortcut" then return nil end
+    return {get_method=function(_,name)
+      assert(name=="isValid(snow.data.DataDef.PlArmorId)" or name=="getArmorBaseData(snow.data.DataDef.PlArmorId)")
+      return {call=function(_,instance,id)
+        assert(instance==nil and type(id)=="number", "wrong static reflection call convention")
+        if name:sub(1,8)=="isValid(" then return catalog_valid end
+        catalog_lookups=catalog_lookups+1
+        return catalog_present and {call=function(_,method)
+          assert(method=="get_Id");return catalog_actual or id
+        end} or nil
+      end}
+    end}
+  end
+''')
+catalog_module = host.execute(original_bundle.replace(entry, 'return require("src.game.equipment_catalog")'))
+assert catalog_module.equipmentUnavailableReason(None,"armor",202375177) is None
+host.globals().catalog_actual = 202375178
+assert catalog_module.equipmentUnavailableReason(None,"armor",202375177) is not None
+host.globals().catalog_actual = None
+host.globals().catalog_valid = False
+assert catalog_module.equipmentUnavailableReason(None,"armor",0x0c1fffff) is not None
+assert host.globals().catalog_lookups == 2
+host.globals().catalog_valid = True
+host.globals().catalog_present = False
+assert catalog_module.equipmentUnavailableReason(None,"armor",202375177) is not None
+host.globals().catalog_api = False
+assert catalog_module.equipmentUnavailableReason(None,"armor",202375177) is not None
+host.globals().catalog_api = True
+host.globals().catalog_present = True
+assert catalog_module.equipmentUnavailableReason(None,"armor",202375177) is None
+print("PASS Lua 5.4: installed equipment range/data checks, static reflection ABI and transient recovery")
+
 
 # The emitted multiplayer modules must run without JS globals (JSON/Date/Array).
 # Two isolated business peers share only the same bounded Steam-value test bus.

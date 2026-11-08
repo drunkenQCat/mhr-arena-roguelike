@@ -7,6 +7,7 @@ import type { NativeRuntime } from "./native_runtime";
 import type { ShopWindow } from "./shop_window";
 import { clockSeconds, getSingleton, refFs, rejson, loadWebconsole, type NativeWebconsole } from "./sdk";
 import { PartySession } from "./party_session";
+import { validateEquipmentConfig } from "./equipment_catalog";
 
 interface Command {
   id?: string; bridgeId?: string; cmd?: string; armor?: string; index?: number;
@@ -240,6 +241,7 @@ export class WebConsoleBridge {
         if (cfg.quest.id !== old.quest.id || cfg.quest.baseId !== old.quest.baseId || cfg.quest.mapNo !== old.quest.mapNo)
           throw new Error("任务身份只读，需要离线修改并重载脚本");
         s.validateConfigForSession(cfg);
+        validateEquipmentConfig(cfg);
         // Preserve schema arrays: REF's encoder turns empty Lua tables into null.
         const text = rejson.dump_string(cfg, -1).split('"unlockChain":null').join('"unlockChain":[]')
           .split('"weak":null').join('"weak":[]');

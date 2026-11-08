@@ -36,12 +36,13 @@ const host = vi.hoisted(() => ({
   packFacade: null as { get_field(n: string): unknown } | null,
   boxFacade: null as Record<string, unknown> | null,
   entries: [] as FakeEntry[],
-  writeCalls:0, persistFails: false,
+  writeCalls:0, persistFails: false, unavailableId: -1,
   grantWorks: true,
   grantThrows: false,
   persisted: null as unknown,
   removedIds: [] as number[],
 }));
+vi.mock("./equipment_catalog",()=>({equipmentUnavailableReason:(_kind:string,id:number)=>id===host.unavailableId ? "游戏中没有此装备" : null}));
 
 vi.mock("./recovery_owner", () => ({
  readRecoveryOwner: () => ({character:"test",slot:0,name:"hunter",process:"process-1"}),
@@ -85,7 +86,7 @@ let boxFacade: {
 };
 
 function buildWorld(initialPack: number[], preOwnedParts: number[], grantWorks = true): void {
-  host.persistFails = false;host.writeCalls=0;
+  host.persistFails = false;host.writeCalls=0;host.unavailableId=-1;
   host.grantWorks = grantWorks;
   host.grantThrows = false;
   host.removedIds = [];
@@ -156,6 +157,17 @@ it("rejects malformed armor before reserving or mutating a native slot",()=>{
  const reserve=vi.fn();const before=structuredClone(host.entries);
  expect(grantEquip(boxFacade,0x0c000009,"armor",reserve,false).ok).toBe(false);
  expect(reserve).not.toHaveBeenCalled();expect(host.entries).toEqual(before);
+});
+it("rejects a well-encoded but unavailable native item before reserving a slot",()=>{
+ const reserve=vi.fn();const before=structuredClone(host.entries);host.unavailableId=0x0c1fffff;
+ expect(grantEquip(boxFacade,host.unavailableId,"armor",reserve,false).reason).toContain("没有此装备");
+ expect(reserve).not.toHaveBeenCalled();expect(host.writeCalls).toBe(0);expect(host.entries).toEqual(before);
+});
+it("preflights the last startup part before stripping, journaling or granting the first",()=>{
+ host.unavailableId=armorId(9,5);const before=structuredClone(host.entries);
+ const result=equipStartupSet("iron",9,RULES,pouchPort);
+ expect(result.ok).toBe(false);expect(result.reason).toContain("部位 5");
+ expect(host.packArr).toEqual(INITIAL);expect(host.entries).toEqual(before);expect(host.writeCalls).toBe(0);
 });
 
 it("retains the complete original journal after memory restoration until native saving",()=>{

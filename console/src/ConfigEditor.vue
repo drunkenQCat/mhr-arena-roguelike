@@ -194,10 +194,10 @@ function submit() {
       </div>
       <div v-if="tab === 'equipment'" class="editor-body">
         <h3>开局装备 <span class="badge">下一局生效</span></h3>
-        <p class="muted">系列号对应游戏内防具系列；请使用已验证的编号。开局前会保存并在结束后恢复原装备。</p>
+        <p class="muted">系列号对应游戏内防具系列。提交时会检查当前游戏是否存在全部五个部位；未知系列将拒绝保存。开局前会保存并在结束后恢复原装备。</p>
         <div v-for="(name, i) in draft.armorOptions" :key="i" class="subpanel">
           <div class="fields"><label class="text-field">方案名称<input :value="name" @change="renameOption(i, $event)" /></label>
-          <NumberField v-if="draft.armorSets?.[name]" v-model="draft.armorSets[name].series" label="防具系列号" />
+          <NumberField v-if="draft.armorSets?.[name]" v-model="draft.armorSets[name].series" label="防具系列号" :max="1048575" />
           <label v-if="draft.armorSets?.[name]" class="text-field">方案说明<input :value="draft.armorSets[name].desc ?? ''" placeholder="可留空" @change="($event.target as HTMLInputElement).value.trim() ? draft.armorSets![name].desc = ($event.target as HTMLInputElement).value.trim() : delete draft.armorSets![name].desc" /></label></div>
           <p v-if="!draft.armorSets?.[name]" class="notice">此方案没有防具定义，将拒绝准备。请补齐定义并保存后再开局。</p>
           <button v-if="!draft.armorSets?.[name]" @click="(draft.armorSets ??= {})[name] = {series: 0}">设置防具系列</button>
@@ -206,7 +206,7 @@ function submit() {
         <div class="toolbar"><label>新方案名称 <input v-model="armorName" /></label><button @click="addArmor">添加方案</button></div>
         <div v-if="draft.startupRules" class="subpanel"><h3>开局规则</h3>
           <label class="check"><input v-model="draft.startupRules.keepPlayerWeapon" type="checkbox" />保留当前武器</label>
-          <NumberField v-if="!draft.startupRules.keepPlayerWeapon" :model-value="draft.startupRules.weaponId ?? 0" label="指定武器 ID" :min="1" @update:model-value="draft.startupRules!.weaponId = $event" />
+          <NumberField v-if="!draft.startupRules.keepPlayerWeapon" :model-value="draft.startupRules.weaponId ?? 0" label="指定武器 ID" :min="1" :max="4294967295" @update:model-value="draft.startupRules!.weaponId = $event" />
           <label class="check"><input v-model="draft.startupRules.stripTalismans" type="checkbox" />卸下护石</label>
           <label class="check"><input v-model="draft.startupRules.stripInsect" type="checkbox" />卸下猎虫</label>
         </div>
@@ -224,11 +224,11 @@ function submit() {
         <h3>单波增益 <span class="badge">下一局生效</span></h3>
         <div v-if="draft.buffAmounts" class="fields"><NumberField v-model="draft.buffAmounts.atk" label="每次购买攻击增加" /><NumberField v-model="draft.buffAmounts.def" label="每次购买防御增加" /><NumberField v-model="draft.buffAmounts.crit" label="每次购买会心增加（%）" /></div>
         <h3>装备抽取池 <span class="badge">下一局生效</span></h3>
-        <p class="muted">ID 须是游戏的武器 / 防具 ID；权重决定池内相对概率，并非百分比。未知 ID 未验证能否发放。</p>
+        <p class="muted">提交时会按当前游戏装备目录检查每个 ID，未知或尚无法读取的装备将拒绝保存。权重决定池内相对概率，并非百分比；目录存在不代表该装备的全部玩法已完成测试。</p>
         <details v-for="id in ['gacha_1','gacha_2','gacha_3','gacha_4']" :key="id" class="subpanel"><summary>{{ draft.shop.find(item => item.id === id)?.name ?? id }} · {{ draft.gachaPools?.[id]?.entries.length ?? 0 }} 件</summary>
           <div v-for="(entry, index) in draft.gachaPools?.[id]?.entries ?? []" :key="index" class="equipment-entry">
             <label>类型<select v-model="entry.kind"><option value="weapon">武器</option><option value="armor">防具</option></select></label>
-            <label>游戏 ID<input v-model.number="entry.id" type="number" min="1" /></label><label>权重<input v-model.number="entry.w" type="number" min="0" step="0.1" /></label>
+            <label>游戏 ID<input v-model.number="entry.id" type="number" min="1" max="4294967295" /></label><label>权重<input v-model.number="entry.w" type="number" min="0" step="0.1" /></label>
             <span>{{ ((entry.w / (draft.gachaPools?.[id]?.entries.reduce((a, e) => a + e.w, 0) || 1)) * 100).toFixed(1) }}%</span><button @click="removeGacha(id, index)">移除</button>
           </div><button @click="addGacha(id)">添加装备</button></details>
       </div>

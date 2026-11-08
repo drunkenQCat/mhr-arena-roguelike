@@ -11,7 +11,9 @@
 
 import { getSingleton, relog, type REManagedObject, type RETypeDefinition } from "./sdk";
 import type { StartupRules } from "../core/config";
-import { validArmorId } from "../core/equipment_id";
+import { validArmorId, armorId } from "../core/equipment_id";
+export { armorId } from "../core/equipment_id";
+import { equipmentUnavailableReason } from "./equipment_catalog";
 import { readRecoveryRecord, recoveryPending, writeRecoveryRecord, recoveryWriteFailure } from "./recovery_journal";
 import { assertRecoveryOwner, readRecoveryOwner, type RecoveryOwner } from "./recovery_owner";
 import { captureEquipmentBox, equipmentFingerprint, validateEquipmentSnapshot, verifyEquipmentBox, type EquipmentSnapshot } from "./equipment_snapshot";
@@ -26,11 +28,6 @@ export const PACK_LEG = 5;
 export const PACK_INSECT = 6;
 export const PACK_TALISMAN = 7;
 export const PACK_LEN = 8;
-
-/** PlArmorId 编码：0x0C<部位 1..5><系列>（部位 1=头 2=身 3=腕 4=腰 5=脚，已实测）。 */
-export function armorId(series: number, part: 1 | 2 | 3 | 4 | 5): number {
-  return 0x0c000000 + part * 0x100000 + series;
-}
 
 function dataManager(): REManagedObject | null {
   return getSingleton("snow.data.DataManager");
@@ -150,6 +147,8 @@ export function grantEquip(box: REManagedObject | null, idVal: number, kind: "ar
   beforeGrant?: (entry: GrantedEntry) => boolean, reuseExisting = true,
   afterGrant?: (entry: GrantedEntry) => boolean): GrantReport {
   if (kind === "armor" && !validArmorId(idVal)) return {ok:false,reason:"Invalid armor ID: expected part 1–5"};
+  const unavailable = equipmentUnavailableReason(kind, idVal);
+  if (unavailable) return {ok:false,reason:unavailable};
   if (!box) return { ok: false, reason: "EquipBox unavailable" };
   const expectType = kind === "armor" ? 2 : 1;
   const existing = reuseExisting ? findEquipEntry(box, idVal, expectType) : null;
@@ -335,6 +334,18 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
     owner = readRecoveryOwner();
   } catch (error) {
     report.reason = String(error); return report;
+  }
+  // Check the entire proposal before stripping gear, journaling or granting its
+  // first piece. A valid encoding alone does not prove that a series exists.
+  if (!Number.isInteger(series) || series < 0 || series >= 0x100000)
+    return {...report,reason:"防具系列号必须是 0–1048575 的整数"};
+  for (const part of [1,2,3,4,5] as const) {
+    const reason = equipmentUnavailableReason("armor", armorId(series,part));
+    if (reason) return {...report,reason:`初始防具部位 ${part}：${reason}`};
+  }
+  if (!rules.keepPlayerWeapon && rules.weaponId !== null) {
+    const reason = equipmentUnavailableReason("weapon", rules.weaponId);
+    if (reason) return {...report,reason};
   }
   const prev = readPack(edm);
   if (!prev) {

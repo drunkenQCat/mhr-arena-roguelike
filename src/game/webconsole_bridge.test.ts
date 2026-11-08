@@ -7,7 +7,8 @@ import { RunSession, type RuntimeReading, type SessionPort } from "../core/run_s
 import type { NativeRuntime } from "./native_runtime";
 import { ShopWindow } from "./shop_window";
 
-const host = vi.hoisted(() => ({ now: 10, files: {} as Record<string, any>, count: 0, failWrite: "", commands: [] as string[] }));
+const host = vi.hoisted(() => ({ now: 10, files: {} as Record<string, any>, count: 0, failWrite: "", commands: [] as string[], equipmentError:false }));
+vi.mock("./equipment_catalog",()=>({validateEquipmentConfig:()=>{if(host.equipmentError)throw new Error("gachaPools.gacha_1.entries[0].id：游戏中没有此装备");}}));
 vi.mock("./sdk", () => ({ loadWebconsole: () => ({
   epoch: () => 1, steam_digest:(text:string)=>createHash("sha256").update(text).digest("hex"),
   take_commands: (limit: number) => host.commands.splice(0, limit),
@@ -47,7 +48,16 @@ function fixture() {
   const state = () => host.files["webconsole_state.json"];
   return { cfg, core, session, runtime, tools, shop, bridge, command, tick, state, reading };
 }
-beforeEach(() => { host.now = 10; host.files = {}; host.count = 0; host.failWrite = ""; host.commands = []; });
+beforeEach(() => { host.now = 10; host.files = {}; host.count = 0; host.failWrite = ""; host.commands = []; host.equipmentError=false; });
+
+it("keeps saved rules and version intact when the installed game rejects equipment data",()=>{
+ const f=fixture();host.equipmentError=true;
+ const reply=f.command("submitConfig",{config:{...f.cfg,startPt:321},configVersion:0});
+ expect(reply.status).toBe("rejected");expect(reply.message).toContain("gachaPools.gacha_1.entries[0].id");
+ expect(host.files["mhw_rogue_config.json"]).toBeUndefined();expect(f.session.configForEditing().startPt).toBe(f.cfg.startPt);
+ host.equipmentError=false;
+ expect(f.command("submitConfig",{config:{...f.cfg,startPt:321},configVersion:0}).configVersion).toBe(1);
+});
 
 it("publishes authoritative controls and preserves route changes after staged rules", () => {
   const f = fixture(); f.tick();

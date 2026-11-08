@@ -208,6 +208,7 @@ export function validateConfig(raw: unknown): RogueConfig {
     const spec = object(armorSetsRaw[key], `armorSets.${key}`);
     armorSets[key] = { series: number(spec.series, `armorSets.${key}.series`, 0, true),
       ...(spec.desc === undefined ? {} : { desc: text(spec.desc, `armorSets.${key}.desc`) }) };
+    if (armorSets[key]!.series >= 0x100000) fail(`armorSets.${key}.series：系列号必须小于 1048576`);
   }
   if (Object.keys(armorSets).length > 0) {
     for (const option of c.armorOptions as string[]) {
@@ -231,6 +232,7 @@ export function validateConfig(raw: unknown): RogueConfig {
   if (!startupRules.keepPlayerWeapon && startupRules.weaponId === null) {
     fail("startupRules：keepPlayerWeapon=false 时必须提供 weaponId（收武器口子）");
   }
+  if (startupRules.weaponId !== null && startupRules.weaponId > 0xffffffff) fail("startupRules.weaponId：必须是 32 位装备 ID");
   c.startupRules = startupRules;
 
   // 抽取奖池：可选；条目 kind/weight 必须合法
@@ -245,6 +247,7 @@ export function validateConfig(raw: unknown): RogueConfig {
       const e = object(entriesRaw[i], `gachaPools.${key}.entries[${i}]`);
       if (e.kind !== "weapon" && e.kind !== "armor") fail(`gachaPools.${key}.entries[${i}].kind`);
       const id = number(e.id, `gachaPools.${key}.entries[${i}].id`, 1, true);
+      if (id > 0xffffffff) fail(`gachaPools.${key}.entries[${i}].id：必须是 32 位装备 ID`);
       if (e.kind === "armor" && !validArmorId(id)) fail(`gachaPools.${key}.entries[${i}].id：防具部位必须为 1–5（0x0C1…–0x0C5…）`);
       entries.push({ kind: e.kind as "weapon" | "armor", id,
         w: number(e.w, `gachaPools.${key}.entries[${i}].w`, 0) });
