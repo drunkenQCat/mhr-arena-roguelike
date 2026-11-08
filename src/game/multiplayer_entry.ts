@@ -278,7 +278,10 @@ export class MultiplayerEntry {
     const role = readLobbyIdentity().role;
     if (role !== "host" && role !== "guest") return null;
     return { installer: this.installer, plan: p, lobby: l.id, owner: l.owner, self: l.self,
-      session: this.plan.session, members: l.members.map(m => m.id).sort() };
+      // The roster was accepted before personal preparation and posting. A late
+      // join must fail the runtime roster check, never silently become a member
+      // of a run whose kit/configuration it has not acknowledged.
+      session: this.plan.session, members: [...this.plan.members] };
   }
   snapshot(): Record<string, unknown> {
     if (this.canPrepare()) this.normalizeArmor();
@@ -287,7 +290,8 @@ export class MultiplayerEntry {
     return { ...identity, questId: ENTRY_QUEST_ID, mode: this.plan ? modes[this.plan.index] : null,
       hash: this.plan?.hash ?? null, revision: this.plan?.revision ?? null,
       transport: this.transport?.getStatus() ?? "Idle", nativePost: this.transport?.getDiagnostics() ?? null, posting: this.pendingPost || !!this.transport?.isActive(),
-      canPost: ready && identity.role === "host" && !this.pendingPost && !this.transport?.isActive(),
+      canPost: ready && identity.role === "host" && this.canPrepare() &&
+        qm?.call("isActiveQuest") === false && !this.pendingPost && !this.transport?.isActive(),
       sync: { available: this.steam.available, reason: this.steam.reason, lobby: lobby?.id ?? null,
         applied: !!this.plan && this.applied === key(this.plan),
         members: lobby?.members.map((m) => ({ id: m.id, self: m.id === lobby.self,

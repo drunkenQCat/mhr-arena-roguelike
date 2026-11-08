@@ -98,7 +98,10 @@ it("stages records without starting native load until every peer acknowledges",(
  f.backend.prepare(f.plan);f.backend.tick(1);
  expect(staged).toHaveBeenCalledWith({token:2,ordinal:0,type:60,slot:2,id:119,uid:11900});
  expect(f.fields._ExtraEmRno).toBe(10);f.backend.tick(2);expect(f.fields._ExtraEmRno).toBe(10);
+ expect(f.backend.status).toContain("waiting all peers");
  commit=true;f.backend.tick(3);expect(f.fields._ExtraEmRno).toBe(5);expect(f.registrations).toEqual([60]);
+ expect(f.backend.status).toBe("inPlace native loader activated: UID 11900; 0 pending");
+ f.backend.tick(4);expect(f.backend.status).not.toContain("waiting all peers");
 });
 it("guests never allocate without a host ticket and stop before loading mismatched identities",()=>{
  const f=fixture();let ticket:any=null;

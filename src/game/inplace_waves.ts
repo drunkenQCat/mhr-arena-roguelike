@@ -63,6 +63,7 @@ export class InplaceWaves {
       if (!this.sync.activate(this.staged)) { this.status = "inPlace waiting all peers to stage native record"; return; }
       q.set_field("_BossSetCount", 2); q.set_field("_ExtraEmRno", 5);
       this.report("in-place-synchronized-activate", this.staged);
+      this.status = `inPlace native loader activated: UID ${this.staged.uid}; ${this.pending.length} pending`;
       this.staged = null; return;
     }
     if (this.sync?.role === "host" && this.sync.canStage?.() === false) { this.status = "inPlace waiting peers to activate previous spawn"; return; }

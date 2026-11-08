@@ -161,6 +161,27 @@ it("keeps entry transport alive until posting finishes and the native quest is a
   expect(f.as(1, () => f.guest.runEntry())).toMatchObject({owner: "100", self: "200"});
 });
 
+it("keeps the acknowledged roster when a late member joins between posting and departure", () => {
+  const f=fixture(); f.prepare(); f.as(0,()=>f.host.post());
+  f.tick(1,f.guest); f.tick(0,f.host);
+  mock.active=true; mock.playing=true; mock.quest=900103;
+  f.server.members.push("300"); f.tick(0,f.host); f.tick(1,f.guest);
+  const entry=f.as(0,()=>f.host.runEntry());
+  expect(entry?.members).toEqual(["100","200"]);
+  expect(f.as(1,()=>f.guest.runEntry())?.members).toEqual(["100","200"]);
+  entry!.members.push("changed-by-caller");
+  expect(f.as(0,()=>f.host.runEntry())?.members).toEqual(["100","200"]);
+  // MultiplayerRun compares this accepted roster to the actual lobby and stops
+  // on the late join; it must not adopt the unprepared player as a third member.
+  expect(f.host.snapshot().canPost).toBe(false);
+});
+
+it("advertises posting only while both native and business state allow it",()=>{
+  const f=fixture(); f.prepare(); expect(f.host.snapshot().canPost).toBe(true);
+  mock.active=true; expect(f.host.snapshot().canPost).toBe(false);
+  mock.active=false; mock.canPrepare=false; expect(f.host.snapshot().canPost).toBe(false);
+});
+
 
 it("cancels preparation on both peers, rejects the retired plan, then prepares a fresh session", () => {
   const life = {prepare:vi.fn(),prepared:()=>true,cancel:vi.fn()}; const f=fixture(life);
