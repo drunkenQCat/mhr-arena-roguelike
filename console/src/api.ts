@@ -14,7 +14,7 @@ export interface ConsoleState {
   multiplayerRun?: { role: "host" | "guest"; live: boolean; message: string; lobby: string; session: string;
     members: { id: string; self: boolean; ready: boolean }[] | null; token: number | null;
     staged: { token: number; ordinal: number; type: number; slot: number; id: number; uid: number } | null;
-    commit: boolean; verifiedTwoClients: boolean } | null;
+    commit: boolean; verifiedTwoClients: boolean; fixedPartySize?: number } | null;
   runSummary?: RunSummary | null;
   previousRun?: RunSummary | null;
   supplyLoot?: {itemId:string;count:number;actual:number;granted:boolean;reason?:string}[] | null;

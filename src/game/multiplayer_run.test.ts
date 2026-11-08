@@ -24,6 +24,7 @@ function fixture(size=2) {
     const port:SessionPort={now:()=>mock.now,ready:()=>true,read:()=>({...reading,time:mock.now}),publish,policy,
       post:vi.fn(),cancelPost:vi.fn(),postingError:()=>null,takeDeaths:()=>[],finish,guardFailure,report:vi.fn(),
       multiplayerRole:()=>run?.role ?? null, multiplayerValid:()=>run?.valid() ?? false, multiplayerCanChoose:()=>run?.canChoose() ?? false};
+    port.partySize=()=>run?.partySize() ?? null;
     const session=new RunSession(core,monsterCatalog,port);
     const network:NativeWebconsole={ping:s=>s,epoch:()=>1,take_commands:()=>[],publish_state:()=>{},publish_results:()=>{},
       steam_digest:s=>createHash("sha256").update(s).digest("hex"),
@@ -45,6 +46,12 @@ function fixture(size=2) {
   return {host,guest,guests,bus,tick,clear};
 }
 beforeEach(()=>{mock.now=100;mock.valid=true;});
+it.each([2,3,4])("keeps a fixed %i-player multiplier even when the actor reading is temporarily smaller",(size)=>{
+ const f=fixture(size);f.tick();f.clear();f.tick();
+ expect(f.host.run.partySize()).toBe(size);f.guests.forEach(g=>expect(g.run.partySize()).toBe(size));
+ const s=f.host.cfg.scaling,base=Math.min(s.hpCap,s.hpBase+(f.host.core.state.layer-1)*s.hpPerLayer);
+ expect(f.host.core.state.currentChoices[0]!.hpMul).toBeCloseTo(base*(size===2?s.mp2Hp:s.mp34Hp));
+});
 it("canonicalizes nested configuration independently of insertion order",()=>{
  expect(canonical({b:[1,{y:2,x:3}],a:"中文"})).toBe(canonical({a:"中文",b:[1,{x:3,y:2}]}));
 });

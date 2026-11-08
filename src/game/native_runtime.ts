@@ -29,6 +29,11 @@ function callNative(object: REManagedObject, name: string, ...args: unknown[]): 
 }
 
 interface Diagnostic { time: number; event: string; detail: unknown }
+interface RuntimeMultiplayer extends SpawnSync {
+  canChoose(): boolean;
+  snapshot(): Record<string, unknown>;
+  partySize(): number;
+}
 
 export class NativeRuntime implements SessionPort {
   readonly transport: QuestTransport;
@@ -48,9 +53,8 @@ export class NativeRuntime implements SessionPort {
   private pendingFinish: { failed: boolean; questId: number; unique: number } | null = null;
   private failedEnding: { questId: number; unique: number } | null = null;
   private finishEvidence: { event: string; detail: unknown } | null = null;
-  /** 离线队友调研 §6C：混合局权威人数来源（PartySession.rosterSize）。 */
-  private multiplayer: (SpawnSync & { canChoose(): boolean; snapshot(): Record<string, unknown> }) | null = null;
-  setMultiplayer(sync: (SpawnSync & { canChoose(): boolean; snapshot(): Record<string, unknown> }) | null): void { this.multiplayer = sync; this.inplace.setSync(sync); }
+  private multiplayer: RuntimeMultiplayer | null = null;
+  setMultiplayer(sync: RuntimeMultiplayer | null): void { this.multiplayer = sync; this.inplace.setSync(sync); }
   multiplayerState(): Record<string, unknown> | null { return this.multiplayer?.snapshot() ?? null; }
   mirrorCartRestore(deaths: number): void {
     if (this.multiplayerRole() !== "guest" || !this.multiplayerValid() || !Number.isInteger(deaths) || deaths < 0) throw new Error("Cart restore mirror scope unavailable");
@@ -126,8 +130,8 @@ export class NativeRuntime implements SessionPort {
   waitingForSpawnCapacity(): boolean { return this.inplace.waitingForCapacity; }
   postingError(): string | null { return this.transport.getError(); }
   takeDeaths(): DeathReading[] { const events = this.deaths; this.deaths = []; return events; }
-  /** SessionPort.partySize：返回混合局名单人数；未锁定时 null=沿用原生人数。 */
-  partySize(): number | null { return this.partySizeSource?.() ?? null; }
+  /** Real runs use their fixed native roster, never a leftover offline mock. */
+  partySize(): number | null { return this.multiplayer ? this.multiplayer.partySize() : this.partySizeSource?.() ?? null; }
   allowEntryHostTest(reading: RuntimeReading): boolean {
     return this.entryHostTest && reading.quest?.id === 900103 && reading.players.length <= 1 && entryHostTestScope();
   }

@@ -418,7 +418,7 @@ export class RunSession {
     } catch (error) { return this.fault(error); }
   }
 
-  /** 权威参战人数：混合实机取 PartySession 名单，默认原生玩家数。 */
+  /** Prefer the runtime's fixed party size; otherwise use the observed native players. */
   private partySize(reading: RuntimeReading): number {
     const fromParty = this.port.partySize?.() ?? null;
     return fromParty ?? (reading.players.length || 1);

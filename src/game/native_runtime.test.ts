@@ -63,6 +63,14 @@ beforeEach(() => {
   mock.find.mockImplementation((type: string) => ({ get_method: (name: string) => ({ key: `${type}.${name}` }) }));
 });
 
+it("uses the locked real party instead of a leftover offline mock when multiplayer attaches",()=>{
+ const {runtime}=fixture();runtime.setPartySizeSource(()=>1);expect(runtime.partySize()).toBe(1);
+ runtime.setMultiplayer({role:"host",valid:()=>true,partySize:()=>4,canChoose:()=>true,snapshot:()=>({}),
+  expected:()=>null,staged:()=>{},activate:()=>false,fail:()=>{}});
+ expect(runtime.partySize()).toBe(4);
+ runtime.setMultiplayer(null);expect(runtime.partySize()).toBe(1);
+});
+
 it("defers finish to native quest update, allows native failure first, and never replays or crosses quest identity", () => {
   const { runtime, qm, plan, hooks } = fixture();
   let unique = 12, status = 2;

@@ -63,6 +63,7 @@ export class MultiplayerRun implements SpawnSync {
     if (this.hash.length !== 64) throw new Error("Steam configuration digest unavailable");
   }
   valid(): boolean { return this.live && multiplayerScope(this.role); }
+  partySize(): number { return this.context.members.length; }
   expected(): SpawnTicket | null { return this.frame?.spawn ?? null; }
   staged(ticket: SpawnTicket): void {
     if (!this.valid()) throw new Error("Multiplayer spawn scope ended");
@@ -229,6 +230,7 @@ export class MultiplayerRun implements SpawnSync {
     } catch { /* Retry on the next poll; native return cancels the pending intent. */ }
   }
   snapshot(): Record<string, unknown> { return { role:this.role, live:this.live, message:this.message,
+    fixedPartySize:this.partySize(),
     lobby:this.context.lobby, session:this.context.session, members:this.members.map(m => ({ id:m.id, self:m.id === this.context.self,
       ready:this.role === "host" ? this.peerReady(m.id) : !!this.frame && m.ack.startsWith(this.ackPrefix(this.frame,"ready")) })),
     token:this.frame?.token ?? null, staged:this.localTicket, commit:this.committed, verifiedTwoClients:false }; }

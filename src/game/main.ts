@@ -76,7 +76,7 @@ try {
   let webConsole: WebConsoleBridge | null = null;
   try { webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun); }
   catch (error) { relog.warn(`[MhwRogue] webconsole unavailable: ${String(error)}`); }
-  // 离线队友调研 §6C：混合局的权威人数来自 PartySession 名单（bridge 自建或注入）。
+  // Offline mock only; NativeRuntime gives an attached real roster priority.
   runtime.setPartySizeSource(() => webConsole?.partyRosterSize() ?? null);
   let lastBuffState = "";
   let lastBuffPoll = -1;

@@ -284,6 +284,7 @@ ____moduleCache["src.game.multiplayer_scope"] = {value={multiplayerScope=functio
 return {RunCore=require("src.core.run_core").RunCore,
  RunSession=require("src.core.run_session").RunSession,
  MultiplayerRun=require("src.game.multiplayer_run").MultiplayerRun,
+ NativeRuntime=require("src.game.native_runtime").NativeRuntime,
  canonical=require("src.game.wire_canonical").canonical,
  makeQuestPlan=require("src.core.quest_plan").makeQuestPlan,
  validateConfig=require("src.core.config").validateConfig,
@@ -316,6 +317,7 @@ multi.execute('''
     function p:multiplayerRole() return self.run and self.run.role end
     function p:multiplayerValid() return self.run and self.run:valid() end
     function p:multiplayerCanChoose() return self.run and self.run:canChoose() end
+    function p:partySize() return self.run and self.run:partySize() end
     local s=new(m.RunSession,core,m.catalog,p)
     local net={steam_digest=wire_hash,steam_plan=function(_,text) assert(#text<=2048);bus.plan=text;return true end,
       steam_ack=function(_,text) bus.acks[self]=text;return true end,
@@ -330,6 +332,13 @@ multi.execute('''
     return {s=s,run=run,core=core,p=p}
   end
   local h,g=peer("h"),peer("g")
+  assert(h.run:partySize()==2 and g.run:partySize()==2)
+  local nativeRoster={partySize=function(self) assert(self~=nil);return 4 end}
+  local mockReads=0
+  local nativeFacade={multiplayer=nativeRoster,partySizeSource=function() mockReads=mockReads+1;return 1 end}
+  assert(m.NativeRuntime.prototype.partySize(nativeFacade)==4 and mockReads==0)
+  nativeFacade.multiplayer=nil
+  assert(m.NativeRuntime.prototype.partySize(nativeFacade)==1 and mockReads==1)
   local function tick() clock=clock+1;h.s:tick();h.run:tick();g.s:tick();g.run:tick() end
   local function clear()
     h.p.reading.enemies={}
