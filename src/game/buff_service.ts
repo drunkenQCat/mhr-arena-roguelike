@@ -1,5 +1,5 @@
 /** Purchased bonuses belong to one roguelike wave, not the native quest lifetime. */
-import { findTypeDefinition, getSingleton, hookMethod, toInt64, toPtr, relog,
+import { findTypeDefinition, getSingleton, hookMethod, toInt64, toManagedObject, relog,
   reframework, type REManagedObject } from "./sdk";
 import type { RuntimeReading, SessionStage } from "../core/run_session";
 import type { BuffAmounts } from "../core/config";
@@ -33,7 +33,7 @@ export class BuffService {
     if (kind === "buff_atk") this.pending.atk += this.amounts.atk;
     else if (kind === "buff_def") this.pending.def += this.amounts.def;
     else if (kind === "buff_crit") {
-      if (!findTypeDefinition("snow.player.PlayerQuestBase")?.get_method("getAdjustCriticalRate"))
+      if (!findTypeDefinition("snow.player.PlayerQuestBase")?.get_method("calcCriticalRate"))
         return { ok: false, total: 0 };
       this.pending.crit += 1;
     } else return { ok: false, total: 0 };
@@ -77,22 +77,35 @@ export class BuffService {
       const data = masterPlayerData();
       if (!data) return;
       if (this.active.crit > 0 && !this.hookInstalled) {
-        const method = findTypeDefinition("snow.player.PlayerQuestBase")?.get_method("getAdjustCriticalRate");
-        if (!method) throw new Error("Critical-rate getter unavailable");
-        // The adjustment belongs to a player actor. Shared weapon definitions are never changed.
-        // Hook storage is per invocation, including recursive/native worker calls.
+        const method = findTypeDefinition("snow.player.PlayerQuestBase")?.get_method("calcCriticalRate");
+        if (!method) throw new Error("Critical-rate calculation unavailable");
+        // Native calcCriticalRate inlines the getter and writes the attack's
+        // runtime rate. Adjust that freshly computed result, never the shared
+        // weapon definition or persistent PlayerData. calcCriticalResult reads
+        // this same field next. Hook storage is per native invocation.
         hookMethod(method, (args) => {
-          reframework.getHookStorage().rogueLocalCritical = this.critBonus !== 0 &&
-            this.playerAddress !== null && toInt64(args[2]) === this.playerAddress;
+          reframework.getHookStorage().rogueCriticalAttack = this.critBonus !== 0 &&
+            this.playerAddress !== null && toInt64(args[2]) === this.playerAddress
+            ? toManagedObject(args[3]) : null;
         }, (retval) => {
-          if (reframework.getHookStorage().rogueLocalCritical !== true || this.critBonus === 0) return retval;
-          let original = toInt64(retval) % 4294967296;
-          if (original >= 2147483648) original -= 4294967296;
-          const result = original + this.critBonus;
-          // Observe the real hit calculation; this method requires hit data and
-          // a target, so an argumentless reflection call is not verification.
-          this.nativeCritical = { base: original, result };
-          return toPtr(result);
+          const attack = reframework.getHookStorage().rogueCriticalAttack as REManagedObject | null;
+          if (!attack || this.critBonus === 0) return retval;
+          try {
+            const flags = attack.get_field("_PlayerAttackAttr") as number;
+            // PlayerAttackAttr.EnableCritical=4; explosions and other fixed
+            // damage skip native rate calculation and must remain untouched.
+            if (typeof flags !== "number" || Math.floor(flags / 4) % 2 !== 1) return retval;
+            const field = "<CriticalRate>k__BackingField";
+            const original = attack.get_field(field) as number;
+            if (!Number.isInteger(original)) throw new Error("Invalid attack critical rate");
+            const result = original + this.critBonus;
+            attack.set_field(field, result);
+            if (attack.get_field(field) !== result) throw new Error("Critical-rate readback failed");
+            this.nativeCritical = { base: original, result };
+          } catch (error) {
+            if (this.failure !== String(error)) { this.failure = String(error); relog.error(`[MhwRogue] buff: ${this.failure}`); }
+          }
+          return retval; // calcCriticalRate returns void, not an integer rate.
         });
         this.hookInstalled = true;
       }

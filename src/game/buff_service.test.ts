@@ -1,13 +1,14 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const h = vi.hoisted(() => ({ values: {} as Record<string, number>, hook: null as any, data: null as any, pre: null as any, storage: {} as Record<string, unknown> }));
+const h = vi.hoisted(() => ({ values: {} as Record<string, number>, hook: null as any, data: null as any, pre: null as any, storage: {} as Record<string, unknown>, method: "" }));
 vi.mock("./sdk", () => ({
   getSingleton: () => ({call: () => ({call: () => h.data, get_address: () => 100})}),
   reframework: {getHookStorage: () => h.storage},
-  findTypeDefinition: () => ({get_method: () => ({})}),
-  hookMethod: (_m: any, _pre: any, post: any) => { h.hook = post; h.pre = _pre; },
+  findTypeDefinition: () => ({get_method: (name:string) => ({name})}),
+  hookMethod: (m: any, _pre: any, post: any) => { h.method=m.name;h.hook = post; h.pre = _pre; },
   // Match sol2's void* conversion: Lua numbers are not pointer userdata.
   toInt64: (v: number | {ptr:number}) => typeof v === "number" ? 0 : v.ptr,
   toPtr: (v: number) => ({ptr:v}),
+  toManagedObject: (v: {object:unknown}) => v.object,
   relog: { info: vi.fn(), error: vi.fn() }
 }));
 import { BuffService } from "./buff_service";
@@ -23,6 +24,10 @@ beforeEach(() => {
 });
 const service = () => new BuffService({atk: 10, def: 15, crit: 10});
 const ptr = (value:number) => ({ptr:value});
+function hit(rate:number, flags=4) {
+  const fields:Record<string,number>={"<CriticalRate>k__BackingField":rate,_PlayerAttackAttr:flags};
+  return {fields,get_field:(name:string)=>fields[name],set_field:(name:string,value:number)=>{fields[name]=value;}};
+}
 it("stacks purchases without writing during preparation", () => {
   const b = service(); b.addPending("buff_atk"); expect(b.addPending("buff_atk").total).toBe(20);
   b.tick(reading(),scope("Selecting")); expect(h.values._AtkUpAlive).toBe(7);
@@ -59,14 +64,26 @@ it("does not overwrite a later native potion update on cleanup", () => {
   const b=service(); b.addPending("buff_atk"); b.tick(reading(),scope()); h.values._AtkUpAlive=99;
   b.tick(reading(),scope("Carve")); expect(h.values._AtkUpAlive).toBe(99);
 });
-it("critical post hook is additive, stable on repeated reads, and handles negative int32 values", () => {
+it("adjusts each freshly calculated local attack, leaving remote and fixed damage untouched", () => {
   const b=service(); b.addPending("buff_crit"); b.addPending("buff_crit"); b.tick(reading(),scope());
+  expect(h.method).toBe("calcCriticalRate"); // the native caller inlines getAdjustCriticalRate
   expect(b.diagnostic().nativeCritical).toBeNull();
-  h.pre({2:ptr(100)}); expect(h.hook(ptr(30))).toEqual(ptr(50)); h.pre({2:ptr(100)}); expect(h.hook(ptr(30))).toEqual(ptr(50));
+  const attack=hit(30);const retval=ptr(0);
+  h.pre({2:ptr(100),3:{object:attack}});expect(h.hook(retval)).toBe(retval);
+  expect(attack.fields["<CriticalRate>k__BackingField"]).toBe(50);
+  // The engine overwrites this runtime field before every post hook.
+  attack.fields["<CriticalRate>k__BackingField"]=30;
+  h.pre({2:ptr(100),3:{object:attack}});h.hook(retval);
+  expect(attack.fields["<CriticalRate>k__BackingField"]).toBe(50);
   expect(b.diagnostic().nativeCritical).toEqual({base:30,result:50});
-  h.pre({2:ptr(200)}); expect(h.hook(ptr(30))).toEqual(ptr(30)); h.pre({2:ptr(100)});
-  expect(h.hook(ptr(4294967281))).toEqual(ptr(5)); // -15 + 20
-  b.tick(reading(),scope("Carve")); expect(h.hook(ptr(30))).toEqual(ptr(30));
+  const remote=hit(30);h.pre({2:ptr(200),3:{object:remote}});h.hook(retval);
+  expect(remote.fields["<CriticalRate>k__BackingField"]).toBe(30);
+  const fixed=hit(30,0);h.pre({2:ptr(100),3:{object:fixed}});h.hook(retval);
+  expect(fixed.fields["<CriticalRate>k__BackingField"]).toBe(30);
+  const negative=hit(-15);h.pre({2:ptr(100),3:{object:negative}});h.hook(retval);
+  expect(negative.fields["<CriticalRate>k__BackingField"]).toBe(5);
+  b.tick(reading(),scope("Carve"));h.pre({2:ptr(100),3:{object:remote}});h.hook(retval);
+  expect(remote.fields["<CriticalRate>k__BackingField"]).toBe(30);
   expect(b.diagnostic().nativeCritical).toBeNull();
 });
 it("canceled preparation drops pending purchases and unrelated/online quests get no buff", () => {
@@ -88,5 +105,6 @@ it("freezes new-run amounts, restores old stats and reuses the critical-rate hoo
  expect(h.values._AtkUpAlive).toBe(7);expect(b.snapshot()).toEqual({atk:0,def:0,crit:0});
  b.addPending("buff_atk");b.addPending("buff_crit");b.tick(reading(43),scope());
  expect(h.values._AtkUpAlive).toBe(30);expect(h.hook).toBe(hook);
- h.pre({2:ptr(100)});expect(h.hook(ptr(5))).toEqual(ptr(50));
+ const attack=hit(5);h.pre({2:ptr(100),3:{object:attack}});h.hook(ptr(0));
+ expect(attack.fields["<CriticalRate>k__BackingField"]).toBe(50);
 });
