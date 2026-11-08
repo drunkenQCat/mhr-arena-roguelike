@@ -62,7 +62,7 @@ export function nextStep(s: ConsoleState | null, connected: boolean): string {
   if (!connected) return '等待新鲜的游戏状态；连接恢复后才能操作。';
   if (!s) return '等待游戏。';
   if (['Idle', 'Finished', 'Fault'].includes(s.sessionStage) && s.control?.startup.restorePending)
-    return '请回村，等待原装备与背包恢复完成后再开局。';
+    return s.control.startup.message || '请回村，等待原装备与背包恢复完成后再开局。';
   switch (s.sessionStage) {
     case 'Preparing': return '已穿戴初始装备并隔离背包，可用初始 PT 购物；全队加入任务后，由房主手动出发。';
     case 'Selecting': if (s.multiplayerRun?.role === 'guest') return '可在本机购买补给，等待房主选择下一波；请留在起点集结。'; return '先购买补给或服务，再选择下一波。选定后自动开始战斗流程。';

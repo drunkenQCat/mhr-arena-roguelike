@@ -7,7 +7,14 @@ interface FakeEntry { _IdType: number; _IdVal: number; _Name?: string }
 
 function entryFacade(e: FakeEntry) {
   return {
-    get_field: (n: string): unknown => (n === "_IdType" ? e._IdType : n === "_IdVal" ? e._IdVal : undefined),
+    get_field: (n: string): unknown => {
+      if(n === "_IdType") return e._IdType;
+      if(n === "_IdVal") return e._IdVal;
+      if(["_IsSetGuildCard","_IsLock","_CustomEnable"].includes(n)) return false;
+      if(n === "_HyakuryuColorData") return null;
+      if(["_HyakuryuSkillIdList","_PrevHyakuryuSkillId","_TalismanDecoSlotNumList","_TalismanSkillIdList","_TalismanSkillLvList","_CustomOpenIdArray","_DecoIdList","_CustomBuildup"].includes(n)) return {get_size:()=>0,get_element:()=>null,call:()=>null};
+      return 0;
+    },
     set_field: (n: string, v: unknown): void => {
       if (n === "_IdType") e._IdType = v as number;
       if (n === "_IdVal") e._IdVal = v as number;
@@ -30,7 +37,8 @@ vi.mock("./recovery_owner", () => ({
   return {character:"test",slot:0,name:"hunter",process:"process-1"};
  }
 }));
-vi.mock("./sdk", () => ({
+vi.mock("./sdk", async () => { const { createHash } = await import("node:crypto"); return ({
+  loadWebconsole: () => ({steam_digest:(s:string)=>createHash("sha256").update(s).digest("hex")}),
   refFs: { read: () => host.persisted === null ? "" : JSON.stringify(host.persisted), glob: () => host.persisted === null ? [] : ["mhw_rogue_startup_state.json", "mhw_rogue_pouch_state.json"] },
  getSingleton: () => ({
     get_field: () => null,
@@ -39,10 +47,11 @@ vi.mock("./sdk", () => ({
   relog: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
   rejson: {
     dump_file: (_p: string, data: unknown) => { if(host.persistFails) return false; host.persisted = data; return true; },
+    dump_string: (v:unknown)=>JSON.stringify(v),
     load_string: (text: string) => { try { return JSON.parse(text); } catch { return null; } },
     load_file: () => host.persisted,
   },
-}));
+}); });
 
 import { appendGrantedEntry, loadStartupState, restoreStartup } from "./equip_wear";
 import { GachaService } from "./gacha";
@@ -167,8 +176,8 @@ it("refuses delivery when the cleanup journal cannot be saved",()=>{
 
 
 it("does not refund a verified equipment grant just because its display-name lookup failed",()=>{
- const original=boxFacade.get_field;let reads=0;
- boxFacade.get_field=(n:string)=>{reads++;if(reads>3 && host.entries.some(e=>e._IdType!==0))throw Error("name list unavailable");return original(n);};
+ const original=boxFacade.get_field;
+ boxFacade.get_field=(n:string)=>{if((host.persisted as any)?.granted?.some((e:any)=>e.fingerprint))throw Error("name list unavailable");return original(n);};
  const r=new GachaService(POOLS,{rollIndex:()=>0}).roll("gacha_1");
  expect(r.ok).toBe(true);expect(host.entries.filter(e=>e._IdType!==0)).toHaveLength(1);
 });

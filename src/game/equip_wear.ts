@@ -13,6 +13,7 @@ import { getSingleton, rejson, relog, type REManagedObject, type RETypeDefinitio
 import type { StartupRules } from "../core/config";
 import { readRecoveryRecord, recoveryPending } from "./recovery_journal";
 import { assertRecoveryOwner, readRecoveryOwner, type RecoveryOwner } from "./recovery_owner";
+import { captureEquipmentBox, equipmentFingerprint, validateEquipmentSnapshot, verifyEquipmentBox, type EquipmentSnapshot } from "./equipment_snapshot";
 
 /** pack 槽位（0 基）。 */
 export const PACK_WEAPON = 0;
@@ -145,7 +146,8 @@ export interface GrantReport {
  * 部分写入标 uncertain，绝不自动重试。
  */
 export function grantEquip(box: REManagedObject | null, idVal: number, kind: "armor" | "weapon",
-  beforeGrant?: (entry: GrantedEntry) => boolean, reuseExisting = true): GrantReport {
+  beforeGrant?: (entry: GrantedEntry) => boolean, reuseExisting = true,
+  afterGrant?: (entry: GrantedEntry) => boolean): GrantReport {
   if (!box) return { ok: false, reason: "EquipBox unavailable" };
   const expectType = kind === "armor" ? 2 : 1;
   const existing = reuseExisting ? findEquipEntry(box, idVal, expectType) : null;
@@ -179,7 +181,8 @@ export function grantEquip(box: REManagedObject | null, idVal: number, kind: "ar
     if (identity(slot) === undefined && candidate?.get_field("_IdType") === 0) { reservedIndex = i; break; }
   }
   if (reservedIndex < 0) return { ok: false, reason: "Cannot identify empty equipment slot" };
-  if (beforeGrant && !beforeGrant({ boxIndex: reservedIndex, idVal, idType: expectType, identity: identity(slot) })) {
+  const reservation: GrantedEntry = { boxIndex: reservedIndex, idVal, idType: expectType, identity: identity(slot) };
+  if (beforeGrant && !beforeGrant(reservation)) {
     return { ok: false, reason: "Equipment recovery journal could not be saved" };
   }
   try {
@@ -201,6 +204,14 @@ export function grantEquip(box: REManagedObject | null, idVal: number, kind: "ar
     after = box.call("countWeaponArmorEmptyNum") as number;
   } catch { /* 同上 */ }
   if (idType === expectType && gotId === idVal && boxIndex !== null) {
+    if (afterGrant) {
+      try {
+        reservation.fingerprint = equipmentFingerprint(slot);
+        if (!afterGrant(reservation)) throw new Error("Cannot persist delivered equipment fingerprint");
+      } catch (error) {
+        return {ok:false, uncertain:true, boxIndex, reason:`装备已发放，持久身份尚未确认：${String(error)}；禁止重发`};
+      }
+    }
     const slotCountOk = before < 0 || after === before - 1;
     return {
       ok: true, uncertain: false, boxIndex,
@@ -216,14 +227,15 @@ export function grantEquip(box: REManagedObject | null, idVal: number, kind: "ar
 function identity(obj: REManagedObject): string | undefined {
   try { return String(obj.get_address()); } catch { return undefined; }
 }
-export interface GrantedEntry { boxIndex: number; idVal: number; idType: number; identity?: string; removed?: boolean }
+export interface GrantedEntry { boxIndex: number; idVal: number; idType: number; identity?: string; fingerprint?: string; removed?: boolean }
 
-function recordedEntry(box: REManagedObject, entry: GrantedEntry): REManagedObject | null {
+function recordedEntry(box: REManagedObject, entry: GrantedEntry, relocated = false): REManagedObject | null {
   const hint = boxEntry(box, entry.boxIndex);
   if (!hint) throw new Error("Recorded equipment slot unavailable; cleanup retained");
   if (hint.get_field("_IdType") === 0) return null;
   if (hint.get_field("_IdType") !== entry.idType || hint.get_field("_IdVal") !== entry.idVal ||
-      (entry.identity !== undefined && identity(hint) !== entry.identity))
+      (relocated ? !entry.fingerprint || equipmentFingerprint(hint) !== entry.fingerprint :
+        entry.identity !== undefined && identity(hint) !== entry.identity))
     throw new Error("Equipment ownership uncertain; refusing to delete a matching user item");
   return hint;
 }
@@ -246,19 +258,23 @@ export interface StartupWearReport {
 export interface EquipWearPort {
   /** 供 NativeRuntime 注入的袋隔离动作（pouch_backup）。 */
   beginPouchIsolation(): { ok: boolean; reason?: string; recoveryRequired?: boolean };
-  endPouchIsolation(): { ok: boolean; reason?: string };
+  endPouchIsolation(retainUntilSave?: boolean): { ok: boolean; reason?: string };
 }
 
 const STATE_FILE = "mhw_rogue_startup_state.json";
 
 interface PersistedState {
+  schema?: number;
   owner?: RecoveryOwner;
+  originalBox?: EquipmentSnapshot;
   active: boolean;
   armor: string | null;
   prevPack: number[];
   granted: GrantedEntry[];
   pouchIsolated: boolean;
   wornPack?: number[];
+  phase?: "restored";
+  restoredProcess?: string;
 }
 
 export function persistStartupState(state: PersistedState | null): boolean {
@@ -283,6 +299,10 @@ export function loadStartupState(): PersistedState | null {
         !Number.isInteger(e.idVal) || e.idVal <= 0 || ![1, 2].includes(e.idType)) || typeof raw.pouchIsolated !== "boolean")
     throw new Error("装备恢复记录无效；保留原备份，禁止开新局");
   assertRecoveryOwner(raw.owner);
+  if (raw.schema === 3) {
+    if (!raw.originalBox) throw new Error("Original equipment box snapshot missing");
+    validateEquipmentSnapshot(raw.originalBox);
+  }
   return raw;
 }
 
@@ -293,7 +313,7 @@ export function startupRecoveryPending(): boolean {
 /**
  * 开局穿戴：保存原装 → 按规则卸护石/虫笼 → 发放并穿上五件 → 读回核验。
  * 任一步失败：尝试回滚原装 pack 并撤销本局新发条目，然后报告失败（不抛异常）。
- * 袋隔离只在装备全部成功后执行；隔离失败不阻断开局（零物资是规则不是安全前提）。
+ * 袋隔离只在装备全部成功后执行；隔离失败则回滚并拒绝开局。
  */
 export function equipStartupSet(armor: string, series: number, rules: StartupRules,
   pouch: EquipWearPort | null): StartupWearReport {
@@ -322,7 +342,10 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
   report.prevPack = prev.slice();
 
   const granted: GrantedEntry[] = [];
-  const journal: PersistedState = { active: true, owner, armor, prevPack: prev, granted, pouchIsolated: false };
+  let originalBox: EquipmentSnapshot;
+  try { originalBox = captureEquipmentBox(box); }
+  catch (error) { return { ...report, reason:String(error) }; }
+  const journal: PersistedState = { schema:3, active: true, owner, originalBox, armor, prevPack: prev, granted, pouchIsolated: false };
   if (!persistStartupState(journal)) { report.reason = "Cannot save original equipment"; return report; }
   const reserve = (entry: GrantedEntry): boolean => {
     granted.push(entry);
@@ -330,7 +353,7 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
   };
   const fail = (reason: string): StartupWearReport => {
     const rollback = restoreStartup(pouch);
-    return { ...report, granted, rollbackAttempted: true,
+    return { ...report, ok:false, granted, rollbackAttempted: true,
       reason: `${reason}; recovery ${rollback.ok ? "completed" : "pending: " + rollback.reason}` };
   };
 
@@ -342,7 +365,7 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
 
   for (let part = 1 as 1 | 2 | 3 | 4 | 5; part <= 5; part++) {
     const id = armorId(series, part);
-    const grant = grantEquip(box, id, "armor", reserve, false);
+    const grant = grantEquip(box, id, "armor", reserve, false, () => persistStartupState(journal));
     if (!grant.ok || grant.boxIndex === undefined) {
       return fail(`防具发放失败（部位 ${part}）: ${grant.reason ?? "未知"}${grant.uncertain ? "［结果不明，禁止自动重试］" : ""}`);
     }
@@ -354,7 +377,7 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
 
   // D1 武器口子：keepPlayerWeapon=false 时按 weaponId 发放并穿上（配置校验保证非空）
   if (!rules.keepPlayerWeapon && rules.weaponId !== null) {
-    const grant = grantEquip(box, rules.weaponId, "weapon", reserve, false);
+    const grant = grantEquip(box, rules.weaponId, "weapon", reserve, false, () => persistStartupState(journal));
     if (!grant.ok || grant.boxIndex === undefined) {
       return fail(`武器发放失败: ${grant.reason ?? "未知"}`);
     }
@@ -390,6 +413,7 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
     journal.pouchIsolated = pouchReport.recoveryRequired !== false;
     report.pouchIsolated = journal.pouchIsolated;
     report.pouchReason = pouchReport.ok ? undefined : pouchReport.reason;
+    if (!pouchReport.ok) return fail(pouchReport.reason ?? "Pouch isolation failed");
   }
   if (!persistStartupState(journal)) return fail("Cannot save startup completion");
   return report;
@@ -403,8 +427,10 @@ export function appendGrantedEntry(entry: GrantedEntry): boolean {
   try {
     const state = loadStartupState();
     const merged: PersistedState = state ?? {
-      active: true, owner: readRecoveryOwner(), armor: null, prevPack: [], granted: [], pouchIsolated: false,
+      schema:3, active: true, owner: readRecoveryOwner(), originalBox:captureEquipmentBox(equipmentBox(dataManager())!),
+      armor: null, prevPack: [], granted: [], pouchIsolated: false,
     };
+    if (merged.granted.some(e => !e.removed && e.boxIndex === entry.boxIndex)) return false;
     merged.active = true;
     merged.granted = merged.granted.concat([entry]);
     return persistStartupState(merged);
@@ -413,8 +439,19 @@ export function appendGrantedEntry(entry: GrantedEntry): boolean {
   }
 }
 
+export function confirmGrantedEntry(entry: GrantedEntry): boolean {
+  try {
+    const state = loadStartupState();
+    const reserved = state?.granted.find(e => !e.removed && e.boxIndex === entry.boxIndex && e.idVal === entry.idVal && e.idType === entry.idType);
+    if (!state || !reserved || !entry.fingerprint) return false;
+    reserved.fingerprint = entry.fingerprint;
+    return persistStartupState(state);
+  } catch { return false; }
+}
+
 export interface RestoreReport {
   ok: boolean;
+  awaitingSave?: boolean;
   restoredPack?: boolean;
   removedEntries?: number;
   skippedEntries?: number;
@@ -426,12 +463,12 @@ export interface RestoreReport {
  * 回村恢复（幂等）：核验角色 → 恢复 pack/道具袋 → 清理本局发件 → 退役记录。
  * 无待恢复状态时返回 ok=true 的 no-op；失败保持待办（调用方稍后重试）。
  */
-export function restoreStartup(pouch: EquipWearPort | null): RestoreReport {
+export function restoreStartup(pouch: EquipWearPort | null, retainUntilSave = false): RestoreReport {
   let state: PersistedState | null;
   try { state = loadStartupState(); }
   catch (error) { return { ok: false, reason: String(error) }; }
   if (!state) {
-    const restored = pouch?.endPouchIsolation();
+    const restored = pouch?.endPouchIsolation(retainUntilSave);
     if (restored && !restored.ok) return { ok: false, reason: restored.reason };
     return { ok: true, restoredPack: false, removedEntries: 0, skippedEntries: 0, pouchRestored: false };
   }
@@ -439,6 +476,18 @@ export function restoreStartup(pouch: EquipWearPort | null): RestoreReport {
   const box = equipmentBox(dataManager());
   if (!edm) {
     return { ok: false, reason: "EquipDataManager unavailable；恢复保持待办" };
+  }
+  const process = readRecoveryOwner().process;
+  const relocated = state.owner?.process !== process;
+  // Character reloads and native return backups may resurrect removed items,
+  // even within the same process. Reconcile live contents before certification.
+  const reconcileSaved = relocated || state.phase === "restored";
+  if (reconcileSaved) {
+    try {
+      if (!box || !state.originalBox) throw new Error("跨进程恢复缺少原装备箱完整指纹，保留待办");
+      // A prior native save can still contain entries removed only in memory.
+      verifyEquipmentBox(box, state.originalBox, state.granted, true);
+    } catch (error) { return {ok:false,reason:String(error)}; }
   }
   const result: RestoreReport = { ok: true, restoredPack: false, removedEntries: 0, skippedEntries: 0, pouchRestored: false };
   const removed = (): number => (result.removedEntries ?? 0);
@@ -461,18 +510,17 @@ export function restoreStartup(pouch: EquipWearPort | null): RestoreReport {
   // cannot be proven after a process restart. Keep the cleanup journal pending.
   if (state.pouchIsolated) {
     if (!pouch) return { ...result, ok:false, reason:"道具袋恢复器不可用；恢复保持待办" };
-    const restored = pouch.endPouchIsolation();
+    const restored = pouch.endPouchIsolation(retainUntilSave);
     if (!restored.ok) return { ...result, ok:false, reason:restored.reason };
-    result.pouchRestored = true; state.pouchIsolated = false;
+    result.pouchRestored = true;
+    if (!retainUntilSave) state.pouchIsolated = false;
     if (!persistStartupState(state)) return { ...result, ok:false, reason:"Cannot save pouch recovery progress" };
   }
-  if (state.granted.some(e => !e.removed) && state.owner?.process !== readRecoveryOwner().process)
-    return { ...result, ok:false, reason:"原装与物资已恢复；游戏已重启，临时装备地址失效，回收需独立核验；恢复记录保留" };
   for (const entry of state.granted) {
-    if (entry.removed) continue;
+    if (entry.removed && !reconcileSaved) continue;
     if (!box) return { ...result, ok: false, reason: "Equipment box unavailable" };
     try {
-      const obj = recordedEntry(box, entry);
+      const obj = recordedEntry(box, entry, reconcileSaved);
       if (obj) {
         box.call("subEquipment", obj);
         // 读回=记录的槽位已空（同 id 双件合法并存，全箱 id 消失不是必要条件）
@@ -486,9 +534,29 @@ export function restoreStartup(pouch: EquipWearPort | null): RestoreReport {
       return { ...result, ok: false, reason: String(error) };
     }
   }
+  if (retainUntilSave) {
+    state.phase = "restored"; state.restoredProcess = process;
+    if (!persistStartupState(state)) return {...result,ok:false,reason:"Cannot retain recovery until native save"};
+    return {...result,awaitingSave:true};
+  }
+  // Immediate retirement is only for a synchronous, unsaved grant rollback.
   if (!persistStartupState(null)) return { ...result, ok: false, reason: "Cannot retire recovery journal" };
   relog.info(`[MhwRogue] 开局装备已恢复（发件清理 ${result.removedEntries}/${state.granted.length}）`);
   return result;
+}
+
+/** Only a restored live inventory can be certified by a subsequent native save. */
+export function startupCommitRecord(): PersistedState | null | undefined {
+  const state = loadStartupState();
+  if (!state) return null;
+  if (state.phase !== "restored" || state.restoredProcess !== readRecoveryOwner().process) return undefined;
+  const box = equipmentBox(dataManager());
+  if (!box || !state.originalBox) throw new Error("Original equipment save verification unavailable");
+  verifyEquipmentBox(box,state.originalBox,[]);
+  const pack = readPack(equipDataManager());
+  if (state.prevPack.length && (!pack || pack.some((v,i)=>v!==state.prevPack[i])))
+    throw new Error("Restored equipment changed before native save");
+  return state;
 }
 
 /** The engine may restore its own equipment backup on quest return. */

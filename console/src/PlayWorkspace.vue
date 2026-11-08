@@ -77,7 +77,7 @@ const transactionText = computed(() => {
       <p v-if="summary">清除 {{ summary.clearedWaves }} 波 · 获得 {{ summary.earnedPt }} PT · 消费 {{ summary.spentPt }} PT · 余款 {{ summary.balance }} PT · 时长 {{ Math.floor(summary.durationSeconds / 60) }} 分 {{ Math.floor(summary.durationSeconds % 60) }} 秒</p>
       <p v-if="summary" class="muted">{{ summary.restored ? '个人装备与背包已恢复，可以直接准备下一局。' : '等待回村恢复个人装备与背包。' }}</p>
       <p v-if="finished">到达第 <strong class="gold">{{ state?.layer }}</strong> 层 · 剩余 <strong class="gold">{{ state?.pt }} PT</strong> · 剩余猫车 {{ state?.cartsLeft }} / {{ state?.maxCarts }}</p>
-      <p v-if="finished">{{ state?.cartsLeft === 0 ? '猫车次数已耗尽。' : '本局流程已结束。' }}{{ state?.control?.startup.restorePending ? '请回村等待原装备与背包恢复。' : '可查看下方购买记录，再准备下一局。' }}</p>
+      <p v-if="finished">{{ state?.cartsLeft === 0 ? '猫车次数已耗尽。' : '本局流程已结束。' }}{{ state?.control?.startup.restorePending ? state.control.startup.message || '请回村等待原装备与背包恢复。' : '可查看下方购买记录，再准备下一局。' }}</p>
       <p v-if="finished && state?.message" class="muted">游戏说明：{{ state.message }}</p>
       <p v-if="state?.ui?.returnFlow" role="status">{{ state.ui.returnFlow.message }}</p>
       <small>显示游戏保留的本局状态；剩余 PT 不代表累计收益。</small>

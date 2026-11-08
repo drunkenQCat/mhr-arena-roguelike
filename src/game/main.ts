@@ -12,6 +12,8 @@ import { QuestInstaller } from "./quest_installer";
 import { ShopWindow } from "./shop_window";
 import { WebConsoleBridge } from "./webconsole_bridge";
 import { startupRecoveryPending } from "./equip_wear";
+import { RecoverySave } from "./recovery_save";
+import { captureRecoveryCommit, commitRecovery } from "./recovery_commit";
 import { BuffService } from "./buff_service";
 import { GachaService } from "./gacha";
 import { DEFAULT_BUFF_AMOUNTS, type BuffAmounts } from "../core/config";
@@ -30,6 +32,8 @@ try {
   const gacha = new GachaService(config.gachaPools ?? {}, { rollIndex: (w) => core.rollWeighted(w) });
   let runtime = new NativeRuntime(config, installer, gacha);
   let session = new RunSession(core, monsterCatalog, runtime);
+  const recoverySave=new RecoverySave({prepare:()=>session.prepareForNativeSave(),
+    capture:captureRecoveryCommit,commit:commitRecovery,report:(event,detail)=>runtime.report(event,detail)});
   // 上局中断留下的未恢复状态（重载/崩溃）：回到村庄后由 session tick 自动恢复。
   if (startupRecoveryPending()) {
     session.armStartupRestore();
@@ -74,6 +78,7 @@ try {
   let multiplayerRun: MultiplayerRun | null = null;
   reframework.onFrame(() => {
     try {
+      recoverySave.tick();
       // Production multiplayer: adopt the already ACKed and posted entry on every peer.
       // Only the host owns progression; guests mirror business state and stage native slots.
       if (!entryAttached && (!session.startupStatus.restorePending || session.startupStatus.prepared) &&

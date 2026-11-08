@@ -8,7 +8,7 @@ import { DEFAULT_RUNTIME, type QuestPlan } from "../core/quest_plan";
 import type { DeathReading, EnemyReading, PlayerReading, RuntimeReading, SessionPort } from "../core/run_session";
 import { QuestInstaller } from "./quest_installer";
 import { QuestTransport } from "./quest_transport";
-import { equipStartupSet, restoreStartup, reapplyStartup, type EquipWearPort } from "./equip_wear";
+import { equipStartupSet, restoreStartup, reapplyStartup, startupRecoveryPending, type EquipWearPort } from "./equip_wear";
 import { beginPouchIsolation, endPouchIsolation } from "./pouch_backup";
 import { DEFAULT_STARTUP_RULES } from "../core/config";
 import { GachaService } from "./gacha";
@@ -191,7 +191,9 @@ export class NativeRuntime implements SessionPort {
     const time = clockSeconds();
     const qm = questManager();
     if (!qm) return { time, quest: null, players: [], enemies: [], deaths: 0, online: false, canPost: false };
-    const active = !!callNative(qm, "isActiveQuest");
+    const nativeQuestActive = callNative(qm, "isActiveQuest");
+    if (typeof nativeQuestActive!=="boolean") throw new Error("Native quest activity unavailable");
+    const active = nativeQuestActive;
     const playing = active && !!callNative(qm, "isPlayQuest");
     const status = qm.get_field("_QuestStatus") as number;
     // The play status is set while the village actors/positions still exist.
@@ -264,18 +266,18 @@ export class NativeRuntime implements SessionPort {
       }
     }
     const gui = getSingleton("snow.gui.GuiManager");
-    return { time, quest, entryReady, players, localPlayerId, enemies, online, staleQuest,
+    return { time, quest, nativeQuestActive, entryReady, players, localPlayerId, enemies, online, staleQuest,
       deaths: active ? callNative(qm, "getDeathNum") as number : 0,
       canPost: !active && (!!gui?.call("IsCanInvokeQuestBoard") || !!getSingleton("snow.gui.fsm.questcounter.GuiQuestCounterFsmManager")) };
   }
 
   private readonly wearPort: EquipWearPort = {
     beginPouchIsolation: () => beginPouchIsolation(),
-    endPouchIsolation: () => endPouchIsolation(),
+    endPouchIsolation: (retainUntilSave) => endPouchIsolation(retainUntilSave),
   };
   private startupNotice: string | null = null;
 
-  /** M3.5 开局准备：穿装 + 零物资袋隔离。不抛异常；袋隔离失败不阻断（返回 notice）。 */
+  /** 开局准备：穿装与零物资隔离均须成功，否则回滚并拒绝准备。 */
   startupPrepare(armor: string): { ok: boolean; reason?: string; notice?: string } {
     const sets = this.cfg.armorSets ?? {};
     const spec = sets[armor];
@@ -311,7 +313,8 @@ export class NativeRuntime implements SessionPort {
 
   /** M3.5 回村恢复（equip_wear.restoreStartup 幂等；失败保持待办由 session 重试）。 */
   startupRestore(): { ok: boolean; reason?: string } {
-    const report = restoreStartup(this.wearPort);
+    const report = restoreStartup(this.wearPort,true);
+    if (report.ok && startupRecoveryPending()) return {ok:false,reason:"原装备与背包已恢复；等待原生保存完成。若已回村，请在原生菜单保存后再开局"};
     if (report.ok) this.startupNotice = null;
     return report.ok ? { ok: true } : { ok: false, reason: report.reason };
   }

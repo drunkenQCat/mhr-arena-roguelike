@@ -27,6 +27,7 @@ export class NativeUi {
   private fingerprint = "";
   private hooks = false;
   private contexts: Record<number, string[][]> = {};
+  private inputFrames: Record<number, (string | null)[]> = {};
   private pending: Pending | null = null;
   private diagnostics: Record<string, number> = {};
   private returning: { questId: number; unique: number; deadline: number; lastPoll: number;
@@ -67,7 +68,7 @@ export class NativeUi {
   rebind(bridge: string, ownedQuestId: () => number): void {
     this.shutdown();
     this.bridge = bridge; this.ownedQuestId = ownedQuestId;
-    this.fingerprint = ""; this.revision = 0; this.contexts = {}; this.diagnostics = {};
+    this.fingerprint = ""; this.revision = 0; this.contexts = {}; this.inputFrames = {}; this.diagnostics = {};
   }
 
   observe(): UiSnapshot {
@@ -206,6 +207,7 @@ export class NativeUi {
       ["snow.gui.fsm.title.GuiTitleFsm_PressAnyButton_Action", "update", ["title.advance"]],
       ["snow.gui.fsm.title.GuiTitleFsm_TitleMenu_Action", "update", ["title.continue"]],
       ["snow.gui.GuiSaveDataSelectMenu", "routineLoadDataSelect", ["save.load"]],
+      ["snow.gui.fsm.GuiQuestPayoffFsmActionSelect", "update", ["result.next"]],
     ];
     for (const [type, name, actions] of contexts) {
       const method = findTypeDefinition(type)?.get_method(name);
@@ -226,10 +228,22 @@ export class NativeUi {
         if (p) this.diagnostics[name] = (this.diagnostics[name] ?? 0) + 1;
         const stack = this.contexts[reframework.getThreadId()] ?? [];
         const scope = stack[stack.length - 1];
+        if (p?.action === "result.next" && name === "getDecideButtonTrg") {
+          const key = scope?.includes("result.next") ? "payoffConfirmScoped" : "payoffConfirmOutside";
+          this.diagnostics[key] = (this.diagnostics[key] ?? 0) + 1;
+        }
+        // Installed Payoff Select queries getDecideButtonOrTrg to advance.
+        // That method aliases getDecideButtonTrg at the same native address;
+        // hook the address once and use its action context to distinguish it.
+        // Its andTrg(UI_INPUT=1/2) calls move the cursor up/down; they are not
+        // confirmation. Only the scoped native decide query consumes next.
+        const payoffConfirm = name === "getDecideButtonTrg" && p?.action === "result.next" &&
+          scope?.includes("result.next") === true;
         let active = !!p && (!p.consumed || p.pulseActive) && clockSeconds() <= p.deadline &&
+          (p.action === "result.next" ? payoffConfirm :
           (scope?.includes(p.action) === true || name === "isNetworkErrorWindowButton" && p.action === "dialog.close"
             || ["getDecideButtonTrg", "getDecideButtonTrgSYS", "getDecideMouseEventTrg"].includes(name) &&
-              ["title.continue", "result.next"].includes(p.action));
+              p.action === "title.continue"));
         if (active && p && name === "getDecideMouseEventTrg" && p.action === "title.continue") {
           const cursor = call(getSingleton(MENU), "get_TitleMenuCursor") as REManagedObject | null;
           const target = field(cursor, "<mouseCtrl>k__BackingField") as REManagedObject | null;
@@ -243,10 +257,10 @@ export class NativeUi {
             (p.action !== "result.next" || ui.scene === "quest_payoff") && (p.action !== "dialog.close" ||
             ui.dialogs.some((d: any) => d.token === p.token && d.supported));
         }
-        reframework.getHookStorage().cliUiInject = active ? p?.id : null;
+        (this.inputFrames[reframework.getThreadId()] ??= []).push(active ? p!.id : null);
         return PRE_HOOK.CALL_ORIGINAL;
       }, value => {
-        const id = reframework.getHookStorage().cliUiInject;
+        const id = this.inputFrames[reframework.getThreadId()]?.pop();
         if (id && this.pending?.id === id && (!this.pending.consumed || this.pending.pulseActive)) {
           this.pending.consumed = true;
           this.pending.pulseActive = true;

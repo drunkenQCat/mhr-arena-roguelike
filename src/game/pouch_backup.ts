@@ -230,12 +230,14 @@ function restoreDurable(pouch: REManagedObject, expected: InventorySnapshot, sta
   }
 }
 
-export function endPouchIsolation(): PouchSnapshot {
+interface PouchJournal { schema?: number; active: boolean; owner?: RecoveryOwner; items: InventorySnapshot;
+  categoryTotals: number[]; stacks?: Record<string, { id: number; n: number }[]>; restoredProcess?: string }
+
+export function endPouchIsolation(retainUntilSave = false): PouchSnapshot {
   const pouch = itemPouch();
   if (!pouch) return { ok: false, reason: "Item pouch unavailable" };
   try {
-    const journal = readRecoveryRecord<{ schema?: number; active: boolean; owner?: RecoveryOwner; items: InventorySnapshot;
-      categoryTotals: number[]; stacks?: Record<string, { id: number; n: number }[]> }>(SNAPSHOT_FILE);
+    const journal = readRecoveryRecord<PouchJournal>(SNAPSHOT_FILE);
     if (!journal?.active) {
       if (isolationActive) throw new Error("Original pouch journal unavailable; recovery retained");
       return { ok: true };
@@ -252,10 +254,29 @@ export function endPouchIsolation(): PouchSnapshot {
       else restoreDurable(pouch, expected, journal.stacks);
     }
     if (!sameSnapshot(expected, inventorySnapshot(pouch, false))) throw new Error("Pouch item IDs/counts do not match original; recovery retained");
-    if (rejson.dump_file(SNAPSHOT_FILE, { active: false }, 2) !== true) throw new Error("Cannot retire pouch journal");
+    journal.restoredProcess = readRecoveryOwner().process;
+    if (rejson.dump_file(SNAPSHOT_FILE, retainUntilSave ? journal : { active: false }, 2) !== true)
+      throw new Error("Cannot persist pouch recovery");
     isolationActive = false;
     return { ok: true };
   } catch (error) {
     return { ok: false, recoveryRequired: true, reason: String(error) };
   }
+}
+
+export function pouchCommitRecord(): PouchJournal | null | undefined {
+  const journal=readRecoveryRecord<PouchJournal>(SNAPSHOT_FILE);
+  if (!journal?.active) return null;
+  const owner=assertRecoveryOwner(journal.owner);
+  if (journal.restoredProcess!==owner.process) return undefined;
+  if (journal.schema!==2) throw new Error("Original pouch save format unavailable");
+  validateSnapshot(journal.items,journal.categoryTotals);
+  const pouch=itemPouch();
+  if (!pouch || !sameSnapshot(journal.items,inventorySnapshot(pouch,false)))
+    throw new Error("Restored pouch changed before native save");
+  return journal;
+}
+
+export function retirePouchCommit(): boolean {
+  return rejson.dump_file(SNAPSHOT_FILE,{active:false},2)===true;
 }

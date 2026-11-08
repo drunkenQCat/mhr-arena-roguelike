@@ -158,12 +158,20 @@ host.execute('''
     dump_file = function(path, data) reports[path] = data; return true end}
   thread = {get_hook_storage = function() return {} end}
   sdk = {PreHookResult = {CALL_ORIGINAL = 0, SKIP_ORIGINAL = 1}}
+  save_hooks = {}; native_save = {get_SaveState=1,get_LastSaveResult=2,get_LastSaveFailed=false,get_SaveSlotLast=1}
+  sdk.find_type_definition = function(name)
+    if name ~= 'via.storage.saveService.SaveService' and name ~= 'snow.SnowSaveService' then return nil end
+    return {get_method=function(_, method) return {name=name..'.'..method,
+      call=function() return native_save[method] end} end}
+  end
+  sdk.hook = function(method, pre, post) save_hooks[method.name]={pre=pre,post=post} end
   re = {on_frame = function(cb) callbacks.frame = cb end,
     on_draw_ui = function(cb) callbacks.ui = cb end,
     on_script_reset = function(cb) callbacks.reset = cb end}
   imgui = {tree_node = function() return false end}
 ''')
 host.execute(original_bundle)
+assert host.globals().reports["mhw_rogue_boot.json"] is not None, str(host.globals().reports["mhw_rogue_error.json"])
 assert host.globals().reports["mhw_rogue_boot.json"].ok is True
 assert host.globals().reports["mhw_rogue_boot.json"].route == "inPlace"
 assert host.globals().reports["mhw_rogue_error.json"] is None

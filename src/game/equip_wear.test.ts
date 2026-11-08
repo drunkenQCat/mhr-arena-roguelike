@@ -8,7 +8,14 @@ interface FakeEntry { _IdType: number; _IdVal: number }
 function entryFacade(e: FakeEntry) {
   return {
     ref: e,
-    get_field: (n: string): unknown => (n === "_IdType" ? e._IdType : n === "_IdVal" ? e._IdVal : undefined),
+    get_field: (n: string): unknown => {
+      if(n === "_IdType") return e._IdType;
+      if(n === "_IdVal") return e._IdVal;
+      if(["_IsSetGuildCard","_IsLock","_CustomEnable"].includes(n)) return false;
+      if(n === "_HyakuryuColorData") return null;
+      if(["_HyakuryuSkillIdList","_PrevHyakuryuSkillId","_TalismanDecoSlotNumList","_TalismanSkillIdList","_TalismanSkillLvList","_CustomOpenIdArray","_DecoIdList","_CustomBuildup"].includes(n)) return {get_size:()=>0,get_element:()=>null,call:()=>null};
+      return 0;
+    },
     set_field: (n: string, v: unknown): void => {
       if (n === "_IdType") e._IdType = v as number;
       if (n === "_IdVal") e._IdVal = v as number;
@@ -43,7 +50,8 @@ vi.mock("./recovery_owner", () => ({
   return {character:"test",slot:0,name:"hunter",process:"process-1"};
  }
 }));
-vi.mock("./sdk", () => ({
+vi.mock("./sdk", async () => { const { createHash } = await import("node:crypto"); return ({
+  loadWebconsole: () => ({steam_digest:(s:string)=>createHash("sha256").update(s).digest("hex")}),
   refFs: { read: () => host.persisted === null ? "" : JSON.stringify(host.persisted), glob: () => host.persisted === null ? [] : ["mhw_rogue_startup_state.json", "mhw_rogue_pouch_state.json"] },
  getSingleton: (name: string) => {
     if (name === "snow.data.EquipDataManager") {
@@ -60,13 +68,14 @@ vi.mock("./sdk", () => ({
   relog: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
   rejson: {
     dump_file: (_p: string, data: unknown) => { if (host.persistFails) return false; host.persisted = JSON.parse(JSON.stringify(data)); return true; },
+    dump_string: (v:unknown)=>JSON.stringify(v),
     load_string: (text: string) => { try { return JSON.parse(text); } catch { return null; } },
     load_file: () => host.persisted,
   },
-}));
+}); });
 
 import { armorId, equipStartupSet, grantEquip, loadStartupState, readPack,
-  restoreStartup, reapplyStartup, writePackSlot, appendGrantedEntry, type EquipWearPort } from "./equip_wear";
+  restoreStartup, reapplyStartup, writePackSlot, appendGrantedEntry, startupCommitRecord, type EquipWearPort } from "./equip_wear";
 
 let packFacade: { get_field(n: string): unknown };
 let boxFacade: {
@@ -142,6 +151,22 @@ const RULES = { stripTalismans: true, stripInsect: false, keepPlayerWeapon: true
 const INITIAL = [90, 11, 12, 13, 14, 15, 60, 70];
 
 beforeEach(() => buildWorld(INITIAL, []));
+
+it("retains the complete original journal after memory restoration until native saving",()=>{
+ equipStartupSet("iron",9,RULES,pouchPort);expect(startupCommitRecord()).toBeUndefined();
+ const r=restoreStartup(pouchPort,true);expect(r.ok).toBe(true);expect(r.awaitingSave).toBe(true);
+ expect(loadStartupState()?.active).toBe(true);expect(loadStartupState()?.phase).toBe("restored");
+ expect(startupCommitRecord()?.prevPack).toEqual(INITIAL);expect(equipStartupSet("iron",9,RULES,pouchPort).ok).toBe(false);
+ expect(restoreStartup(pouchPort,true).awaitingSave).toBe(true);expect(host.removedIds).toHaveLength(5);
+});
+
+it("reclaims items present in an earlier native save even after a previous in-memory cleanup",()=>{
+ equipStartupSet("iron",9,RULES,pouchPort);const oldSave=structuredClone(host.entries);
+ restoreStartup(pouchPort,true);const journal=host.persisted as any;journal.owner.process="previous-process";journal.restoredProcess="previous-process";
+ host.entries=oldSave;host.packArr![1]=0;
+ expect(restoreStartup(pouchPort,true).ok).toBe(true);expect(host.entries.every(e=>e._IdType===0)).toBe(true);
+ expect(loadStartupState()?.active).toBe(true);expect(startupCommitRecord()).not.toBeUndefined();
+});
 
 describe("equip_wear", () => {
   it("armorId 编码 = 0x0C<部位><系列>", () => {
@@ -241,11 +266,11 @@ it("deletes only the recorded copy rather than the first matching equipment ID",
   expect(host.entries[0]._IdType).toBe(2); expect(host.entries[1]._IdType).toBe(0);
 });
 it("partial pouch failure retains the recovery obligation", () => {
-  const end=vi.fn(()=>({ok:true}));
+  const end=vi.fn(()=>({ok:false,reason:"restore pending"}));
   const port={beginPouchIsolation:()=>({ok:false,reason:"partial clear"}),endPouchIsolation:end};
   const r=equipStartupSet("test",9,RULES,port);
-  expect(r.pouchIsolated).toBe(true); expect(loadStartupState()?.pouchIsolated).toBe(true);
-  expect(restoreStartup(port).ok).toBe(true); expect(end).toHaveBeenCalledOnce();
+  expect(r.ok).toBe(false);expect(r.pouchIsolated).toBe(true); expect(loadStartupState()?.pouchIsolated).toBe(true);
+  expect(restoreStartup(port).ok).toBe(false); expect(end).toHaveBeenCalledTimes(2);
 });
 it("restores the pouch before deleting temporary equipment and never deletes twice on retry", () => {
   equipStartupSet("test",9,RULES,pouchPort);
@@ -265,13 +290,13 @@ it("never overwrites or applies a malformed or foreign character recovery journa
  }
 });
 
-it("restores original resources but retains temporary cleanup after a process identity change",()=>{
+it("recovers verified original and temporary equipment after a process identity change",()=>{
  equipStartupSet("test",9,RULES,pouchPort);
  (host.persisted as any).owner.process="previous-process";
  const result=restoreStartup(pouchPort);
- expect(result.ok).toBe(false);expect(result.restoredPack).toBe(true);expect(result.pouchRestored).toBe(true);
- expect([...host.packArr!]).toEqual(INITIAL);expect(host.removedIds).toHaveLength(0);
- expect((host.persisted as any).active).toBe(true);expect((host.persisted as any).pouchIsolated).toBe(false);
+ expect(result.ok).toBe(true);expect(result.restoredPack).toBe(true);expect(result.pouchRestored).toBe(true);
+ expect([...host.packArr!]).toEqual(INITIAL);expect(host.removedIds).toHaveLength(5);
+ expect((host.persisted as any).active).toBe(false);
 });
 
 it("reapplies the chosen run pack after native reentry restored the old one, without granting twice",()=>{
@@ -284,4 +309,16 @@ it("never searches for a user-owned same-ID replacement when the recorded slot c
  const id=armorId(9,1);host.entries[0]={_IdType:2,_IdVal:id};host.entries[1]={_IdType:2,_IdVal:123};
  host.persisted={active:true,owner:{character:"test",slot:0,name:"hunter",process:"process-1"},prevPack:[],granted:[{boxIndex:1,idType:2,idVal:id}],pouchIsolated:false};
  expect(restoreStartup(null).ok).toBe(false);expect(host.entries[0]._IdType).toBe(2);
+});
+
+it("reconciles an earlier native save loaded inside the same process",()=>{
+ equipStartupSet("iron",9,RULES,pouchPort);const oldSave=structuredClone(host.entries);
+ restoreStartup(pouchPort,true);host.entries=oldSave;host.packArr![1]=0;
+ expect(restoreStartup(pouchPort,true).ok).toBe(true);expect(host.entries.every(e=>e._IdType===0)).toBe(true);
+ expect(startupCommitRecord()).not.toBeUndefined();expect(Array.from(host.packArr!)).toEqual(INITIAL);
+});
+it("rejects and rolls back preparation when pouch isolation fails",()=>{
+ const report=equipStartupSet("iron",9,RULES,{...pouchPort,beginPouchIsolation:()=>({ok:false,reason:"backup failed"})});
+ expect(report.ok).toBe(false);expect(report.rollbackAttempted).toBe(true);expect(Array.from(host.packArr!)).toEqual(INITIAL);
+ expect(host.entries.every(e=>e._IdType===0)).toBe(true);
 });

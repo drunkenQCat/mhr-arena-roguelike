@@ -3,7 +3,7 @@ const host = vi.hoisted(() => ({ objects: {} as Record<string, any>, hooks: new 
   now: 100, storage: {} as Record<string, unknown> }));
 vi.mock("./sdk", () => ({
   clockSeconds: () => host.now, getSingleton: (n: string) => host.objects[n] ?? null,
-  findTypeDefinition: (type: string) => ({ get_method: (name: string) => ({ key: `${type}.${name}` }) }),
+  findTypeDefinition: (type: string) => ({ get_method: (name: string) => ({ key: `${type}.${name.split('(')[0]}` }) }),
   hookMethod: (method: any, pre: any, post: any) => { host.installations++; host.hooks.set(method.key, { pre, post }); },
   PRE_HOOK: { CALL_ORIGINAL: 0 }, toPtr: (v: unknown) => v, toManagedObject: (v: unknown) => v,
   reframework: { getThreadId: () => 1, getHookStorage: () => host.storage },
@@ -38,6 +38,10 @@ function signal(name: string, argument?: unknown) {
   const hook = host.hooks.get(`snow.gui.StmGuiInput.${name}`);
   hook.pre([undefined, undefined, argument]);
   return hook.post(0);
+}
+function payoffSignal() {
+ const scope=host.hooks.get("snow.gui.fsm.GuiQuestPayoffFsmActionSelect.update");
+ scope.pre([]);const result=signal("getDecideButtonTrg");scope.post(0);return result;
 }
 beforeEach(() => { host.objects = {}; host.hooks.clear(); host.installations = 0; host.now = 100; host.storage = {}; });
 
@@ -157,9 +161,12 @@ it("identifies result pages and waits for native transitions rather than closing
   expect(ui.observe().scene).toBe("quest_payoff");
   ui.request({id:"next",cmd:"result.next",sceneToken:ui.observe().sceneToken});
   expect(signal("getAnyTrgSYS")).toBe(0);
-  expect(signal("getDecideButtonTrg")).toBe(1);
-  expect(signal("getDecideButtonTrg")).toBe(1);
-  r.node="Save";expect(signal("getDecideButtonTrg")).toBe(0);
+  expect(signal("getDecideButtonTrg")).toBe(0);
+  expect(host.hooks.has("snow.gui.StmGuiInput.getDecideButtonOrTrg")).toBe(false); // Native alias is hooked once.
+  expect(host.hooks.has("snow.gui.StmGuiInput.andTrg")).toBe(false); // Cursor directions must remain native.
+  expect(payoffSignal()).toBe(1);
+  expect(payoffSignal()).toBe(1);
+  r.node="Save";expect(payoffSignal()).toBe(0);
   expect(ui.poll()?.status).toBe("applied");
   expect(ui.observe().allowedActions).toEqual([]);
 });
@@ -167,11 +174,23 @@ it("automates only the pinned ended quest and completes on real village readines
   const {ui,r}=resultFixture();ui.beginReturn(900103,7);ui.tickReturn();
   expect(r.receive).toBe(1);ui.tickReturn();expect(r.receive).toBe(1);
   r.node="Payoffselect";ui.poll();host.now++;ui.tickReturn();
-  expect(signal("getDecideButtonTrg")).toBe(1);r.node="Save";ui.poll();
+  expect(payoffSignal()).toBe(1);r.node="Save";ui.poll();
   host.now++;ui.tickReturn();expect(ui.observe().returnFlow.state).toBe("waiting");
   r.active=false;r.village=true;r.node="End";host.now++;ui.tickReturn();
   expect(ui.observe().returnFlow.state).toBe("complete");
   ui.beginReturn(900103,7);expect(ui.observe().returnFlow.state).toBe("complete");
+});
+it("preserves payoff confirmation across nested native input queries",()=>{
+  const {ui,r}=resultFixture();r.node="Payoffselect";
+  ui.request({id:"nested",cmd:"result.next",sceneToken:ui.observe().sceneToken});
+  const scope=host.hooks.get("snow.gui.fsm.GuiQuestPayoffFsmActionSelect.update");
+  const decide=host.hooks.get("snow.gui.StmGuiInput.getDecideButtonTrg");
+  scope.pre([]);decide.pre([]);
+  expect(signal("getAnyTrgSYS")).toBe(0);
+  expect(signal("getDecideMouseEventTrg")).toBe(0);
+  expect(decide.post(0)).toBe(1);scope.post(0);
+  expect(signal("getDecideButtonTrg")).toBe(0);
+  r.node="BeforeSave";expect(ui.poll()?.status).toBe("applied");
 });
 it("stops result automation on another quest, and never offers it during combat",()=>{
  const {ui,r}=resultFixture();r.playing=true;

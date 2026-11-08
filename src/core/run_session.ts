@@ -14,6 +14,8 @@ export interface QuestReading { id: number; unique: number; playing: boolean; st
 export interface RuntimeReading {
   time: number;
   quest: QuestReading | null;
+  /** Explicit native activity observation; absent when QuestManager is unavailable. */
+  nativeQuestActive?: boolean;
   players: PlayerReading[];
   localPlayerId?: number | null;
   enemies: EnemyReading[];
@@ -89,6 +91,26 @@ export class RunSession {
 
   get startupMessage(): string | null { return this.startupNotice; }
   get startupStatus() { return { prepared: this.startupPrepared, restorePending: this.startupRestorePending, message: this.startupNotice }; }
+  /** Called immediately BEFORE the engine serializes this character. Restore only
+   * an ended owned run or an already loaded village recovery, never Preparing/Combat. */
+  prepareForNativeSave():void {
+    if (!this.startupRestorePending || !this.port.startupRestore) return;
+    const r=this.port.read(),q=r.quest;
+    const village=r.canPost && r.players.length>0 && (!q || r.staleQuest===true);
+    const terminal=["Finished","Fault"].includes(this.stage);
+    const ended=terminal && !!q && !q.playing && q.id===this.plan?.questId &&
+      (this.questUnique===null || q.unique===this.questUnique) && ["failed","return","success"].includes(q.status);
+    // Result saving can happen after QuestManager cleared the quest, while the
+    // player list and village UI are still loading. The ended session remains pinned.
+    const clearedEnding=!q && r.nativeQuestActive===false && this.plan!==null && terminal;
+    if (village && ["Idle","Finished","Fault"].includes(this.stage) || ended || clearedEnding) {
+      const result=this.port.startupRestore();
+      if (!result.ok) {
+        this.startupNotice=result.reason ?? "等待原生保存";
+        this.message=`原装恢复待办：${this.startupNotice}`;
+      }
+    }
+  }
   get nextRoute(): RuntimeSettings["route"] { return this.nextRunConfig?.runtime?.route ?? this.settings.route; }
   setRunRoute(route: RuntimeSettings["route"]): void {
     if (!["Idle", "Finished", "Fault"].includes(this.stage)) throw new Error("路线只能在开局前切换");
@@ -504,7 +526,10 @@ export class RunSession {
             this.startupPrepared = false;
             this.startupNotice = null;
             this.announce("startup-restored", restore);
-          } else this.message = `原装恢复待办：${restore.reason ?? "未知"}`;
+          } else {
+            this.startupNotice=restore.reason ?? "未知";
+            this.message = `原装恢复待办：${this.startupNotice}`;
+          }
         }
       }
       if (["Idle", "Finished", "Fault"].includes(this.stage)) return;

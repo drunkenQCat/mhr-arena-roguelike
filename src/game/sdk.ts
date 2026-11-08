@@ -128,6 +128,7 @@ export interface RETypeDefinition {
 
 export interface REMethodDefinition {
   get_name(): string;
+  call(instance: REManagedObject | null, ...args: unknown[]): unknown;
 }
 
 export const PRE_HOOK = sdk.PreHookResult;

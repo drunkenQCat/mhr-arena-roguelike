@@ -46,6 +46,14 @@ it("journals before native backup moves the pouch, then restores exact original 
 it("refuses a second begin without overwriting the original backup",()=>{
  expect(beginPouchIsolation().ok).toBe(true);expect(beginPouchIsolation().ok).toBe(false);expect(h.backup[0][0].n).toBe(10);
 });
+it("preserves original stacks until a successful native save, including a later cold retry",async()=>{
+ const before=structuredClone(h.bag);beginPouchIsolation();endPouchIsolation(true);
+ expect(h.saved.active).toBe(true);expect(h.saved.restoredProcess).toBe("process-1");
+ expect(beginPouchIsolation().ok).toBe(false);expect((await import("./pouch_backup")).pouchCommitRecord()).not.toBeUndefined();
+ h.bag=empty();h.backup=empty();h.saved.restoredProcess="previous-process";vi.resetModules();
+ const fresh=await import("./pouch_backup");expect(fresh.pouchCommitRecord()).toBeUndefined();
+ expect(fresh.endPouchIsolation(true).ok).toBe(true);expect(h.bag).toEqual(before);expect(h.saved.active).toBe(true);
+});
 it("partial clear failure retains a recoverable obligation",()=>{
  h.failClear=true;expect(beginPouchIsolation().ok).toBe(false);expect(h.saved.active).toBe(true);
  expect(endPouchIsolation().ok).toBe(true);expect(h.bag[0][0].n).toBe(10);

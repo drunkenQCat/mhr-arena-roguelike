@@ -60,6 +60,21 @@ function setup(route: "reentry" | "inPlace" = "reentry") {
   return { config, core, game, session, tick, start, enter, clear, village };
 }
 
+it("restores before character saving only for an ended owned instance or idle village recovery",()=>{
+ const {game,session,start,enter}=setup("inPlace");let restored=0;
+ (game as SessionPort).startupRestore=()=>{restored++;return {ok:false,reason:"awaiting native save"};};
+ start(true);enter(9);session.armStartupRestore();session.prepareForNativeSave();expect(restored).toBe(0);
+ game.reading.quest={...game.reading.quest!,playing:false,status:"failed"};
+ session.prepareForNativeSave();expect(restored).toBe(0);
+ session.stage="Finished";session.prepareForNativeSave();expect(restored).toBe(1);
+ game.reading.quest.unique=10;session.prepareForNativeSave();expect(restored).toBe(1);
+ game.reading.quest=null;game.reading.canPost=true;session.stage="Preparing";
+ session.prepareForNativeSave();expect(restored).toBe(1);session.stage="Finished";
+ game.reading.canPost=false;game.reading.players=[];session.prepareForNativeSave();expect(restored).toBe(1);
+ game.reading.nativeQuestActive=false;session.prepareForNativeSave();expect(restored).toBe(2);
+ session.stage="Idle";session.prepareForNativeSave();expect(restored).toBe(2);
+});
+
 it("adopts a posted entry without startup isolation, clears and shops in place, then releases on lost authorization", () => {
   const { config, core, game, session, tick } = setup("inPlace");
   config.quest.id = 900103;
@@ -576,4 +591,13 @@ it("requests owned native failure on host sync faults but never lets a connected
  session.prepareMultiplayer(plan,config.armorOptions[0]!);game.reading.quest={id:900103,unique:7,playing:true,status:"play"};session.adoptMultiplayerEntry(plan);enter(7);
  role="guest";canFinish=false;session.failMultiplayer("lost ACK");expect(game.finishes).toEqual([]);
  session.stage="Combat";canFinish=true;session.failMultiplayer("disconnected locally");expect(game.finishes).toEqual([true]);
+});
+
+it("does not reclaim equipment at a continuing reentry wave's native save",()=>{
+ const {game,session,start,enter}=setup("reentry");let restored=0;
+ (game as SessionPort).startupRestore=()=>{restored++;return {ok:true};};
+ start(true);enter(9);session.armStartupRestore();session.stage="Returning";
+ game.reading.quest={...game.reading.quest!,playing:false,status:"success"};
+ session.prepareForNativeSave();expect(restored).toBe(0);
+ game.reading.quest=null;game.reading.canPost=true;session.prepareForNativeSave();expect(restored).toBe(0);
 });

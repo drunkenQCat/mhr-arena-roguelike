@@ -21,6 +21,11 @@ it('blocks repeated effects and purchases while they await confirmation', () => 
   const a = actions(s, true, false);
   expect(a.kill).toBe(false); expect(a.camp).toBe(false); expect(a.monster).toBe(false); expect(a.buy).toBe(false); expect(a.choose).toBe(false);
 });
+it('shows the actionable recovery/save message while a new run is blocked',()=>{
+ const s=state();s.sessionStage='Finished';s.control!.startup.restorePending=true;
+ s.control!.startup.message='原装备与背包已恢复；等待原生保存完成';
+ expect(nextStep(s,true)).toBe(s.control!.startup.message);
+});
 it('describes camp gathering and names known enemies without fabricating vitals', () => {
   expect(nextStep({ ...state(), sessionStage: 'Carve' }, true)).toContain('任务起点');
   expect(monsterName(98)).not.toBe('怪物 98'); expect(monsterName(-100)).toBe('怪物 -100');

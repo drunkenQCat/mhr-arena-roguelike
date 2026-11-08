@@ -458,7 +458,7 @@ export class WebConsoleBridge {
       runtimeStatus: this.runtime.status(),
       ui: this.uiSection(),
       control: { ready, nextRoute: s.nextRoute, configuredRoute: next.runtime?.route ?? s.settings.route,
-        startReason: canStart ? null : !idle ? "当前一局尚未结束" : s.startupStatus.restorePending ? "请先回村，等待原装备与背包恢复完成"
+        startReason: canStart ? null : !idle ? "当前一局尚未结束" : s.startupStatus.restorePending ? s.startupMessage ?? "请先回村，等待原装备与背包恢复完成"
           : !ready ? "等待任务安装和原生接口就绪" : r?.online ? "当前仅支持单人开局" : "请在村庄、未接任务时开局",
         startup: s.startupStatus, startupRules: next.startupRules ?? null, armorSets: next.armorSets ?? {},
         testLayers: next.pools.map((pool) => pool.from),

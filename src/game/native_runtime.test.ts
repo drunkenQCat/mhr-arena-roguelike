@@ -9,7 +9,11 @@ import { defaultConfig, monsterCatalog } from "./default_config";
 const mock = vi.hoisted(() => ({
   singleton: vi.fn(), qm: vi.fn(), find: vi.fn(), hook: vi.fn(), storage: {} as Record<string, unknown>,
   dump: vi.fn(), info: vi.fn(), now: 100,
+  restore: vi.fn(), endPouch: vi.fn(),
 }));
+vi.mock("./equip_wear",()=>({equipStartupSet:vi.fn(),reapplyStartup:vi.fn(),startupRecoveryPending:()=>false,
+ restoreStartup:(...args:unknown[])=>mock.restore(...args)}));
+vi.mock("./pouch_backup",()=>({beginPouchIsolation:vi.fn(),endPouchIsolation:(retain?:boolean)=>mock.endPouch(retain)}));
 vi.mock("./sdk", () => ({
   clockSeconds: () => mock.now, questManager: mock.qm, getSingleton: mock.singleton,
   findTypeDefinition: mock.find, hookMethod: mock.hook,
@@ -213,4 +217,10 @@ it("does not release completed native objectives before an owned failure has bee
  status=4;expect(clear.pre()).toBe(1);
  qm.call.mockImplementation((n:string)=>n==="get_ActiveQuestNo"?101:n==="getActiveQuestUniqueNo"?13:true);
  expect(clear.pre()).toBe(0);
+});
+
+it("forwards save retention through the runtime's actual pouch adapter",()=>{
+ const {runtime}=fixture();mock.endPouch.mockReturnValue({ok:true});
+ mock.restore.mockImplementation((pouch,retain)=>{pouch.endPouchIsolation(retain);return {ok:true};});
+ expect(runtime.startupRestore().ok).toBe(true);expect(mock.endPouch).toHaveBeenCalledWith(true);
 });

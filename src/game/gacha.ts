@@ -8,7 +8,7 @@
 
 import { getSingleton, relog, type REManagedObject } from "./sdk";
 import type { GachaEntry, GachaPoolSpec } from "../core/config";
-import { grantEquip, appendGrantedEntry } from "./equip_wear";
+import { grantEquip, appendGrantedEntry, confirmGrantedEntry } from "./equip_wear";
 
 export interface GachaRollResult {
   ok: boolean;
@@ -67,7 +67,7 @@ export class GachaService {
     const entry: GachaEntry = pool.entries[picked]!;
     const box = equipmentBox();
     if (!box) return { ok: false, reason: "EquipBox unavailable" };
-    const grant = grantEquip(box, entry.id, entry.kind, appendGrantedEntry, false);
+    const grant = grantEquip(box, entry.id, entry.kind, appendGrantedEntry, false, confirmGrantedEntry);
     if (!grant.ok || grant.boxIndex === undefined) {
       return { ok: false, uncertain: grant.uncertain,
         reason: grant.reason ?? "发放未生效", kind: entry.kind, id: entry.id };
