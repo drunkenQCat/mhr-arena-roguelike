@@ -9,7 +9,15 @@ function list(items:any[]) { return {call:(m:string,i:number)=>m==="get_Count"?i
   if(n.startsWith("add(")&&!h.failAdd)items[i]={id:args[0],n:args[1]};
  }
 }}; }
+vi.mock("./recovery_owner", () => ({
+ readRecoveryOwner: () => ({character:"test",slot:0,name:"hunter",process:"process-1"}),
+ assertRecoveryOwner: (owner: any) => {
+  if (!owner || owner.character !== "test" || owner.slot !== 0) throw new Error("恢复属于其他角色或缺少身份");
+  return {character:"test",slot:0,name:"hunter",process:"process-1"};
+ }
+}));
 vi.mock("./sdk",()=>({
+ refFs: { read: () => h.saved === null ? "" : JSON.stringify(h.saved), glob: () => h.saved === null ? [] : ["mhw_rogue_startup_state.json", "mhw_rogue_pouch_state.json"] },
  getSingleton:()=>({get_field:()=>({call:(m:string,t:number)=>{
   if(m==="getInventoryDataList") {if(h.failRead)throw Error("unreadable");return list(h.bag[t]);}
   if(m==="get_BackupInventoryDataList")return h.backup?{call:(_n:string,i:number)=>list(h.backup[i])}:null;
@@ -18,7 +26,8 @@ vi.mock("./sdk",()=>({
   if(m==="loadFromBackupInventory"&&h.backup)h.bag=structuredClone(h.backup);
  }})}),
  findTypeDefinition:()=>({get_fields:()=>["Normal","Temporary","BulletBottle","Regular","WireJumpInsect","OtDogItemPouch"].map((name,i)=>({get_name:()=>name,is_static:()=>true,get_data:()=>i}))}),
- rejson:{load_file:()=>h.saved,dump_file:(_p:string,d:any)=>{if(h.failSave)return false;h.saved=structuredClone(d);return true;}},
+ rejson:{load_string: (text: string) => { try { return JSON.parse(text); } catch { return null; } },
+    load_file:()=>h.saved,dump_file:(_p:string,d:any)=>{if(h.failSave)return false;h.saved=structuredClone(d);return true;}},
  relog:{info:vi.fn(),warn:vi.fn(),error:vi.fn()}
 }));
 const empty=()=>Array.from({length:6},()=>Array.from({length:8},()=>({id:0,n:0})));
@@ -60,4 +69,23 @@ it("never treats failed reads as proof of recovery",async()=>{
 });
 it("does not mutate the pouch when the journal cannot be saved",()=>{
  h.failSave=true;expect(beginPouchIsolation().ok).toBe(false);expect(h.bag[0][0].n).toBe(10);
+});
+
+it("does not restore or replace another character's pouch journal",()=>{
+ beginPouchIsolation();h.saved.owner.character="other";const before=structuredClone(h.bag),journal=structuredClone(h.saved);
+ expect(endPouchIsolation().ok).toBe(false);expect(beginPouchIsolation().ok).toBe(false);
+ expect(h.bag).toEqual(before);expect(h.saved).toEqual(journal);
+});
+
+it("rejects missing categories or contradictory stack totals before clearing any live slot",()=>{
+ beginPouchIsolation();h.backup=null;h.bag[0][0]={id:9,n:7};const saved=structuredClone(h.saved),bag=structuredClone(h.bag);
+ for(const bad of [{...saved,items:{}},{...saved,stacks:{...saved.stacks,'0':[{id:1,n:99}]}}]) {
+  h.saved=bad;expect(endPouchIsolation().ok).toBe(false);expect(h.bag).toEqual(bag);expect(h.saved).toEqual(bad);
+ }
+});
+
+it("restores empty categories serialized as null by the native Lua JSON binding",async()=>{
+ beginPouchIsolation();h.saved.items['1']=null;delete h.saved.items['5'];h.saved.stacks['1']=null;
+ h.backup=null;vi.resetModules();const fresh=await import("./pouch_backup");
+ expect(fresh.endPouchIsolation().ok).toBe(true);expect(h.bag[0][0]).toEqual({id:1,n:10});
 });

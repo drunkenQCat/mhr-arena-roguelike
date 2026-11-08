@@ -122,7 +122,8 @@ it("propagates guest stop immediately and guards success before releasing local 
  expect(f.guest.guardFailure.mock.invocationCallOrder[0]).toBeLessThan(f.guest.policy.mock.invocationCallOrder.at(-1)!);
  f.tick();expect(f.bus.acks.g).toMatch(/^R4ERR\|s\|/);
  expect(f.guest.run.valid()).toBe(false);expect(f.guest.finish).not.toHaveBeenCalled();
- f.tick();expect(f.host.session.stage).toBe("Fault");expect(f.host.finish).toHaveBeenCalledWith(true);
+ f.tick();expect(f.host.session.stage).toBe("Finished");expect(f.host.finish).toHaveBeenCalledWith(true);
+ expect(f.host.run.snapshot().message).toContain("队友已请求停止");
 });
 
 it("propagates a guest fault outside the coordinator instead of waiting for a timeout",()=>{
@@ -135,7 +136,7 @@ it("retries a lost guest abort publication and retires it when native failure ar
  const f=fixture();f.tick();const ack=f.guest.network.steam_ack!;
  const publish=vi.fn().mockImplementationOnce(()=>{throw new Error("temporary Steam failure");}).mockImplementation(ack);
  f.guest.network.steam_ack=publish;f.guest.session.stop();f.tick();
- expect(f.host.session.stage).not.toBe("Fault");f.tick();f.tick();expect(f.host.session.stage).toBe("Fault");
+ expect(f.host.session.stage).not.toBe("Finished");f.tick();f.tick();expect(f.host.session.stage).toBe("Finished");
  f.guest.reading.quest!.status="failed";f.guest.reading.quest!.playing=false;f.tick();
  const calls=publish.mock.calls.length;f.tick();expect(publish).toHaveBeenCalledTimes(calls);
 });

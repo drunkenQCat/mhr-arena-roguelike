@@ -11,7 +11,7 @@ import { NativeRuntime } from "./native_runtime";
 import { QuestInstaller } from "./quest_installer";
 import { ShopWindow } from "./shop_window";
 import { WebConsoleBridge } from "./webconsole_bridge";
-import { loadStartupState } from "./equip_wear";
+import { startupRecoveryPending } from "./equip_wear";
 import { BuffService } from "./buff_service";
 import { GachaService } from "./gacha";
 import { DEFAULT_BUFF_AMOUNTS, type BuffAmounts } from "../core/config";
@@ -31,7 +31,7 @@ try {
   let runtime = new NativeRuntime(config, installer, gacha);
   let session = new RunSession(core, monsterCatalog, runtime);
   // 上局中断留下的未恢复状态（重载/崩溃）：回到村庄后由 session tick 自动恢复。
-  if (loadStartupState()) {
+  if (startupRecoveryPending()) {
     session.armStartupRestore();
     relog.warn("[MhwRogue] 检测到未恢复的上局开局状态；回到村庄后自动恢复原装备");
   }

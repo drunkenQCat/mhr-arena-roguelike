@@ -11,6 +11,8 @@
 
 import { getSingleton, rejson, relog, type REManagedObject, type RETypeDefinition } from "./sdk";
 import type { StartupRules } from "../core/config";
+import { readRecoveryRecord, recoveryPending } from "./recovery_journal";
+import { assertRecoveryOwner, readRecoveryOwner, type RecoveryOwner } from "./recovery_owner";
 
 /** pack 槽位（0 基）。 */
 export const PACK_WEAPON = 0;
@@ -250,6 +252,7 @@ export interface EquipWearPort {
 const STATE_FILE = "mhw_rogue_startup_state.json";
 
 interface PersistedState {
+  owner?: RecoveryOwner;
   active: boolean;
   armor: string | null;
   prevPack: number[];
@@ -269,17 +272,22 @@ export function persistStartupState(state: PersistedState | null): boolean {
 }
 
 export function loadStartupState(): PersistedState | null {
-  try {
-    const raw = rejson.load_file(STATE_FILE) as PersistedState | null;
-    if (!raw || raw.active !== true) return null;
-    // REFramework serializes an empty Lua array as JSON null.
-    raw.prevPack = raw.prevPack ?? [];
-    raw.granted = raw.granted ?? [];
-    if (!Array.isArray(raw.prevPack) || !Array.isArray(raw.granted)) throw new Error("Invalid startup journal");
-    return raw;
-  } catch {
-    return null;
-  }
+  const raw = readRecoveryRecord<PersistedState>(STATE_FILE);
+  if (!raw || raw.active !== true) return null;
+  // REFramework serializes an empty Lua array as JSON null.
+  raw.prevPack = raw.prevPack ?? [];
+  raw.granted = raw.granted ?? [];
+  if (!Array.isArray(raw.prevPack) || ![0, PACK_LEN].includes(raw.prevPack.length) ||
+      raw.prevPack.some(v => !Number.isInteger(v) || v < -1) || !Array.isArray(raw.granted) ||
+      raw.granted.some(e => !e || !Number.isInteger(e.boxIndex) || e.boxIndex < 0 ||
+        !Number.isInteger(e.idVal) || e.idVal <= 0 || ![1, 2].includes(e.idType)) || typeof raw.pouchIsolated !== "boolean")
+    throw new Error("装备恢复记录无效；保留原备份，禁止开新局");
+  assertRecoveryOwner(raw.owner);
+  return raw;
+}
+
+export function startupRecoveryPending(): boolean {
+  return recoveryPending(STATE_FILE) || recoveryPending("mhw_rogue_pouch_state.json");
 }
 
 /**
@@ -296,9 +304,15 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
     report.reason = "EquipDataManager/EquipBox unavailable";
     return report;
   }
-  if (loadStartupState()) {
-    report.reason = "Previous startup recovery must finish before starting another run";
-    return report;
+  let owner: RecoveryOwner;
+  try {
+    if (loadStartupState()) {
+      report.reason = "Previous startup recovery must finish before starting another run";
+      return report;
+    }
+    owner = readRecoveryOwner();
+  } catch (error) {
+    report.reason = String(error); return report;
   }
   const prev = readPack(edm);
   if (!prev) {
@@ -308,7 +322,7 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
   report.prevPack = prev.slice();
 
   const granted: GrantedEntry[] = [];
-  const journal: PersistedState = { active: true, armor, prevPack: prev, granted, pouchIsolated: false };
+  const journal: PersistedState = { active: true, owner, armor, prevPack: prev, granted, pouchIsolated: false };
   if (!persistStartupState(journal)) { report.reason = "Cannot save original equipment"; return report; }
   const reserve = (entry: GrantedEntry): boolean => {
     granted.push(entry);
@@ -386,13 +400,13 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
  * 无活动状态时构造只含发件的记录（prevPack 置空标记"恢复期跳过 pack 写回"）。
  */
 export function appendGrantedEntry(entry: GrantedEntry): boolean {
-  const state = loadStartupState();
-  const merged: PersistedState = state ?? {
-    active: true, armor: null, prevPack: [], granted: [], pouchIsolated: false,
-  };
-  merged.active = true;
-  merged.granted = merged.granted.concat([entry]);
   try {
+    const state = loadStartupState();
+    const merged: PersistedState = state ?? {
+      active: true, owner: readRecoveryOwner(), armor: null, prevPack: [], granted: [], pouchIsolated: false,
+    };
+    merged.active = true;
+    merged.granted = merged.granted.concat([entry]);
     return persistStartupState(merged);
   } catch {
     return false;
@@ -409,12 +423,16 @@ export interface RestoreReport {
 }
 
 /**
- * 回村恢复（幂等）：恢复 pack → 清理本局发件 → 袋备份还原 → 清持久化。
+ * 回村恢复（幂等）：核验角色 → 恢复 pack/道具袋 → 清理本局发件 → 退役记录。
  * 无待恢复状态时返回 ok=true 的 no-op；失败保持待办（调用方稍后重试）。
  */
 export function restoreStartup(pouch: EquipWearPort | null): RestoreReport {
-  const state = loadStartupState();
+  let state: PersistedState | null;
+  try { state = loadStartupState(); }
+  catch (error) { return { ok: false, reason: String(error) }; }
   if (!state) {
+    const restored = pouch?.endPouchIsolation();
+    if (restored && !restored.ok) return { ok: false, reason: restored.reason };
     return { ok: true, restoredPack: false, removedEntries: 0, skippedEntries: 0, pouchRestored: false };
   }
   const edm = equipDataManager();
@@ -439,6 +457,17 @@ export function restoreStartup(pouch: EquipWearPort | null): RestoreReport {
       return { ...result, ok: false, reason: "pack 恢复读回不一致；恢复保持待办" };
     }
   }
+  // Original resources can be restored even if a temporary item's ownership
+  // cannot be proven after a process restart. Keep the cleanup journal pending.
+  if (state.pouchIsolated) {
+    if (!pouch) return { ...result, ok:false, reason:"道具袋恢复器不可用；恢复保持待办" };
+    const restored = pouch.endPouchIsolation();
+    if (!restored.ok) return { ...result, ok:false, reason:restored.reason };
+    result.pouchRestored = true; state.pouchIsolated = false;
+    if (!persistStartupState(state)) return { ...result, ok:false, reason:"Cannot save pouch recovery progress" };
+  }
+  if (state.granted.some(e => !e.removed) && state.owner?.process !== readRecoveryOwner().process)
+    return { ...result, ok:false, reason:"原装与物资已恢复；游戏已重启，临时装备地址失效，回收需独立核验；恢复记录保留" };
   for (const entry of state.granted) {
     if (entry.removed) continue;
     if (!box) return { ...result, ok: false, reason: "Equipment box unavailable" };
@@ -455,13 +484,6 @@ export function restoreStartup(pouch: EquipWearPort | null): RestoreReport {
       if (!persistStartupState(state)) throw new Error("Cannot save cleanup progress");
     } catch (error) {
       return { ...result, ok: false, reason: String(error) };
-    }
-  }
-  if (state.pouchIsolated && pouch) {
-    const pouchReport = pouch.endPouchIsolation();
-    result.pouchRestored = pouchReport.ok;
-    if (!pouchReport.ok) {
-      return { ...result, ok: false, reason: `道具袋恢复失败: ${pouchReport.reason ?? "未知"}；装备已恢复` };
     }
   }
   if (!persistStartupState(null)) return { ...result, ok: false, reason: "Cannot retire recovery journal" };

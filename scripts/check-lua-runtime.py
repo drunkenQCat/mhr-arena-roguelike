@@ -152,6 +152,7 @@ print("PASS Lua 5.4: compiled M2 two-monster gap, one-time reward, camp gate and
 host = LuaRuntime(unpack_returned_tuples=True)
 host.execute('''
   callbacks = {}; reports = {}
+  fs = {read = function() return "" end, glob = function() return {} end}
   log = {info = function() end, warn = function() end, error = function() end}
   json = {load_file = function() return nil end,
     dump_file = function(path, data) reports[path] = data; return true end}

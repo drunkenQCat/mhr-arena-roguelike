@@ -137,4 +137,7 @@ node cli/mhr.mjs game last-error --json
 
 `game return --timeout 120` 用于已经 Finished / Fault 的本模组任务，提交一次返回请求后等待实际村庄就绪且存在玩家；本来就在村庄时不提交操作。活动战斗中不能用它代替 stop，未知弹窗或未确认的输入会停止，不能盲目重发。结算期间 PlayerList 为空是正常现象，不应据此调用玩家生成或回村接口。
 
-2026-11-05 本机双引擎已完成 stop 后两端自动回村；三猫失败曾在场景清理阶段崩溃；将原生结束请求移入QuestManager.update更新回调后，R12/R13两端共享次数、首波/续波后失败结算、保存与自动回村均已通过。详见 [多人运行说明](multiplayer-runtime.md)。
+2026-11-05 本机双引擎已完成 stop 后两端自动回村；R12/R13记录覆盖共享猫车与回村，但未核实原生结束类型，不能算失败完整验收。11月8日及9日独立实测已记录双端 Failed=4 后保存回村；正常完成 Success=3 与三猫失败分开验收。详见 [多人运行说明](multiplayer-runtime.md)。
+
+
+存档选择的 slot 对应 SnowSaveService 原生角色槽（CLI 从1计数），名称来自同一原生数组，不能用可能重排的界面预览列表作索引。开局/停止等命令回执返回前会先发布新业务状态；原生异步效果仍按 queued/后置条件判定。恢复待办时应读 control.startup 与 message，不能靠 Reset scripts 绕过错角色或损坏记录保护。

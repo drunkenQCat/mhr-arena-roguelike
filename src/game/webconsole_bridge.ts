@@ -101,8 +101,6 @@ export class WebConsoleBridge {
         const result = this.results.find((entry) => entry.id === this.purchase!.id);
         if (result) {
           Object.assign(result, this.shop.lastTransaction);
-          // An applied receipt must not race the previous wallet snapshot.
-          this.publish();
           const saved = this.writeResults(result);
           if (!saved) return;
         }
@@ -206,6 +204,10 @@ export class WebConsoleBridge {
 
   private writeResults(last: Outcome): boolean {
     try {
+      // CLI callers may immediately read state after a receipt, in the same
+      // sampled second. Publish the resulting business state before acknowledging
+      // every mutation, not only purchases. Retry publication without re-execution.
+      if (last.status === "applied" || last.status === "queued") this.publish();
       const text = rejson.dump_string({ bridgeId: this.bridgeId,
         configVersion: this.configVersion, lastId: last.id, last, history: this.results }, 0);
       if (!text) throw new Error("结果序列化失败");

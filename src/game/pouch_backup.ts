@@ -14,13 +14,14 @@
  * Temporary（任务补给临时袋）/Regular（常驻砥石等）/翔虫/狗袋不动。
  * （首版写的 "NORMAL/AMMO/BOTTLE" 是不存在的名字，clear 全部静默跳过——已修正。）
  *
- * 已知边界（design doc §4.1，均未实测）：
- * - 原生备份是进程内状态，不解决崩溃恢复——正式隔离仍需自有带标识的恢复记录；
- * - 游戏可能在未知时点自动覆盖备份区；
- * - loadFromBackupInventory 的布尔参数语义（排除翔虫钥）按名推断，需实机确认。
+ * 原生备份只是缓存，任务结算可能覆盖它。修改前另存带角色身份的持久记录，
+ * 恢复时优先核验缓存，否则按记录重建并逐类读回。schema2 的分类总数处理
+ * 空 Lua 表写成 JSON null 的绑定差异；缺失非空分类时不能当空背包恢复。
  */
 
 import { findTypeDefinition, getSingleton, relog, rejson, type REManagedObject, type RETypeDefinition } from "./sdk";
+import { readRecoveryRecord } from "./recovery_journal";
+import { assertRecoveryOwner, readRecoveryOwner, type RecoveryOwner } from "./recovery_owner";
 
 const POUCH = "snow.data.ItemPouch";
 
@@ -117,6 +118,7 @@ function countList(list: REManagedObject | null): Record<string, number> {
     const id = slot.call("get_ItemId") as number;
     const n = slot.call("get_Count") as number;
     if (!Number.isInteger(n) || n < 0) throw new Error("Invalid inventory count");
+    if (n > 0 && (!Number.isInteger(id) || id <= 0)) throw new Error("Invalid inventory item ID");
     if (n > 0) items[String(id)] = (items[String(id)] ?? 0) + n;
   }
   return items;
@@ -139,10 +141,32 @@ function sameSnapshot(a: InventorySnapshot, b: InventorySnapshot): boolean {
   return true;
 }
 
+function validateSnapshot(expected: InventorySnapshot, totals: number[]): void {
+  if (!expected || typeof expected !== "object") throw new Error("Original pouch snapshot unavailable");
+  if (!Array.isArray(totals) || totals.length !== RESTORE_TYPES.length || totals.some(n => !Number.isInteger(n) || n < 0))
+    throw new Error("Original pouch category totals unavailable");
+  for (let i = 0; i < RESTORE_TYPES.length; i++) {
+    const t = RESTORE_TYPES[i]!;
+    // The native JSON binding turns an empty Lua table into null, and loading
+    // null removes that key. Explicit non-null totals distinguish empty from lost.
+    if (expected[String(t)] == null && totals[i] === 0) expected[String(t)] = {};
+    const group = expected[String(t)];
+    if (!group || typeof group !== "object") throw new Error("Original pouch journal missing an inventory category");
+    let sum = 0;
+    for (const id of Object.keys(group)) {
+      if (!Number.isInteger(Number(id)) || Number(id) <= 0 || !Number.isInteger(group[id]) || group[id]! <= 0)
+        throw new Error("Original pouch journal has invalid item counts");
+      sum += group[id]!;
+    }
+    if (sum !== totals[i]) throw new Error("Original pouch category total differs from saved items");
+  }
+}
+
 export function beginPouchIsolation(): PouchSnapshot {
   let recoveryRequired = false;
   try {
-    if (isolationActive || (rejson.load_file(SNAPSHOT_FILE) as { active?: boolean } | null)?.active) return { ok: false, recoveryRequired: true, reason: "Pouch recovery already pending" };
+    if (isolationActive || readRecoveryRecord<{ active:boolean }>(SNAPSHOT_FILE)?.active) return { ok: false, recoveryRequired: true, reason: "Pouch recovery already pending" };
+    const owner = readRecoveryOwner();
     const pouch = itemPouch();
     if (!pouch) return { ok: false, recoveryRequired: false, reason: "Item pouch unavailable" };
     const table = inventoryTypesTable();
@@ -159,7 +183,8 @@ export function beginPouchIsolation(): PouchSnapshot {
       }
     }
     // A durable obligation exists before any native mutation.
-    if (rejson.dump_file(SNAPSHOT_FILE, { active: true, boot: BOOT_ID, items: original, stacks }, 2) !== true) return { ok: false, recoveryRequired: false, reason: "Cannot journal original pouch" };
+    const categoryTotals = RESTORE_TYPES.map(t => Object.values(original[String(t)]!).reduce((sum, n) => sum + n, 0));
+    if (rejson.dump_file(SNAPSHOT_FILE, { schema:2, active: true, owner, boot: BOOT_ID, items: original, stacks, categoryTotals }, 2) !== true) return { ok: false, recoveryRequired: false, reason: "Cannot journal original pouch" };
     isolationActive = true;
     recoveryRequired = true;
     pouch.call("saveToBackupInventory");
@@ -185,6 +210,11 @@ function restoreDurable(pouch: REManagedObject, expected: InventorySnapshot, sta
     const items = stacks?.[String(t)] ?? Object.entries(expected[String(t)] ?? {}).map(([id, n]) => ({ id: Number(id), n }));
     if (!Number.isInteger(count) || count < items.length || count > 10000) throw new Error("Pouch restore capacity mismatch");
     if (items.some((x) => !Number.isInteger(x.id) || x.id <= 0 || !Number.isInteger(x.n) || x.n <= 0)) throw new Error("Invalid original pouch journal");
+    const counts: Record<string, number> = {};
+    for (const item of items) counts[String(item.id)] = (counts[String(item.id)] ?? 0) + item.n;
+    const group = expected[String(t)]!;
+    if (Object.keys(counts).length !== Object.keys(group).length || Object.keys(counts).some(id => counts[id] !== group[id]))
+      throw new Error("Original pouch stacks differ from the recorded item totals");
     const slots: REManagedObject[] = [];
     for (let i = 0; i < count; i++) {
       const slot = list.call("get_Item", i) as REManagedObject;
@@ -204,13 +234,16 @@ export function endPouchIsolation(): PouchSnapshot {
   const pouch = itemPouch();
   if (!pouch) return { ok: false, reason: "Item pouch unavailable" };
   try {
-    const journal = rejson.load_file(SNAPSHOT_FILE) as { active: boolean; items: InventorySnapshot; stacks?: Record<string, { id: number; n: number }[]> } | null;
+    const journal = readRecoveryRecord<{ schema?: number; active: boolean; owner?: RecoveryOwner; items: InventorySnapshot;
+      categoryTotals: number[]; stacks?: Record<string, { id: number; n: number }[]> }>(SNAPSHOT_FILE);
     if (!journal?.active) {
       if (isolationActive) throw new Error("Original pouch journal unavailable; recovery retained");
       return { ok: true };
     }
+    assertRecoveryOwner(journal.owner);
+    if (journal.schema !== 2) throw new Error("旧道具袋恢复格式需要核对迁移，原备份保留");
     const expected = journal.items;
-    if (!expected || typeof expected !== "object") throw new Error("Original pouch snapshot unavailable");
+    validateSnapshot(expected, journal.categoryTotals);
     // Reading the live pouch must succeed even after Reset scripts or a restart.
     if (!sameSnapshot(expected, inventorySnapshot(pouch, false))) {
       let backup: InventorySnapshot | null = null;

@@ -23,14 +23,23 @@ const host = vi.hoisted(() => ({
   persisted: null as unknown,
 }));
 
+vi.mock("./recovery_owner", () => ({
+ readRecoveryOwner: () => ({character:"test",slot:0,name:"hunter",process:"process-1"}),
+ assertRecoveryOwner: (owner: any) => {
+  if (!owner || owner.character !== "test" || owner.slot !== 0) throw new Error("恢复属于其他角色或缺少身份");
+  return {character:"test",slot:0,name:"hunter",process:"process-1"};
+ }
+}));
 vi.mock("./sdk", () => ({
-  getSingleton: () => ({
+  refFs: { read: () => host.persisted === null ? "" : JSON.stringify(host.persisted), glob: () => host.persisted === null ? [] : ["mhw_rogue_startup_state.json", "mhw_rogue_pouch_state.json"] },
+ getSingleton: () => ({
     get_field: () => null,
     call: (m: string) => (m === "getEquipBox" ? host.boxFacade : null),
   }),
   relog: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
   rejson: {
     dump_file: (_p: string, data: unknown) => { if(host.persistFails) return false; host.persisted = data; return true; },
+    load_string: (text: string) => { try { return JSON.parse(text); } catch { return null; } },
     load_file: () => host.persisted,
   },
 }));
@@ -142,7 +151,7 @@ describe("gacha", () => {
   });
 
   it("开局状态存在时 gacha 发件追加到同一清单", () => {
-    host.persisted = { active: true, armor: "铁套", prevPack: [1, 2, 3, 4, 5, 6, 7, 8], granted: [], pouchIsolated: false };
+    host.persisted = { active: true, owner:{character:"test",slot:0,name:"hunter",process:"process-1"}, armor: "铁套", prevPack: [1, 2, 3, 4, 5, 6, 7, 8], granted: [], pouchIsolated: false };
     appendGrantedEntry({ boxIndex: 2, idVal: 0x0c100009, idType: 2 });
     expect(loadStartupState()?.granted).toHaveLength(1);
     expect(loadStartupState()?.prevPack).toHaveLength(8);

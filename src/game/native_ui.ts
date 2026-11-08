@@ -110,7 +110,9 @@ export class NativeUi {
     const sceneToken = `${this.bridge}:ui:${this.revision}`;
     for (let i = 0; i < dialogs.length; i++) dialogs[i]!.token = `${sceneToken}:dialog:${i}`;
     const slots: UiSnapshot["slots"] = [];
-    const data = field(save, "_SlotDataArray") as REManagedArray | null;
+    // The GUI list can be reordered for preview. Native loading uses the save
+    // service's character slot, so names/occupied checks must use that same order.
+    const data = field(field(getSingleton("snow.SnowSaveService"), "_LoadInfoData"), "_HunterArray") as REManagedArray | null;
     if (saveOpen && data) {
       try {
         for (let i = 0; i < Math.min(data.get_size(), 3); i++) {

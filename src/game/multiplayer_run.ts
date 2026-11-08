@@ -191,6 +191,12 @@ export class MultiplayerRun implements SpawnSync {
       if (!lobby || lobby.members.map(m => m.id).sort().join(",") !== [...this.context.members].sort().join(",")) throw new Error("固定队伍改变；暂不支持中途加入、离开或房主迁移");
       this.members = lobby.members;
       if (this.role === "host") {
+        if (this.members.some(m => m.id !== this.context.self && m.ack.startsWith(`R4ERR|${this.context.session}|stop|`))) {
+          this.session.stop(); this.publish(); this.live = false;
+          this.message = "队友已请求停止本局，等待原生失败回村与个人恢复";
+          this.runtime.report("multiplayer-run-stopped", { role:this.role, requestedBy:"guest" });
+          return;
+        }
         if (this.members.some(m => m.ack.startsWith(`R4ERR|${this.context.session}|`))) throw new Error("队友同步失败，请下载双方日志");
         this.observeHeartbeats(now);
         this.publish();
@@ -219,7 +225,7 @@ export class MultiplayerRun implements SpawnSync {
     // The persistent member value is retried while this exact local quest is live.
     // A failed publication must not strand the host until its 120-second timeout.
     try {
-      this.network.steam_ack?.(this.context.lobby, `R4ERR|${this.context.session}|${this.session.message.slice(0,256)}`);
+      this.network.steam_ack?.(this.context.lobby, `R4ERR|${this.context.session}|${this.session.multiplayerAbortKind}|${this.session.message.slice(0,256)}`);
     } catch { /* Retry on the next poll; native return cancels the pending intent. */ }
   }
   snapshot(): Record<string, unknown> { return { role:this.role, live:this.live, message:this.message,

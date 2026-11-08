@@ -23,6 +23,7 @@ function fixture() {
   const slot = obj("existing", { _HunterName: "hunter", _HunterRank: 1, _MasterRank: 1 });
   const empty = obj("empty", { _HunterName: "(仮)名無し", _HunterRank: -1, _MasterRank: -1 });
   const data = { get_size: () => 3, get_element: (i: number) => i === 0 ? slot : empty };
+  host.objects["snow.SnowSaveService"] = obj("save-service", { _LoadInfoData: obj("load-info", { _HunterArray: data }) });
   const save = obj("save", { _SlotDataArray: data, _CurrentSlotNo: 0 }, { isOpen: () => state.saveOpen });
   const network = obj("network", {}, { isOpen: () => state.network, getText: () => state.error, get_WindowType: 1 });
   const info = obj("info", {}, { isOpen: () => state.info, getText: "正在加载", get_WindowType: () => state.mode });
@@ -72,6 +73,14 @@ it("does not treat preview players or default names in empty slots as a loaded s
   expect(view.slots.map(s => s.occupied)).toEqual([true, false, false]);
   expect(() => f.ui.request({ id: "bad", cmd: "save.load", slot: 2, sceneToken: view.sceneToken })).toThrow("existing");
   expect(f.save.get_field("_CurrentSlotNo")).toBe(0);
+});
+
+it("uses canonical native slots instead of the reordered GUI preview to name and validate a character", () => {
+ const f=fixture();f.state.node="ロード画面初期化";f.state.saveOpen=true;
+ const other=obj("other",{_HunterName:"other hunter",_HunterRank:2,_MasterRank:1});
+ f.save.set_field("_SlotDataArray",{get_size:()=>3,get_element:()=>other});
+ expect(f.ui.observe().slots.map(s=>s.name)).toEqual(["hunter","(仮)名無し","(仮)名無し"]);
+ expect(()=>f.ui.request({id:"wrong",cmd:"save.load",slot:2,sceneToken:f.ui.observe().sceneToken})).toThrow("existing");
 });
 it("refuses to operate the reused save UI during new-game or overwrite flows", () => {
   const f = fixture(); f.state.node = "NewGame"; f.state.saveOpen = true;

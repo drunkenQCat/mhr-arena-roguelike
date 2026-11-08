@@ -85,7 +85,7 @@ declare const imgui: RefImgui;
 declare const thread: RefThread;
 declare const sdk: RefSdk;
 /** @noSelf */
-interface RefFs { read(path: string): string; write(path: string, text: string): void; }
+interface RefFs { read(path: string): string; write(path: string, text: string): void; glob(filter: string): string[]; }
 declare const fs: RefFs;
 
 declare global {
@@ -192,6 +192,7 @@ export interface NativeWebconsole {
   steam_digest?(value: string): string;
   ping(text: string): string;
   epoch(): number;
+  session_id?(): string;
   take_commands(limit: number): string[];
   publish_state(json: string): void;
   publish_results(json: string): void;

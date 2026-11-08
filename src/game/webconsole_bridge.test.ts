@@ -61,6 +61,17 @@ it("publishes authoritative controls and preserves route changes after staged ru
   expect(f.session.route).toBe('reentry');
 });
 
+it("publishes start/stop state before their receipts even within the same sampled second",()=>{
+ const f=fixture();f.tick();const timestamp=host.now;
+ const send=(cmd:string)=>{
+  host.commands.push(JSON.stringify({id:`instant-${cmd}`,bridgeId:f.bridge.bridgeId,cmd,armor:f.cfg.armorOptions[0],questUnique:null,waveToken:null}));
+  for(let i=0;i<12;i++)f.bridge.tick();
+  expect(host.files['webconsole_results.json'].last.status).toBe('applied');
+ };
+ send('startRun');expect(f.state().sessionStage).toBe('Selecting');
+ send('stop');expect(f.state().sessionStage).toBe('Finished');expect(host.now).toBe(timestamp);
+});
+
 it("rejects unsupported test layers before preparing the run", () => {
   const f = fixture(); f.tick();
   const start = vi.spyOn(f.session, 'start');

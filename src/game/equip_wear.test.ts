@@ -36,8 +36,16 @@ const host = vi.hoisted(() => ({
   removedIds: [] as number[],
 }));
 
+vi.mock("./recovery_owner", () => ({
+ readRecoveryOwner: () => ({character:"test",slot:0,name:"hunter",process:"process-1"}),
+ assertRecoveryOwner: (owner: any) => {
+  if (!owner || owner.character !== "test" || owner.slot !== 0) throw new Error("恢复属于其他角色或缺少身份");
+  return {character:"test",slot:0,name:"hunter",process:"process-1"};
+ }
+}));
 vi.mock("./sdk", () => ({
-  getSingleton: (name: string) => {
+  refFs: { read: () => host.persisted === null ? "" : JSON.stringify(host.persisted), glob: () => host.persisted === null ? [] : ["mhw_rogue_startup_state.json", "mhw_rogue_pouch_state.json"] },
+ getSingleton: (name: string) => {
     if (name === "snow.data.EquipDataManager") {
       return { call: (m: string) => (m === "get_PlEquipPack" ? host.packFacade : null) };
     }
@@ -52,6 +60,7 @@ vi.mock("./sdk", () => ({
   relog: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
   rejson: {
     dump_file: (_p: string, data: unknown) => { if (host.persistFails) return false; host.persisted = JSON.parse(JSON.stringify(data)); return true; },
+    load_string: (text: string) => { try { return JSON.parse(text); } catch { return null; } },
     load_file: () => host.persisted,
   },
 }));
@@ -227,7 +236,7 @@ it("does not mutate equipment when the original journal cannot be saved", () => 
 });
 it("deletes only the recorded copy rather than the first matching equipment ID", () => {
   const id=armorId(9,1); host.entries[0]={_IdType:2,_IdVal:id}; host.entries[1]={_IdType:2,_IdVal:id};
-  host.persisted={active:true,prevPack:[],granted:[{boxIndex:1,idVal:id,idType:2}],pouchIsolated:false};
+  host.persisted={active:true,owner:{character:"test",slot:0,name:"hunter",process:"process-1"},prevPack:[],granted:[{boxIndex:1,idVal:id,idType:2}],pouchIsolated:false};
   expect(restoreStartup(null).ok).toBe(true);
   expect(host.entries[0]._IdType).toBe(2); expect(host.entries[1]._IdType).toBe(0);
 });
@@ -238,11 +247,31 @@ it("partial pouch failure retains the recovery obligation", () => {
   expect(r.pouchIsolated).toBe(true); expect(loadStartupState()?.pouchIsolated).toBe(true);
   expect(restoreStartup(port).ok).toBe(true); expect(end).toHaveBeenCalledOnce();
 });
-it("a pouch retry never deletes equipment a second time", () => {
+it("restores the pouch before deleting temporary equipment and never deletes twice on retry", () => {
   equipStartupSet("test",9,RULES,pouchPort);
   expect(restoreStartup({beginPouchIsolation:()=>({ok:true}),endPouchIsolation:()=>({ok:false})}).ok).toBe(false);
-  const removed=host.removedIds.length;
-  expect(restoreStartup(pouchPort).ok).toBe(true); expect(host.removedIds.length).toBe(removed);
+  expect(host.removedIds).toHaveLength(0);
+  expect(restoreStartup(pouchPort).ok).toBe(true); expect(host.removedIds).toHaveLength(5);
+  expect(restoreStartup(pouchPort).ok).toBe(true); expect(host.removedIds).toHaveLength(5);
+});
+
+it("never overwrites or applies a malformed or foreign character recovery journal", () => {
+ for (const bad of [{active:true,prevPack:[1],granted:[],pouchIsolated:false},
+   {active:true,prevPack:INITIAL.slice(),granted:[],pouchIsolated:false,owner:{character:"other",slot:1}}]) {
+  host.persisted=structuredClone(bad);const before=structuredClone(host.persisted);const pack=[...host.packArr!];
+  expect(equipStartupSet("test",9,RULES,pouchPort).ok).toBe(false);
+  expect(restoreStartup(pouchPort).ok).toBe(false);
+  expect(host.persisted).toEqual(before);expect([...host.packArr!]).toEqual(pack);
+ }
+});
+
+it("restores original resources but retains temporary cleanup after a process identity change",()=>{
+ equipStartupSet("test",9,RULES,pouchPort);
+ (host.persisted as any).owner.process="previous-process";
+ const result=restoreStartup(pouchPort);
+ expect(result.ok).toBe(false);expect(result.restoredPack).toBe(true);expect(result.pouchRestored).toBe(true);
+ expect([...host.packArr!]).toEqual(INITIAL);expect(host.removedIds).toHaveLength(0);
+ expect((host.persisted as any).active).toBe(true);expect((host.persisted as any).pouchIsolated).toBe(false);
 });
 
 it("reapplies the chosen run pack after native reentry restored the old one, without granting twice",()=>{
@@ -253,6 +282,6 @@ it("reapplies the chosen run pack after native reentry restored the old one, wit
 });
 it("never searches for a user-owned same-ID replacement when the recorded slot changes",()=>{
  const id=armorId(9,1);host.entries[0]={_IdType:2,_IdVal:id};host.entries[1]={_IdType:2,_IdVal:123};
- host.persisted={active:true,prevPack:[],granted:[{boxIndex:1,idType:2,idVal:id}],pouchIsolated:false};
+ host.persisted={active:true,owner:{character:"test",slot:0,name:"hunter",process:"process-1"},prevPack:[],granted:[{boxIndex:1,idType:2,idVal:id}],pouchIsolated:false};
  expect(restoreStartup(null).ok).toBe(false);expect(host.entries[0]._IdType).toBe(2);
 });
