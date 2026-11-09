@@ -67,6 +67,12 @@ export interface SessionPort {
 }
 
 export type SessionStage = "Idle" | "Preparing" | "Selecting" | "AwaitQuest" | "Combat" | "Carve" | "Returning" | "Finished" | "Fault";
+export const RUN_END_INTENTS=["cleared-all","carts-exhausted","stopped","fault","native-ended","quest-left","entry-cancelled"] as const;
+export type RunEndIntent=typeof RUN_END_INTENTS[number];
+export interface NativeEndObservation {
+  questId:number;unique:number;status:"success"|"failed"|"return";deaths:number|null;observedAt:number;
+  conflictingStatus?:"success"|"failed";
+}
 
 export class RunSession {
   /** The same sampled reading drives both progression and the web console. */
@@ -237,6 +243,30 @@ export class RunSession {
   earnedPt = 0;
   private startedAt = 0;
   private clearedWaves = 0;
+  private endIntent:RunEndIntent|null=null;
+  private nativeEnd:NativeEndObservation|null=null;
+  get endingIntent():RunEndIntent|null{return this.endIntent;}
+  private resetRunEnd():void{this.endIntent=null;this.nativeEnd=null;}
+  private markRunEnd(intent:RunEndIntent):void{if(this.endIntent===null)this.endIntent=intent;}
+  /** A host Finished frame expresses intent, never this engine's result.
+   * Continue observing the pinned local quest after business progression ends. */
+  private observeNativeEnd(reading:RuntimeReading):void {
+    const q=reading.quest,owned=this.questUnique??this.preparationQuest;
+    if(!q||!this.plan||owned===null||q.id!==this.plan.questId||q.unique!==owned||
+      !["success","failed","return"].includes(q.status))return;
+    const status=q.status as NativeEndObservation["status"];
+    if(this.nativeEnd&&this.nativeEnd.status!=="return"){
+      if(status!=="return"&&status!==this.nativeEnd.status&&this.nativeEnd.conflictingStatus!==status){
+        this.nativeEnd={...this.nativeEnd,conflictingStatus:status};
+        this.announce("native-end-conflict",{...this.nativeEnd});
+      }
+      return;
+    }
+    if(this.nativeEnd?.status===status)return;
+    this.nativeEnd={questId:q.id,unique:q.unique,status,
+      deaths:Number.isInteger(reading.deaths)&&reading.deaths>=0?reading.deaths:null,observedAt:reading.time};
+    this.announce("native-end-observed",{...this.nativeEnd});
+  }
   private pendingSupplies: SupplyDrop[] = [];
   supplyLoot: {itemId:string;count:number;actual:number;granted:boolean;reason?:string}[] = [];
   runSummary() { return { layer:this.core.state.layer, clearedWaves:this.clearedWaves,
@@ -245,7 +275,8 @@ export class RunSession {
     cartRestored:this.core.state.cartRestoreUsed, armor:this.core.state.armor,
     purchases:this.core.state.wallet.purchaseLog.slice(), reason:this.message,
     durationSeconds:Math.max(0,(this.readingSnapshot?.time ?? this.startedAt)-this.startedAt),
-    restored:!this.startupRestorePending, role:this.multiplayerRole }; }
+    restored:!this.startupRestorePending, role:this.multiplayerRole,maxCarts:this.core.config.maxCarts,
+    ending:{intent:this.endIntent,native:this.nativeEnd?{...this.nativeEnd}:null} }; }
   private queueSupplies(plan: QuestPlan): void {
     this.clearedWaves++;
     this.pendingSupplies.push(...rollSupplyDrops(this.core.config.supplyDrops, plan.monsterIds.length, w=>this.core.rollWeighted(w)));
@@ -290,6 +321,7 @@ export class RunSession {
     this.startupPrepared = true; this.startupRestorePending = true;
     const started = this.core.startRun(armor);
     if (!started.ok) return this.fault(started.message);
+    this.resetRunEnd();
     this.startedAt = r.time;
     this.plan = plan; this.stage = "Preparing"; this.route = "inPlace";
     this.readingSnapshot = r;
@@ -300,7 +332,7 @@ export class RunSession {
   /** Guest has its own wallet. Apply cumulative host rewards once, never copy host spending. */
   mirrorMultiplayer(frame: { stage: SessionStage; phase: import("./run_state").RunPhase; layer: number;
     plan: QuestPlan; choices: WaveOption[]; earned: number; carts: number; camp: Position | null;
-    cartUsed: boolean; killed: string[] }): void {
+    cartUsed: boolean; killed: string[];endIntent?:RunEndIntent|null }): void {
     if (this.multiplayerRole !== "guest" || !this.port.multiplayerValid?.()) throw new Error("Guest mirror scope ended");
     if (frame.earned < this.mirroredReward) throw new Error("Multiplayer reward total went backwards");
     const newReward = frame.earned > this.mirroredReward;
@@ -313,6 +345,7 @@ export class RunSession {
       this.queueSupplies(frame.plan);
       if (frame.plan.wave.tier === "ultimate") this.grantUltimateDrop();
     }
+    if(["Finished","Fault"].includes(frame.stage))this.markRunEnd(frame.endIntent??(frame.stage==="Fault"?"fault":"native-ended"));
     this.stage = frame.stage; this.core.state.phase = frame.phase; this.core.state.layer = frame.layer;
     this.core.state.cartsLeft = frame.carts; this.core.state.cartRestoreUsed = frame.cartUsed;
     this.core.state.killedUltimates = [...frame.killed];
@@ -321,7 +354,8 @@ export class RunSession {
     this.roster = this.readingSnapshot?.players.map(p => p.id) ?? [];
     const q = this.readingSnapshot?.quest;
     if (q?.playing) this.questUnique = q.unique;
-    this.message = "联机同步：由房主选波，个人 PT 和购物独立结算";
+    this.message = frame.stage==="Fault"?"房主因错误停止本局，等待本机原生结算与个人恢复":
+      frame.stage==="Finished"?"房主已结束本局，等待本机原生结果与个人恢复":"联机同步：由房主选波，个人 PT 和购物独立结算";
     this.port.policy(frame.plan, !["Finished", "Fault"].includes(frame.stage));
   }
 
@@ -353,6 +387,7 @@ export class RunSession {
         reading.quest?.id !== plan.questId || !this.onlineAllowed(reading)) return fail("Entry host test scope unavailable");
     const started = this.stage === "Preparing" && this.startupPrepared ? ok() : this.core.startRun(this.core.config.armorOptions[0]!);
     if (!started.ok) return started;
+    if(this.stage!=="Preparing")this.resetRunEnd();
     this.core.generateChoices(1);
     this.core.state.currentChoices = [plan.wave];
     const picked = this.core.pickChoice(plan.wave.index);
@@ -400,6 +435,7 @@ export class RunSession {
         if (this.port.startupPrepare) this.startupRestorePending = true;
         return result;
       }
+      this.resetRunEnd();
       this.startupRestorePending = this.port.startupPrepare !== undefined;
       // 测试直跳层（仅单人离线；跳过逐层进程直接检验目标层生成与结算）
       if (testLayer !== undefined) {
@@ -441,6 +477,7 @@ export class RunSession {
   private generate(players: number): void {
     const lastLayer = Math.max(...this.core.config.pools.map((pool) => pool.to));
     if (this.core.state.layer > lastLayer) {
+      this.markRunEnd("cleared-all");
       this.stage = "Finished";
       this.message = "已完成全部配置层数";
       this.port.policy(null, false);
@@ -486,7 +523,7 @@ export class RunSession {
     this.port.takeDeaths();
     this.lastDeaths = inPlace ? reading.deaths : 0;
     this.questUnique = inPlace ? reading.quest!.unique : null;
-    if (!inPlace) { this.camp = null; this.roster = []; }
+    if (!inPlace) { this.nativeEnd = null; this.camp = null; this.roster = []; }
     this.campSince = null;
     this.chainKillAt = null;
     this.nextSpawnReported = false;
@@ -519,6 +556,7 @@ export class RunSession {
 
   stop(): void {
     const reading = this.port.read();
+    this.observeNativeEnd(reading);this.markRunEnd("stopped");
     this.port.cancelPost();
     this.requestMultiplayerAbort(reading, "stop");
     if ((this.port.canFinishLocal?.() ?? this.multiplayerRole !== "guest") && this.plan && reading.quest?.id === this.plan.questId && reading.quest.playing &&
@@ -538,6 +576,7 @@ export class RunSession {
       if (reading.time - this.lastPoll < this.settings.pollSeconds) return;
       this.lastPoll = reading.time;
       this.readingSnapshot = reading;
+      this.observeNativeEnd(reading);
       // M3.5 恢复检查在 stage 早退之前：Finished/Fault 后回到村庄也要恢复原装。
       // 不能在活跃局内触发——inPlace 首波前 Selecting 与 reentry 波间 Selecting 都在村庄。
       if (this.startupRestorePending && this.port.startupRestore &&
@@ -564,6 +603,7 @@ export class RunSession {
       if ((this.multiplayerRole || this.stage === "Preparing") && ((this.stage === "Preparing" && reading.quest && reading.quest.id === this.plan?.questId &&
             ["failed", "return", "success"].includes(reading.quest.status)) ||
           (pinned && (!same || !!reading.quest && ["failed", "return", "success"].includes(reading.quest?.status ?? ""))))) {
+        this.markRunEnd(same?"native-ended":"quest-left");
         if (same && Number.isInteger(reading.deaths) && reading.deaths >= 0)
           this.core.state.cartsLeft = Math.max(0,this.core.config.maxCarts-reading.deaths);
         this.core.abortRun("原生任务已结束或离开"); this.port.policy(null, false); this.port.cancelPost();
@@ -574,6 +614,7 @@ export class RunSession {
       if (this.stage === "Preparing") {
         if (reading.quest?.id === this.plan?.questId) this.preparationQuest = reading.quest?.unique ?? null;
         else if (this.preparationQuest !== null) {
+          this.markRunEnd("entry-cancelled");
           this.core.abortRun("原生入场任务已取消"); this.stage = "Finished";
           this.message = "已取消入场，回村恢复后可重新准备";
         }
@@ -583,6 +624,7 @@ export class RunSession {
         const delta = Math.max(0, reading.deaths - this.lastDeaths); this.lastDeaths = reading.deaths;
         for (let i = 0; i < delta && this.core.state.phase !== "GameOver"; i++) this.core.cart(reading.quest?.playing === true);
         if (this.core.state.phase === "GameOver") {
+          this.markRunEnd("carts-exhausted");
           if (reading.quest?.playing) this.port.finish(true);
           this.port.policy(null, false);
           this.stage = "Finished"; this.message = "全队猫车耗尽，等待原生结算与个人恢复";
@@ -628,6 +670,7 @@ export class RunSession {
               this.fault("玩家位置尚未初始化，无法记录集结点；请检查玩家采样接口");
             return;
           }
+          if (this.nativeEnd?.unique !== reading.quest.unique) this.nativeEnd = null;
           this.questUnique = reading.quest.unique;
           this.camp = { ...reading.players[0]!.position };
           this.roster = reading.players.map((player) => player.id);
@@ -648,6 +691,7 @@ export class RunSession {
       this.lastDeaths = reading.deaths;
       for (let i = 0; i < cartDelta && this.core.state.phase !== "GameOver"; i++) this.core.cart();
       if (this.core.state.phase === "GameOver" || reading.quest.status === "failed") {
+        this.markRunEnd(this.core.state.phase==="GameOver"?"carts-exhausted":"native-ended");
         this.core.abortRun("Quest failed");
         this.port.policy(null, false);
         if (reading.quest.playing) this.port.finish(true);
@@ -778,6 +822,7 @@ export class RunSession {
 
   private fault(error: unknown): Result {
     if (this.stage === "Fault" && this.message === String(error)) return fail(this.message);
+    this.markRunEnd("fault");
     const q = this.readingSnapshot?.quest;
     if (this.readingSnapshot) {
       try { this.requestMultiplayerAbort(this.readingSnapshot, "fault"); }

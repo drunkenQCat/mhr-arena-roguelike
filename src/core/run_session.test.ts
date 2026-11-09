@@ -60,6 +60,45 @@ function setup(route: "reentry" | "inPlace" = "reentry") {
   return { config, core, game, session, tick, start, enter, clear, village };
 }
 
+describe("run ending evidence",()=>{
+  it("records delayed local failure after stop without calling it a successful completion",()=>{
+    const f=setup("inPlace");f.start(true);f.enter(9);
+    f.session.stop();expect(f.session.runSummary().ending).toEqual({intent:"stopped",native:null});
+    f.tick();expect(f.session.runSummary().ending.native).toMatchObject({status:"failed",deaths:0,unique:9});
+    f.game.reading.quest=null;f.tick();
+    expect(f.session.runSummary().ending.native?.status).toBe("failed");
+    expect(f.game.finishes).toEqual([true]);
+  });
+  it("distinguishes exhausted carts from the native outcome and keeps the first strong result",()=>{
+    const f=setup("inPlace");f.start(true);f.enter(9);
+    for(let deaths=1;deaths<=3;deaths++){f.game.reading.deaths=deaths;f.tick();}
+    expect(f.session.endingIntent).toBe("carts-exhausted");f.tick();
+    expect(f.session.runSummary().ending.native).toMatchObject({status:"failed",deaths:3});
+    f.game.reading.quest!.status="return";f.tick();
+    expect(f.session.runSummary().ending.native?.status).toBe("failed");
+    f.game.reading.quest!.status="success";f.tick();f.tick();
+    expect(f.session.runSummary().ending.native).toMatchObject({status:"failed",conflictingStatus:"success"});
+    expect(f.game.events.filter(e=>e.event==="native-end-conflict")).toHaveLength(1);
+  });
+  it("does not invent a result from another instance or permit summary mutation",()=>{
+    const f=setup("inPlace");f.start(true);f.enter(9);f.session.stop();
+    f.game.reading.quest!.unique=10;f.tick();expect(f.session.runSummary().ending.native).toBeNull();
+    f.game.reading.quest!.unique=9;f.tick();
+    const summary=f.session.runSummary();summary.ending.native!.status="success";
+    expect(f.session.runSummary().ending.native?.status).toBe("failed");
+    f.village();expect(f.session.start(f.config.armorOptions[0]!,true).ok).toBe(true);
+    expect(f.session.runSummary().ending).toEqual({intent:null,native:null});
+  });
+  it("upgrades a return-only observation but never treats missing deaths as zero",()=>{
+    const f=setup("inPlace");f.start(true);f.enter(9);
+    f.game.reading.quest!.status="return";f.game.reading.quest!.playing=false;
+    f.game.reading.deaths=NaN;f.tick();
+    expect(f.session.runSummary().ending.native).toMatchObject({status:"return",deaths:null});
+    f.game.reading.quest!.status="success";f.tick();
+    expect(f.session.runSummary().ending.native).toMatchObject({status:"success",deaths:null});
+  });
+});
+
 it("restores before character saving only for an ended owned instance or idle village recovery",()=>{
  const {game,session,start,enter}=setup("inPlace");let restored=0;
  (game as SessionPort).startupRestore=()=>{restored++;return {ok:false,reason:"awaiting native save"};};

@@ -1,4 +1,8 @@
-export interface RunSummary {layer:number;clearedWaves:number;earnedPt:number;spentPt:number;balance:number;remainingCarts:number;cartRestored:boolean;armor:string|null;durationSeconds:number;restored:boolean;reason:string;purchases:string[]|null;role:string|null}
+export interface RunSummary {layer:number;clearedWaves:number;earnedPt:number;spentPt:number;balance:number;remainingCarts:number;cartRestored:boolean;armor:string|null;durationSeconds:number;restored:boolean;reason:string;purchases:string[]|null;role:string|null;
+  maxCarts?:number;
+  ending?:{intent:'cleared-all'|'carts-exhausted'|'stopped'|'fault'|'native-ended'|'quest-left'|'entry-cancelled'|null;
+    native:{questId:number;unique:number;status:'success'|'failed'|'return';deaths:number|null;observedAt:number;conflictingStatus?:'success'|'failed'}|null};
+}
 export interface ShopEntry { id: string; name: string; category: string; price: number; cap: number; owned: number; mode: string; desc?: string; canBuy: boolean; reason?: string; }
 export interface Choice { index: number; label: string; monsters: string[]; mode?: string; hpMul: number; dmgMul: number; rewardPt: number; }
 export interface ConsoleState {

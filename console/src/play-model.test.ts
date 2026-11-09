@@ -1,6 +1,19 @@
 import { expect, it } from 'vitest';
-import { actions, chooseReason, entryGuidance, localizeTransaction, nextStep, monsterName, orderedCategories, percent } from './play-model';
-import type { ConsoleState } from './api';
+import { actions, chooseReason, entryGuidance, localizeTransaction, nextStep, monsterName, orderedCategories, percent, runEnding } from './play-model';
+import type { ConsoleState, RunSummary } from './api';
+it('keeps tool intent, native outcome and unknown evidence distinct',()=>{
+ const s={maxCarts:3,ending:{intent:'stopped',native:null}} as RunSummary;
+ expect(runEnding(s)).toMatchObject({title:'主动终止',warning:''});
+ expect(runEnding(s).detail).toContain('尚未记录');
+ s.ending!.native={questId:900103,unique:7,status:'failed',deaths:0,observedAt:1};
+ expect(runEnding(s).title).toBe('主动终止');
+ s.ending!.intent='carts-exhausted';s.ending!.native.deaths=3;
+ expect(runEnding(s).title).toContain('3 / 3');
+ s.ending!.native.status='success';
+ expect(runEnding(s).warning).toContain('不能作为三猫失败验收');
+ s.ending!.native.status='return';expect(runEnding(s).detail).toContain('尚未观察');
+ expect(runEnding(undefined).title).toBe('本局已结束');
+});
 const state = () => ({ sessionStage: 'Selecting', capabilities: { start: true, choose: true, stop: true, route: true, retry: true, invincible: true, kill: true, teleport: true, teleportMonster: true, testLayer: true }, shopAvailable: true, shopBusy: false,
   control: { startup: { restorePending: false }, effectPending: false } }) as ConsoleState;
 it('disables every command when stale or a receipt is pending', () => {

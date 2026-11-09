@@ -438,3 +438,35 @@ journal.execute("""
   assert(m.readRecoveryRecord(nil,f).original==2)
 """)
 print("PASS Lua 5.4: atomic recovery writer arguments, missing DLL, failed write and exact readback")
+
+# Ending intent is business metadata. Only local readings establish native results,
+# including a result arriving after Finished (the normal asynchronous return path).
+ending_config = modules.validateConfig(None, lua.table_from(raw, recursive=True))
+lua.eval('''function(m, config)
+  local function new(Class,...) local o=setmetatable({},Class.prototype);o:____constructor(...);return o end
+  for _,mode in ipairs({'stopped','carts-exhausted'}) do
+    local clock=0;local finishes=0
+    local reading={time=0,online=false,canPost=true,deaths=0,enemies={},players={{id=0,position={x=10,y=20,z=30}}}}
+    local port={ready=function() return true end,read=function() return reading end,
+      publish=function() end,policy=function() end,post=function() end,cancelPost=function() end,
+      postingError=function() end,takeDeaths=function() return {} end,report=function() end,
+      finish=function(_,failed) assert(failed);finishes=finishes+1 end}
+    local session=new(m.RunSession,new(m.RunCore,config,42),m.catalog,port)
+    local function tick() clock=clock+1;reading.time=clock;session:tick() end
+    assert(session:start(config.armorOptions[1],true).ok)
+    reading.quest={id=config.quest.id,unique=7,status='play',playing=true};reading.canPost=false;tick()
+    if mode=='stopped' then session:stop() else
+      for deaths=1,3 do reading.deaths=deaths;tick() end
+    end
+    local summary=session:runSummary()
+    assert(summary.ending.intent==mode and summary.ending.native==nil and finishes==1)
+    reading.quest.status='failed';reading.quest.playing=false;reading.quest.unique=8;tick()
+    assert(session:runSummary().ending.native==nil)
+    reading.quest.unique=7;tick();summary=session:runSummary()
+    assert(summary.ending.native.status=='failed' and summary.ending.native.deaths==reading.deaths)
+    summary.ending.native.status='success';assert(session:runSummary().ending.native.status=='failed')
+    reading.quest.status='return';tick();assert(session:runSummary().ending.native.status=='failed')
+    reading.quest=nil;tick();assert(session:runSummary().ending.native.status=='failed' and finishes==1)
+  end
+end''')(modules, ending_config)
+print("PASS Lua 5.4: stop vs exhausted carts, delayed local failure, instance binding and preserved result")

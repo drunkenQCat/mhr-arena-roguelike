@@ -75,6 +75,14 @@ try {
   assert.match(finished, /剩余 PT 不代表累计收益/);
   checked++;
 
+  const ended = { maxCarts:3,clearedWaves:2,earnedPt:160,spentPt:0,balance:310,durationSeconds:60,restored:false,
+    ending:{intent:'carts-exhausted',native:{questId:900103,unique:7,status:'failed',deaths:3,observedAt:1}} };
+  const cats = await render(Play, { ...props, state:{...state,sessionStage:'Finished',runSummary:ended} });
+  assert.match(cats,/猫车次数耗尽（3 \/ 3）/);assert.match(cats,/本机原生结果：失败/);checked++;
+  const mismatch = await render(Play, { ...props, state:{...state,sessionStage:'Fault',runSummary:{...ended,
+    ending:{...ended.ending,native:{...ended.ending.native,status:'success'}}}} });
+  assert.match(mismatch,/本机原生结果：成功/);assert.match(mismatch,/不能作为三猫失败验收/);checked++;
+
   const cfg = editorConfig(JSON.parse(readFileSync(new URL('../../data/rogue_config.json', import.meta.url), 'utf8')));
   const balance = await render(Balance, { draft: cfg, baseline: cfg, layer: 5, players: 2, unlocked: false });
   assert.match(balance, /value="5"/);

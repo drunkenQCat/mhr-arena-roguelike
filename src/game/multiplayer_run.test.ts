@@ -62,6 +62,21 @@ function fixture(size=2,configUpdates=false) {
   return {host,guest,guests,bus,tick,clear};
 }
 beforeEach(()=>{mock.now=100;mock.valid=true;});
+it("transports stop intent without inventing the guest's native result",()=>{
+ const f=fixture();f.tick();f.host.session.stop();f.tick();
+ expect(JSON.parse(f.bus.plan).endIntent).toBe("stopped");
+ expect(f.guest.session.runSummary().ending).toEqual({intent:"stopped",native:null});
+ expect(f.guest.finish).not.toHaveBeenCalled();
+ f.guest.reading.quest!.status="failed";f.guest.reading.quest!.playing=false;f.guest.reading.deaths=0;f.tick();
+ expect(f.guest.session.runSummary().ending.native).toMatchObject({status:"failed",unique:7,deaths:0});
+ expect(f.guest.finish).not.toHaveBeenCalled();
+});
+it("rejects a nonterminal frame carrying a terminal intent",()=>{
+ const f=fixture();f.tick();const frame=JSON.parse(f.bus.plan);frame.n+=100;frame.endIntent="cleared-all";
+ f.bus.plan=JSON.stringify(frame);mock.now++;f.guest.run.tick();
+ expect(f.guest.session.stage).toBe("Fault");
+ expect(f.guest.session.runSummary().ending.native).toBeNull();
+});
 it.each([2,3,4])("synchronizes real RunSession rules and persistent user config across %i peers without replacing wallets/current wave",size=>{
  const f=fixture(size,true);f.tick();f.clear();for(let i=0;i<4;i++)f.tick();
  expect(f.host.run.canChoose()).toBe(true);

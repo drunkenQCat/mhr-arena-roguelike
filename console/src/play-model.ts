@@ -1,4 +1,4 @@
-import type { ConsoleState } from './api';
+import type { ConsoleState, RunSummary } from './api';
 import catalog from '../../data/monster_ids.json';
 import itemIds from '../../data/item_ids.json';
 
@@ -28,6 +28,27 @@ export function entryGuidance(entry: ConsoleState['multiplayerEntry'], connected
   return '选择入场波次，等待所有队友的任务表一致后承接任务。';
 }
 export const stageNames: Record<string, string> = { Idle: '未开局', Preparing: '联机开局整备', Selecting: '整备 · 选择波次', AwaitQuest: '等待进入任务', Combat: '战斗中', Carve: '剥取 · 集结', Returning: '返回村庄', Finished: '本局结束', Fault: '需要处理' };
+export function runEnding(summary:RunSummary|null|undefined):{title:string;detail:string;warning:string} {
+  const end=summary?.ending,native=end?.native;
+  const intentNames:Record<string,string>={'cleared-all':'已通关全部层数','carts-exhausted':'猫车次数耗尽',stopped:'主动终止',fault:'因错误停止','native-ended':'原生任务结束','quest-left':'已离开任务','entry-cancelled':'入场已取消'};
+  let title=intentNames[end?.intent??'']??'本局已结束';
+  let detail='尚未记录本机原生成功或失败结果。';
+  let warning='';
+  if(native){
+    if(native.status==='failed'){
+      const exhausted=native.deaths!=null&&summary?.maxCarts!=null&&native.deaths>=summary.maxCarts;
+      title=end?.intent==='stopped'?'主动终止':end?.intent==='fault'?'因错误停止':
+        exhausted?`猫车次数耗尽（${native.deaths} / ${summary!.maxCarts}）`:'任务失败';
+      detail=`本机原生结果：失败；猫车 ${native.deaths??'未知'} 次。`;
+    } else if(native.status==='success'){
+      title=end?.intent==='cleared-all'?'已通关全部层数':'原生任务完成';
+      detail=`本机原生结果：成功；猫车 ${native.deaths??'未知'} 次。`;
+      if(['carts-exhausted','stopped','fault'].includes(end?.intent??''))warning='原生成功结果与工具结束原因不一致；本次不能作为三猫失败验收。';
+    } else detail='本机已进入返回流程，尚未观察到原生成功或失败结果。';
+    if(native.conflictingStatus)warning='同一任务记录了相互冲突的原生结果，请下载日志核查。';
+  }
+  return {title,detail,warning};
+}
 const names = new Map(Object.values(catalog).map(m => [m.id, m.cn]));
 export const monsterName = (id: number) => names.get(id) ?? `怪物 ${id}`;
 export const stat = (n?: number | null) => n == null || !Number.isFinite(n) ? '—' : String(Number(n.toFixed(4)));

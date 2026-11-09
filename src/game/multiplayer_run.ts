@@ -9,7 +9,7 @@ import { ConfigStore } from "./config_store";
 import { validateEquipmentConfig } from "./equipment_catalog";
 import { makeQuestPlan, type MonsterCatalog, type QuestPlan } from "../core/quest_plan";
 import type { WaveOption, RunPhase } from "../core/run_state";
-import type { Position, RunSession, SessionStage } from "../core/run_session";
+import { RUN_END_INTENTS, type RunEndIntent, type Position, type RunSession, type SessionStage } from "../core/run_session";
 import type { NativeRuntime } from "./native_runtime";
 import type { SpawnTicket, SpawnSync } from "./inplace_waves";
 import { multiplayerScope } from "./multiplayer_scope";
@@ -22,7 +22,7 @@ interface Frame { v: 4; s: string; o: string; l: string; h: string; n: number;
   rules:number;
   stage: SessionStage; phase: RunPhase; layer: number; token: number;
   w: EncodedWave; c: EncodedWave[]; earned: number; carts: number; deaths: number; cartUsed: boolean;
-  camp: Position | null; killed: string[]; spawn: SpawnTicket | null; commit: boolean; }
+  camp: Position | null; killed: string[]; spawn: SpawnTicket | null; commit: boolean; endIntent?:RunEndIntent|null; }
 function encode(w: WaveOption): EncodedWave { return [w.index, w.typeTag, w.monsters, w.tier, w.hpMul, w.dmgMul, w.rewardMul, w.rewardPt, w.mode ?? "single"]; }
 function decode(w: EncodedWave): WaveOption {
   if (!Array.isArray(w) || w.length !== 9 || !Number.isInteger(w[0]) || w[0] < 0 || w[0] > 2 ||
@@ -181,7 +181,7 @@ export class MultiplayerRun implements SpawnSync {
       stage:s.stage, phase:s.core.state.phase, layer:s.core.state.layer, token:p.token,
       w:encode(p.wave), c:s.core.state.currentChoices.map(encode), earned:s.earnedPt,
       carts:s.core.state.cartsLeft, deaths:s.readingSnapshot?.deaths ?? 0, cartUsed:s.core.state.cartRestoreUsed, camp:s.campSnapshot,
-      killed:s.core.state.killedUltimates, spawn, commit:!!spawn && this.committed };
+      killed:s.core.state.killedUltimates, spawn, commit:!!spawn && this.committed, endIntent:s.endingIntent };
   }
   private publish(): void {
     const f = this.build(), text = rejson.dump_string(f, -1);
@@ -210,6 +210,7 @@ export class MultiplayerRun implements SpawnSync {
     if (!Number.isInteger(f.layer) || f.layer < 1 || !Number.isInteger(f.token) || f.token < 0 ||
         !Number.isInteger(f.deaths) || f.deaths < 0 || !Number.isInteger(f.earned) || f.earned < 0 || !Number.isInteger(f.carts) || f.carts < 0 || f.carts > this.config.maxCarts ||
         !["AwaitQuest","Combat","Carve","Selecting","Finished","Fault"].includes(f.stage) ||
+        (f.endIntent != null && (!RUN_END_INTENTS.includes(f.endIntent) || !["Finished","Fault"].includes(f.stage))) ||
         !["Prep","Choosing","Combat","Carve","GameOver"].includes(f.phase) ||
         (f.camp !== null && (!f.camp || ![f.camp.x,f.camp.y,f.camp.z].every(x => Number.isFinite(x))))) throw new Error("Invalid multiplayer state");
     const wave = decode(f.w), choices = (f.c ?? []).map(decode);
@@ -229,7 +230,7 @@ export class MultiplayerRun implements SpawnSync {
     if (this.busy() && stateKey(f) !== (this.frame ? stateKey(this.frame) : "")) return;
     if (f.cartUsed && !this.session.core.state.cartRestoreUsed) this.runtime.mirrorCartRestore(f.deaths);
     this.session.mirrorMultiplayer({ stage:f.stage, phase:f.phase, layer:f.layer, plan, choices,
-      earned:f.earned, carts:f.carts, cartUsed:f.cartUsed, camp:f.camp, killed:f.killed ?? [] });
+      earned:f.earned, carts:f.carts, cartUsed:f.cartUsed, camp:f.camp, killed:f.killed ?? [], endIntent:f.endIntent });
     this.frame = f; this.lastSequence = f.n; this.lastSeen = clockSeconds();
     this.message = f.stage === "Fault" ? "房主已停止本局，请下载双方日志" : f.stage === "Finished" ? "房主已结束本局" : "已跟随房主；个人余额与背包保留";
   }
