@@ -52,6 +52,7 @@ export class MultiplayerRun implements SpawnSync {
   private lastSeen = clockSeconds();
   private sequence = 0;
   private lastSequence = 0;
+  private endingReadUntil:number|null=null;
   private frame: Frame | null = null;
   private ticket: SpawnTicket | null = null;
   private committed = false;
@@ -191,7 +192,7 @@ export class MultiplayerRun implements SpawnSync {
     this.publications.push({ sequence:f.n, at:clockSeconds() });
     if (this.publications.length > 128) this.publications.shift();
   }
-  private accept(text: string): void {
+  private accept(text: string, endingOnly=false): void {
     let f: Frame;
     try { f = rejson.load_string(text) as Frame; } catch { return; }
     if (!f || f.v !== 4) return; // Entry prepare/post envelope until host attaches.
@@ -225,6 +226,12 @@ export class MultiplayerRun implements SpawnSync {
     if (reading.quest.id !== plan.questId || (this.session.questUniqueSnapshot !== null &&
         reading.quest.unique !== this.session.questUniqueSnapshot)) throw new Error("Guest native quest instance changed");
     const terminal = ["Finished", "Fault"].includes(f.stage);
+    if(endingOnly){
+      if(!terminal)return;
+      this.session.reconcileMultiplayerEnd(plan,f.endIntent??(f.stage==="Fault"?"fault":null));
+      this.lastSequence=f.n;
+      return;
+    }
     if (this.preparedToken !== f.token && f.layer > 1 && f.stage === "Combat") {
       // Native death delivery can lag host state; wait rather than destroying a live actor.
       if (reading.enemies.some(e => !e.dead && !e.captured) || this.busy()) return;
@@ -241,14 +248,25 @@ export class MultiplayerRun implements SpawnSync {
   }
   tick(): void {
     const now = clockSeconds();
-    if ((!this.live && !this.abortPending) || this.lastPoll === now) return;
+    const reconcileEnding=this.role==="guest"&&this.session.stage==="Finished"&&this.session.endingIntent==="native-ended"&&
+      (this.endingReadUntil===null||now<=this.endingReadUntil);
+    if ((!this.live && !this.abortPending && !reconcileEnding) || this.lastPoll === now) return;
     this.lastPoll = now;
     // Native return can finish locally before the last Steam frame or lobby teardown.
     // Never turn an already-ended local run back into a synchronization fault.
     if (["Finished", "Fault"].includes(this.session.stage)) {
       this.configSync?.shutdown("原生任务已结束，撤销尚未完成的配置事务");
       if (this.role === "host") { try { this.publish(); } catch { /* native lobby may already be retired */ } }
-      else this.publishAbort();
+      else {
+        this.publishAbort();
+        if(reconcileEnding){
+          this.endingReadUntil??=now+30;
+          try{
+            const lobby=this.network.steam_snapshot?.().lobbies?.find(l=>l.id===this.context.lobby&&l.owner===this.context.owner&&l.self===this.context.self);
+            if(lobby&&lobby.members.map(m=>m.id).sort().join(",") === [...this.context.members].sort().join(","))this.accept(lobby.plan,true);
+          }catch{/* Late metadata must never fault, restart or delay local recovery. */}
+        }
+      }
       this.live = false; this.message = "本局已结束，等待回村恢复后重新开局";
       return;
     }

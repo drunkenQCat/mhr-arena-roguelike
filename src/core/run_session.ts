@@ -247,6 +247,18 @@ export class RunSession {
   private endIntent:RunEndIntent|null=null;
   private nativeEnd:NativeEndObservation|null=null;
   get endingIntent():RunEndIntent|null{return this.endIntent;}
+  /** Native failure can arrive before the host's terminal frame. Reconcile only
+   * the explanation of that pinned run; never replay accounting or native work. */
+  reconcileMultiplayerEnd(plan:QuestPlan,intent:RunEndIntent|null|undefined):void {
+    const q=this.readingSnapshot?.quest;
+    if(this.multiplayerRole!=="guest"||this.stage!=="Finished"||this.endIntent!=="native-ended"||
+      !intent||!["cleared-all","carts-exhausted","stopped","fault"].includes(intent)||
+      !this.plan||plan.token!==this.plan.token||plan.layer!==this.plan.layer||plan.questId!==this.plan.questId||
+      this.questUnique===null||!q||q.playing||q.id!==plan.questId||q.unique!==this.questUnique||
+      this.nativeEnd?.unique!==q.unique||this.nativeEnd.questId!==q.id)return;
+    this.endIntent=intent;
+    this.announce("multiplayer-ending-reconciled",{intent,questId:q.id,unique:q.unique,token:plan.token});
+  }
   private resetRunEnd():void{this.endIntent=null;this.nativeEnd=null;}
   private markRunEnd(intent:RunEndIntent):void{if(this.endIntent===null)this.endIntent=intent;}
   /** A host Finished frame expresses intent, never this engine's result.

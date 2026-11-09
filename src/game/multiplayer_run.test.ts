@@ -77,6 +77,40 @@ it("rejects a nonterminal frame carrying a terminal intent",()=>{
  expect(f.guest.session.stage).toBe("Fault");
  expect(f.guest.session.runSummary().ending.native).toBeNull();
 });
+it.each([2,3,4])("reconciles a late host ending after native failure without replaying gameplay across %i peers",size=>{
+ const f=fixture(size);f.tick();
+ for(const p of f.guests){p.reading.quest!.status="failed";p.reading.quest!.playing=false;}
+ f.tick();
+ for(const p of f.guests){
+   expect(p.session.endingIntent).toBe("native-ended");
+   expect(p.run.snapshot().live).toBe(false);
+ }
+ f.host.session.stop();mock.now++;f.host.run.tick();
+ const end=JSON.parse(f.bus.plan);end.earned=999;end.cartUsed=true;f.bus.plan=JSON.stringify(end);
+ for(const p of f.guests){
+   const before=p.session.runSummary(),published=p.publish.mock.calls.length,guards=p.guardFailure.mock.calls.length;
+   p.setBusy(true);p.run.tick();
+   expect(p.session.runSummary()).toEqual({...before,ending:{...before.ending,intent:"stopped"}});
+   expect(p.publish).toHaveBeenCalledTimes(published);expect(p.guardFailure).toHaveBeenCalledTimes(guards);
+   expect(p.mirrorCartRestore).not.toHaveBeenCalled();expect(p.ultimateDrop).not.toHaveBeenCalled();expect(p.finish).not.toHaveBeenCalled();
+ }
+ // A fresh but nonterminal frame cannot revive an ended local session.
+ end.n++;end.stage="Combat";end.phase="Combat";end.endIntent=null;f.bus.plan=JSON.stringify(end);mock.now++;
+ for(const p of f.guests){p.run.tick();expect(p.session.stage).toBe("Finished");expect(p.session.endingIntent).toBe("stopped");}
+});
+it.each(["expired","owner","quest","wave","session"])("ignores %s late terminal metadata without changing a completed native result",variant=>{
+ const f=fixture();f.tick();f.guest.reading.quest!.status="failed";f.guest.reading.quest!.playing=false;f.tick();
+ f.host.session.stop();mock.now++;f.host.run.tick();
+ const frame=JSON.parse(f.bus.plan);
+ if(variant==="expired")mock.now+=31;
+ if(variant==="owner")f.bus.owner="other";
+ if(variant==="quest")f.guest.reading.quest!.unique=8;
+ if(variant==="wave")frame.token++;
+ if(variant==="session")frame.s="old-session";
+ f.bus.plan=JSON.stringify(frame);f.guest.session.tick();const before=f.guest.session.runSummary();f.guest.run.tick();
+ expect(f.guest.session.runSummary()).toEqual(before);expect(f.guest.session.stage).toBe("Finished");
+ expect(f.guest.session.endingIntent).toBe("native-ended");expect(f.guest.finish).not.toHaveBeenCalled();
+});
 it.each([2,3,4])("synchronizes real RunSession rules and persistent user config across %i peers without replacing wallets/current wave",size=>{
  const f=fixture(size,true);f.tick();f.clear();for(let i=0;i<4;i++)f.tick();
  expect(f.host.run.canChoose()).toBe(true);

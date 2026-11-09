@@ -378,8 +378,23 @@ multi.execute('''
   assert(g.core.state.wallet.pt==expected+80 and #g.s.pendingSupplies==pendingBefore)
   assert(g.s:runSummary().ending.intent=="stopped" and g.s:runSummary().ending.native==nil)
   assert(not string.find(bus.acks.g or "","R4ERR|",1,true))
+  -- The native engine can finish before the last host frame is delivered.
+  -- Retired gameplay may read terminal intent briefly, without replaying PT,
+  -- native services or spawning even if the terminal frame has newer totals.
+  local h2,g2=peer("h"),peer("g")
+  clock=clock+1;h2.run:tick();g2.run:tick()
+  g2.p.reading.quest.status="failed";g2.p.reading.quest.playing=false
+  clock=clock+1;g2.s:tick();g2.run:tick()
+  assert(g2.s.stage=="Finished" and g2.s:runSummary().ending.intent=="native-ended" and not g2.run:valid())
+  function h2.p:finish(failed,expected) assert(failed and expected.unique==7) end
+  h2.s:stop();clock=clock+1;h2.run:tick()
+  local late=wire_load(bus.plan);late.earned=late.earned+80;late.cartUsed=true
+  bus.plan=wire_dump(late);g2.p.busy=true
+  local before=g2.core.state.wallet.pt;g2.run:tick()
+  assert(g2.s:runSummary().ending.intent=="stopped" and g2.s:runSummary().ending.native.status=="failed")
+  assert(g2.core.state.wallet.pt==before and not g2.core.state.cartRestoreUsed and g2.s.stage=="Finished")
 ''')
-print("PASS Lua 5.4: two-peer staging/rewards, wallet isolation and terminal priority over unresolved delivery")
+print("PASS Lua 5.4: two-peer staging/rewards, wallet isolation, terminal priority and late intent without replay")
 
 # The live adapter must compare the caller's authorized instance before pinning
 # clear or queueing completion, then compare the copied identity again in update.
