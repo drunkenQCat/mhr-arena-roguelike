@@ -15,6 +15,12 @@ it("waits for native effects to complete rather than releasing controls on queue
   expect((await pending).status).toBe("applied");
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
+it("does not report queued configuration as saved and can wait beyond the ordinary request deadline",async()=>{
+ fetchMock.mockResolvedValue(reply(receipt("queued")));
+ let settled=false;const pending=waitForReceipt("request-1","current",{configuration:true}).then(value=>{settled=true;return value;});
+ await vi.advanceTimersByTimeAsync(14000);expect(settled).toBe(false);
+ fetchMock.mockResolvedValue(reply(receipt("applied")));await vi.advanceTimersByTimeAsync(250);expect((await pending).status).toBe("applied");
+});
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });

@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "./load_config";
-import { rejson, relog } from "./sdk";
+import { rejson, relog,refFs } from "./sdk";
 import { defaultConfig } from "./default_config";
 
 vi.mock("./sdk", () => ({
+  refFs:{read:vi.fn(()=>""),glob:vi.fn(()=>[])},
   rejson: { load_file: vi.fn() },
   relog: { info: vi.fn(), warn: vi.fn() },
 }));
 
 describe("runtime configuration overrides", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {vi.clearAllMocks();vi.mocked(refFs.read).mockReturnValue("");vi.mocked(refFs.glob).mockReturnValue([]);});
 
   it.each(["negative price", "missing unlock rules"])("falls back on %s", (problem) => {
     const override = JSON.parse(JSON.stringify(defaultConfig));
@@ -29,5 +30,9 @@ describe("runtime configuration overrides", () => {
     expect(loadConfig().startPt).toBe(999);
     expect(relog.info).toHaveBeenCalledOnce();
     expect(relog.warn).not.toHaveBeenCalled();
+  });
+  it("does not silently load defaults over a corrupt pending multiplayer config",()=>{
+    vi.mocked(refFs.read).mockReturnValue("{");vi.mocked(refFs.glob).mockReturnValue(["mhw_rogue_config_pending.json"]);
+    expect(()=>loadConfig()).toThrow("配置恢复记录损坏");expect(rejson.load_file).not.toHaveBeenCalled();
   });
 });

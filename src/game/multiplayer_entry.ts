@@ -127,7 +127,7 @@ export class MultiplayerEntry {
     return this.digest();
   }
   private rulesDigest(): string {
-    const hash = this.network?.steam_digest?.(canonical({ rules:this.config, runtimeProtocol:5 })) ?? "";
+    const hash = this.network?.steam_digest?.(canonical({ rules:this.config, runtimeProtocol:6 })) ?? "";
     if (hash.length !== 64) throw new Error("Cannot hash multiplayer rules");
     return hash;
   }

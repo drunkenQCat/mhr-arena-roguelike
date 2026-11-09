@@ -62,6 +62,7 @@ export interface SessionPort {
   multiplayerRole?(): "host" | "guest" | null;
   multiplayerValid?(): boolean;
   multiplayerCanChoose?(): boolean;
+  multiplayerConfigBusy?(): boolean;
   canFinishLocal?(): boolean;
 }
 
@@ -70,6 +71,8 @@ export type SessionStage = "Idle" | "Preparing" | "Selecting" | "AwaitQuest" | "
 export class RunSession {
   /** The same sampled reading drives both progression and the web console. */
   readingSnapshot: RuntimeReading | null = null;
+  externalConfigRevision=0;
+  configurationRecovered():void{this.externalConfigRevision++;}
   stage: SessionStage = "Idle";
   message = "在村庄开始。M2 使用你当前的装备。";
   route: RuntimeSettings["route"];
@@ -139,15 +142,25 @@ export class RunSession {
     }
   }
 
-  applyConfig(config: RogueConfig): void {
+  previewConfig(config: RogueConfig): RogueConfig {
     const old = this.core.config;
     this.validateConfigForSession(config);
-    this.nextRunConfig = config;
     const active = !["Idle", "Finished", "Fault"].includes(this.stage);
-    this.core.replaceConfig(active ? { ...config, maxCarts: old.maxCarts,
+    return active ? { ...config, maxCarts: old.maxCarts,
       startPt: old.startPt, armorOptions: old.armorOptions, runtime: old.runtime,
       armorSets:old.armorSets, startupRules:old.startupRules, gachaPools:old.gachaPools, buffAmounts:old.buffAmounts,
-      cartRestorePrice: old.cartRestorePrice, cartRestoreLimit: old.cartRestoreLimit } : config);
+      cartRestorePrice: old.cartRestorePrice, cartRestoreLimit: old.cartRestoreLimit } : config;
+  }
+  configurationSnapshot(): { active:RogueConfig; next:RogueConfig|null } {
+    return {active:this.core.config,next:this.nextRunConfig??null};
+  }
+  restoreConfiguration(snapshot:{active:RogueConfig;next:RogueConfig|null}):void {
+    this.core.replaceConfig(snapshot.active);this.nextRunConfig=snapshot.next;
+    this.configSubmitted?.(snapshot.next??snapshot.active);
+  }
+  applyConfig(config: RogueConfig): void {
+    const effective=this.previewConfig(config);
+    this.nextRunConfig=config;this.core.replaceConfig(effective);
     this.configSubmitted?.(config);
   }
   private requestedAt = 0;
@@ -196,6 +209,7 @@ export class RunSession {
   }
 
   canShop(): boolean {
+    if(this.multiplayerRole&&this.port.multiplayerConfigBusy?.())return false;
     if (this.stage === "Preparing") {
       const r = this.readingSnapshot;
       return this.startupPrepared && !!r && (r.quest

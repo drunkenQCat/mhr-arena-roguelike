@@ -58,6 +58,26 @@ it("keeps saved rules and version intact when the installed game rejects equipme
  host.equipmentError=false;
  expect(f.command("submitConfig",{config:{...f.cfg,startPt:321},configVersion:0}).configVersion).toBe(1);
 });
+it("keeps a multiplayer config receipt queued until the barrier completes and increments the local version on guests",()=>{
+ const f=fixture();let role:"host"|"guest"="host",revision=0,finished=false;
+ Object.assign((f.session as any).port,{multiplayerRole:()=>role,multiplayerValid:()=>true});
+ Object.assign(f.runtime,{multiplayerConfigRevision:()=>revision,multiplayerConfigBusy:()=>!finished&&revision>0,
+  submitMultiplayerConfig:vi.fn(()=>7),multiplayerConfigResult:()=>finished?{serial:7,status:"applied",message:"all peers persisted"}:null});
+ const receipt=f.command("submitConfig",{config:f.cfg,configVersion:0},"mp-config");
+ expect(receipt.status).toBe("queued");expect(f.bridge.configVersion).toBe(0);expect(host.files["mhw_rogue_config.json"]).toBeUndefined();
+ finished=true;revision=1;f.tick();expect(host.files["webconsole_results.json"].last).toMatchObject({id:"mp-config",status:"applied",configVersion:1});
+ const fp=host.files["webconsole_results.json"].last.__fp;expect(fp).toHaveLength(64);
+ role="guest";revision=2;f.tick();expect(f.bridge.configVersion).toBe(2);
+});
+it("rejects stale config task identity before asking the multiplayer coordinator",()=>{
+ const f=fixture();const submit=vi.fn();Object.assign(f.runtime,{submitMultiplayerConfig:submit});
+ expect(f.command("submitConfig",{config:f.cfg,configVersion:0,questUnique:999},"old-task").status).toBe("rejected");expect(submit).not.toHaveBeenCalled();
+});
+it("invalidates planner drafts after configuration recovery even without a Lua reset",()=>{
+ const f=fixture();f.tick();expect(f.bridge.configVersion).toBe(0);f.session.configurationRecovered();f.tick();
+ expect(f.bridge.configVersion).toBe(1);
+ expect(f.command("submitConfig",{config:f.cfg,configVersion:0},"stale-before-recovery").status).toBe("rejected");
+});
 
 it("publishes authoritative controls and preserves route changes after staged rules", () => {
   const f = fixture(); f.tick();

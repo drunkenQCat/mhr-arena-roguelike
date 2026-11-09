@@ -284,6 +284,7 @@ ____moduleCache["src.game.multiplayer_scope"] = {value={multiplayerScope=functio
 return {RunCore=require("src.core.run_core").RunCore,
  RunSession=require("src.core.run_session").RunSession,
  MultiplayerRun=require("src.game.multiplayer_run").MultiplayerRun,
+ MultiplayerConfig=require("src.game.multiplayer_config").MultiplayerConfig,
  NativeRuntime=require("src.game.native_runtime").NativeRuntime,
  canonical=require("src.game.wire_canonical").canonical,
  makeQuestPlan=require("src.core.quest_plan").makeQuestPlan,
@@ -361,6 +362,51 @@ multi.execute('''
   assert(g.core.state.layer==3)
 ''')
 print("PASS Lua 5.4: two-peer multiplayer choice/staging/commit/activation/reward and personal-wallet isolation")
+
+# Exercise the emitted configuration protocol using the exact C-module noSelf
+# conventions. This is a protocol test, not proof that production is wired yet.
+multi.execute('''
+  assert(JSON==nil and Date==nil and Array==nil)
+  local m=mpmods
+  local function new(C,...) local o=setmetatable({},C.prototype);o:____constructor(...);return o end
+  local bus={control='',payload='',complete=false,acks={}}
+  local ids={'h','g','g2','g3'}
+  local function peer(id)
+    local p={rules={price=10,hp=1},wallet=123,applied=0,saved=0,finished=false}
+    local hooks={}
+    function hooks:boundary() return {token=9,layer=2,ready=true} end
+    function hooks:currentHash() return wire_hash(m.canonical(nil,p.rules)) end
+    function hooks:validate(text)
+      local value=wire_load(text);assert(value.hp>0 and value.price>=0)
+      return {value=value,effectiveHash=wire_hash(m.canonical(nil,value))}
+    end
+    function hooks:apply(value) p.rules=value;p.applied=p.applied+1 end
+    function hooks:finish(value) p.saved=p.saved+1 end
+    function hooks:restore() p.rules={price=10,hp=1} end
+    function hooks:fail(reason) error('unexpected config failure on '..id..': '..reason..'; '..wire_dump(p.sync:snapshot())..'; '..bus.control) end
+    local net={steam_digest=wire_hash,
+      steam_config_payload=function(_,text) bus.payload=text;return true end,
+      steam_config_control=function(_,text) bus.control=text;return true end,
+      steam_config_ack=function(_,text) bus.acks[id]=text;return true end,
+      steam_snapshot=function()
+        local members={}
+        for i,member in ipairs(ids) do members[i]={id=member,ack='gameplay-unchanged',configAck=bus.acks[member] or ''} end
+        return {lobbies={{id='l',owner='h',self=id,plan='gameplay-unchanged',members=members,
+          config={control=bus.control,payload=bus.payload,digest=wire_hash(bus.payload),complete=bus.complete}}}}
+      end}
+    p.sync=new(m.MultiplayerConfig,{lobby='l',owner='h',self=id,session='s',members=ids},hooks,net)
+    return p
+  end
+  local peers={};for i,id in ipairs(ids) do peers[i]=peer(id) end
+  local serial=peers[1].sync:propose(wire_dump({price=15,hp=1.5}))
+  local function tick(n) for _=1,n do clock=clock+1;for _,p in ipairs(peers) do p.sync:tick() end end end
+  tick(4);for _,p in ipairs(peers) do assert(p.applied==0 and p.wallet==123) end
+  bus.complete=true;tick(10)
+  for _,p in ipairs(peers) do assert(p.applied==1 and p.saved==1 and p.rules.price==15 and not p.sync:busy() and p.wallet==123) end
+  assert(peers[1].sync:result(serial).status=='applied')
+  tick(5);for _,p in ipairs(peers) do assert(p.applied==1 and p.saved==1) end
+''')
+print("PASS Lua 5.4: four-peer config barrier, incomplete payload, noSelf ABI, once-only apply and wallet preservation")
 
 # Execute the emitted recovery writer with Lua C-module calling conventions.
 # Never substitute an unsafe json.dump_file fallback when a DLL is older/missing.

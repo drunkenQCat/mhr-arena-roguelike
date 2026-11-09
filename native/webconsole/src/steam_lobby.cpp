@@ -102,6 +102,57 @@ bool writable(const std::string& text, const std::string& value, Id& lobby) {
     const auto self = api.self(api.user);
     return self && std::find(api.lobbies.begin(), api.lobbies.end(), lobby) != api.lobbies.end() && member_of(lobby, self);
 }
+constexpr size_t CONFIG_CHUNK_BYTES = 1800;
+constexpr size_t CONFIG_MAX_CHUNKS = 49; // ceil(base64(65536) / 1800).
+std::string chunk_key(size_t index) { return "mhr_arena_config_v1_part_" + std::to_string(index); }
+std::string encode_payload(const std::string& value) {
+    DWORD length = 0;
+    if (!CryptBinaryToStringA(reinterpret_cast<const BYTE*>(value.data()), static_cast<DWORD>(value.size()),
+                              CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, nullptr, &length)) return {};
+    std::string encoded(length, '\0');
+    if (!CryptBinaryToStringA(reinterpret_cast<const BYTE*>(value.data()), static_cast<DWORD>(value.size()),
+                              CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, encoded.data(), &length)) return {};
+    encoded.resize(length);
+    if (!encoded.empty() && encoded.back() == '\0') encoded.pop_back();
+    return encoded;
+}
+bool number(const std::string& value, size_t& out) {
+    const auto result = std::from_chars(value.data(), value.data() + value.size(), out);
+    return !value.empty() && result.ec == std::errc{} && result.ptr == value.data() + value.size();
+}
+SteamConfig read_config(Id lobby) {
+    SteamConfig out;
+    out.control = bounded(api.data(api.matchmaking, lobby, STEAM_CONFIG_CONTROL_KEY));
+    const auto manifest = bounded(api.data(api.matchmaking, lobby, STEAM_CONFIG_MANIFEST_KEY));
+    // A complete manifest seals ALL chunks, not just the most recent local write.
+    // Steam may deliver the manifest before some parts or retain old cached parts.
+    const auto first = manifest.find('|'), second = manifest.find('|', first == std::string::npos ? first : first + 1);
+    const auto third = manifest.find('|', second == std::string::npos ? second : second + 1);
+    if (first != 2 || manifest.substr(0, first) != "C1" || second == std::string::npos || third == std::string::npos) return out;
+    size_t count = 0, bytes = 0;
+    if (!number(manifest.substr(first + 1, second - first - 1), count) || count == 0 || count > CONFIG_MAX_CHUNKS ||
+        !number(manifest.substr(second + 1, third - second - 1), bytes) || bytes == 0 || bytes > STEAM_CONFIG_MAX_BYTES) return out;
+    const auto digest = manifest.substr(third + 1);
+    if (digest.size() != 64 || digest.find_first_not_of("0123456789abcdef") != std::string::npos) return out;
+    const size_t encoded_size = ((bytes + 2) / 3) * 4;
+    if (count != (encoded_size + CONFIG_CHUNK_BYTES - 1) / CONFIG_CHUNK_BYTES) return out;
+    std::string encoded;
+    encoded.reserve(encoded_size);
+    for (size_t i = 0; i < count; ++i) {
+        const auto part = bounded(api.data(api.matchmaking, lobby, chunk_key(i).c_str()));
+        const auto wanted = (std::min)(CONFIG_CHUNK_BYTES, encoded_size - encoded.size());
+        if (part.size() != wanted || part.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=") != std::string::npos) return out;
+        encoded += part;
+    }
+    DWORD decoded_size = static_cast<DWORD>(STEAM_CONFIG_MAX_BYTES);
+    std::string payload(STEAM_CONFIG_MAX_BYTES, '\0');
+    if (!CryptStringToBinaryA(encoded.c_str(), static_cast<DWORD>(encoded.size()), CRYPT_STRING_BASE64,
+                              reinterpret_cast<BYTE*>(payload.data()), &decoded_size, nullptr, nullptr)) return out;
+    payload.resize(decoded_size);
+    if (payload.size() != bytes || payload.find('\0') != std::string::npos || steam_digest(payload) != digest) return out;
+    out.complete = true; out.digest = digest; out.payload = std::move(payload);
+    return out;
+}
 }
 
 SteamSnapshot steam_snapshot() {
@@ -120,8 +171,10 @@ SteamSnapshot steam_snapshot() {
         const auto count = api.count(api.matchmaking, id);
         for (int i = 0; i < count; ++i) {
             const auto member = api.member(api.matchmaking, id, i);
-            lobby.members.push_back({std::to_string(member), bounded(api.member_data(api.matchmaking, id, member, STEAM_ACK_KEY))});
+            lobby.members.push_back({std::to_string(member), bounded(api.member_data(api.matchmaking, id, member, STEAM_ACK_KEY)),
+                                    bounded(api.member_data(api.matchmaking, id, member, STEAM_CONFIG_ACK_KEY))});
         }
+        lobby.config = read_config(id);
         out.lobbies.push_back(std::move(lobby));
     }
     if (out.lobbies.empty()) out.reason = "No active lobby observed; create or rejoin the game lobby after the plugin loaded";
@@ -137,6 +190,34 @@ bool steam_write_ack(const std::string& text, const std::string& value) {
     if (!writable(text, value, lobby)) return false;
     api.set_member_data(api.matchmaking, lobby, STEAM_ACK_KEY, value.c_str());
     return true; // Local submission only. Peers must observe the matching value.
+}
+bool steam_write_config_control(const std::string& text, const std::string& value) {
+    Id lobby = 0;
+    if (!writable(text, value, lobby) || api.owner(api.matchmaking, lobby) != api.self(api.user)) return false;
+    return api.set_data(api.matchmaking, lobby, STEAM_CONFIG_CONTROL_KEY, value.c_str());
+}
+bool steam_write_config_ack(const std::string& text, const std::string& value) {
+    Id lobby = 0;
+    if (!writable(text, value, lobby)) return false;
+    api.set_member_data(api.matchmaking, lobby, STEAM_CONFIG_ACK_KEY, value.c_str());
+    return true;
+}
+bool steam_write_config_payload(const std::string& text, const std::string& value) {
+    Id lobby = 0;
+    // Membership/ownership are checked before encoding, and again by Steam on
+    // every owner-only write. Never expose caller-controlled Steam metadata keys.
+    if (value.empty() || value.size() > STEAM_CONFIG_MAX_BYTES || value.find('\0') != std::string::npos ||
+        !writable(text, "", lobby) || api.owner(api.matchmaking, lobby) != api.self(api.user)) return false;
+    const auto encoded = encode_payload(value), digest = steam_digest(value);
+    if (encoded.empty() || digest.size() != 64) return false;
+    const auto count = (encoded.size() + CONFIG_CHUNK_BYTES - 1) / CONFIG_CHUNK_BYTES;
+    if (count == 0 || count > CONFIG_MAX_CHUNKS) return false;
+    for (size_t i = 0; i < count; ++i) {
+        const auto part = encoded.substr(i * CONFIG_CHUNK_BYTES, CONFIG_CHUNK_BYTES);
+        if (!api.set_data(api.matchmaking, lobby, chunk_key(i).c_str(), part.c_str())) return false;
+    }
+    const auto manifest = "C1|" + std::to_string(count) + "|" + std::to_string(value.size()) + "|" + digest;
+    return api.set_data(api.matchmaking, lobby, STEAM_CONFIG_MANIFEST_KEY, manifest.c_str());
 }
 std::string steam_digest(const std::string& value) {
     HCRYPTPROV provider = 0; HCRYPTHASH hash = 0;

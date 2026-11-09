@@ -127,11 +127,18 @@ int lua_steam_snapshot(lua_State* L) {
         for (const auto& pair : {std::pair{"id", &lobby.id}, {"owner", &lobby.owner}, {"self", &lobby.self}, {"plan", &lobby.plan}}) {
             lua_pushlstring(L, pair.second->data(), pair.second->size()); lua_setfield(L, -2, pair.first);
         }
+        lua_newtable(L);
+        for (const auto& pair : {std::pair{"control", &lobby.config.control}, {"payload", &lobby.config.payload}, {"digest", &lobby.config.digest}}) {
+            lua_pushlstring(L, pair.second->data(), pair.second->size()); lua_setfield(L, -2, pair.first);
+        }
+        lua_pushboolean(L, lobby.config.complete); lua_setfield(L, -2, "complete");
+        lua_setfield(L, -2, "config");
         lua_newtable(L); int member_index = 1;
         for (const auto& member : lobby.members) {
             lua_newtable(L);
             lua_pushlstring(L, member.id.data(), member.id.size()); lua_setfield(L, -2, "id");
             lua_pushlstring(L, member.ack.data(), member.ack.size()); lua_setfield(L, -2, "ack");
+            lua_pushlstring(L, member.config_ack.data(), member.config_ack.size()); lua_setfield(L, -2, "configAck");
             lua_rawseti(L, -2, member_index++);
         }
         lua_setfield(L, -2, "members"); lua_rawseti(L, -2, index++);
@@ -150,6 +157,24 @@ int lua_steam_write(lua_State* L, bool plan) {
 }
 int lua_steam_plan(lua_State* L) { return lua_steam_write(L, true); }
 int lua_steam_ack(lua_State* L) { return lua_steam_write(L, false); }
+int lua_steam_config_write(lua_State* L, int kind) {
+    size_t id_length = 0, length = 0;
+    const auto* id = luaL_checklstring(L, 1, &id_length);
+    const auto* value = luaL_checklstring(L, 2, &length);
+    luaL_argcheck(L, id_length > 0 && id_length <= 20, 1, "invalid lobby ID");
+    luaL_argcheck(L, length <= (kind == 0 ? webconsole::STEAM_CONFIG_MAX_BYTES : 2048), 2, "configuration channel value too large");
+    bool ok = false;
+    try {
+        const std::string lobby(id, id_length), body(value, length);
+        ok = kind == 0 ? webconsole::steam_write_config_payload(lobby, body)
+             : kind == 1 ? webconsole::steam_write_config_control(lobby, body)
+                         : webconsole::steam_write_config_ack(lobby, body);
+    } catch (...) { /* No C++ exception crosses the host Lua C ABI. */ }
+    lua_pushboolean(L, ok); return 1;
+}
+int lua_steam_config_payload(lua_State* L) { return lua_steam_config_write(L, 0); }
+int lua_steam_config_control(lua_State* L) { return lua_steam_config_write(L, 1); }
+int lua_steam_config_ack(lua_State* L) { return lua_steam_config_write(L, 2); }
 int lua_steam_digest(lua_State* L) {
     size_t length = 0; const auto* value = luaL_checklstring(L, 1, &length);
     luaL_argcheck(L, length <= 262144, 1, "descriptor too large");
@@ -169,11 +194,27 @@ int lua_write_recovery(lua_State* L) {
     lua_pushboolean(L, ok); return 1;
 }
 
+int lua_write_config(lua_State* L) {
+    size_t name_length = 0, body_length = 0;
+    const auto* name = luaL_checklstring(L, 1, &name_length);
+    const auto* body = luaL_checklstring(L, 2, &body_length);
+    luaL_argcheck(L, name_length <= 64, 1, "invalid config filename");
+    luaL_argcheck(L, body_length > 0 && body_length <= 262144, 2, "config too large or empty");
+    bool ok = false;
+    try { ok = webconsole::write_config(std::string(name, name_length), std::string(body, body_length)); }
+    catch (...) { /* Keep C++ allocation failures inside the native boundary. */ }
+    lua_pushboolean(L, ok); return 1;
+}
+
 const luaL_Reg MODULE_FUNCS[] = {
     { "write_recovery", lua_write_recovery },
+    { "write_config", lua_write_config },
     { "steam_snapshot", lua_steam_snapshot },
     { "steam_plan", lua_steam_plan },
     { "steam_ack", lua_steam_ack },
+    { "steam_config_payload", lua_steam_config_payload },
+    { "steam_config_control", lua_steam_config_control },
+    { "steam_config_ack", lua_steam_config_ack },
     { "steam_digest", lua_steam_digest },
     { "ping", lua_ping },
     { "version", lua_version },

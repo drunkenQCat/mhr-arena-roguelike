@@ -6,7 +6,7 @@ import { renameArmor, emptyWeightedPools } from "./equipment-model";
 import { changes, editorConfig, monsters, parameterLabel, poolIssues, preview, validateConfig, type RogueConfig } from "./editor-model";
 import { downloadJson } from "./api";
 
-const props = defineProps<{ config: unknown; version: number; serverVersion: number; sessionChanged: boolean; busy: boolean; connected: boolean; message: string }>();
+const props = defineProps<{ config: unknown; version: number; serverVersion: number; sessionChanged: boolean; busy: boolean; connected: boolean; message: string;blockedReason?:string }>();
 const emit = defineEmits<{ load: []; submit: [config: RogueConfig, version: number] }>();
 const draft = ref<RogueConfig | null>(null);
 const baseline = ref<RogueConfig | null>(null);
@@ -147,7 +147,7 @@ function applyRaw() {
   catch (e) { localMessage.value = `JSON 无效：${String(e)}`; }
 }
 function submit() {
-  if (error.value || !draft.value || conflict.value || props.busy) return;
+  if (error.value || !draft.value || conflict.value || props.busy||props.blockedReason||!props.connected) return;
   localMessage.value = "";
   emit("submit", validateConfig(draft.value), props.version);
 }
@@ -156,7 +156,7 @@ function submit() {
 <template>
   <section class="editor panel">
     <div class="section-heading"><div><p class="eyebrow">DESIGN WORKBENCH</p><h2>策划工作台</h2>
-      <p class="muted">编辑草稿并与已载入方案比较。当前战斗和奖励不会中途重算。</p><p class="muted">开局装备、抽装池与增益数值下一局生效；单人其他设置按各项提示生效。联机配置必须全队一致；修改时全队先回村并完成恢复，再分别保存同一方案；之后可直接准备新局，无需重载脚本。当前联机局不会热换规则。</p></div>
+      <p class="muted">编辑草稿并与已载入方案比较。当前战斗和奖励不会中途重算。</p><p class="muted">联机局内由房主在清波、全员集结和交易完成后提交，全队自动校验并保存后解除屏障。价格用于后续交易；曲线和怪池在下次生成选择时生效；已生成的选项不重算。起始 PT、猫车上限、开局装备、抽装池、增益数值和流程节奏留到下一局。首次准备前，各端仍须使用相同配置。</p></div>
       <span class="badge">已载入 v{{ version }} · 游戏 v{{ serverVersion }}</span></div>
     <div class="toolbar">
       <button :disabled="busy || !connected || diff.length > 0" @click="emit('load')">载入游戏配置</button>
@@ -291,8 +291,8 @@ function submit() {
       </div>
       </div><BalancePreview :draft="draft" :baseline="baseline" v-model:layer="previewLayer" v-model:players="players" v-model:unlocked="unlockAll" /></div>
       <details class="advanced"><summary @click="rawText = JSON.stringify(draft, null, 2)">高级：JSON 草稿</summary><textarea v-model="rawText" rows="12" aria-label="高级 JSON 草稿" spellcheck="false" /><button @click="applyRaw">将 JSON 应用到表单草稿</button></details>
-      <div class="submit-bar"><span>{{ error ? '请先修正上方配置错误' : '价格下次交易生效；曲线和怪池下次生成生效；装备、抽装池与增益下一局生效' }}</span>
-        <button class="primary" :disabled="!!error || !diff.length || busy || !connected || conflict" @click="submit">{{ busy ? '等待游戏确认…' : '校验并提交到游戏' }}</button></div>
+      <div class="submit-bar"><span>{{ blockedReason || (error ? '请先修正上方配置错误' : '价格下次交易生效；曲线和怪池下次生成生效；装备、抽装池与增益下一局生效') }}</span>
+        <button class="primary" :disabled="!!blockedReason || !!error || !diff.length || busy || !connected || conflict" @click="submit">{{ busy ? '等待游戏确认…' : '校验并提交到游戏' }}</button></div>
     </template>
   </section>
 </template>

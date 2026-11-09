@@ -6,12 +6,10 @@ namespace webconsole {
 enum class RecoveryWriteStage { Created, Written, Flushed, Published };
 using RecoveryWriteObserver = bool (*)(RecoveryWriteStage);
 
-// Only recovery journals, never a caller-controlled path. The observer is a
-// native test seam for interrupted writes; it is not exposed to Lua or HTTP.
-inline bool write_recovery(const std::string& name, const std::string& body,
-                           RecoveryWriteObserver observer = nullptr) noexcept {
-    if ((name != "mhw_rogue_startup_state.json" && name != "mhw_rogue_pouch_state.json") ||
-        body.empty() || body.size() > 2 * 1024 * 1024 || g_data_dir.empty()) return false;
+// Internal primitive; public wrappers below select fixed filenames and limits.
+// The observer is a native test seam, never exposed to Lua or HTTP.
+inline bool write_document_atomic(const std::string& name, const std::string& body,
+                                  RecoveryWriteObserver observer = nullptr) noexcept {
     static std::mutex mutex;
     static std::atomic<unsigned long long> sequence{0};
     HANDLE handle = INVALID_HANDLE_VALUE;
@@ -48,6 +46,20 @@ inline bool write_recovery(const std::string& name, const std::string& body,
         if (!temporary.empty()) DeleteFileW(temporary.c_str());
         return false;
     }
+}
+
+inline bool write_recovery(const std::string& name, const std::string& body,
+                           RecoveryWriteObserver observer = nullptr) noexcept {
+    if ((name != "mhw_rogue_startup_state.json" && name != "mhw_rogue_pouch_state.json") ||
+        body.empty() || body.size() > 2 * 1024 * 1024 || g_data_dir.empty()) return false;
+    return write_document_atomic(name, body, observer);
+}
+
+inline bool write_config(const std::string& name, const std::string& body,
+                         RecoveryWriteObserver observer = nullptr) noexcept {
+    if ((name != "mhw_rogue_config.json" && name != "mhw_rogue_config_pending.json") ||
+        body.empty() || body.size() > 262144 || g_data_dir.empty()) return false;
+    return write_document_atomic(name, body, observer);
 }
 
 } // namespace webconsole

@@ -1,10 +1,12 @@
 import { MultiplayerRun } from "./multiplayer_run";
+import { ConfigStore } from "./config_store";
+import {ConfigRecovery} from "./config_recovery";
 import { MultiplayerEntry } from "./multiplayer_entry";
 import { RunCore } from "../core/run_core";
 import { RunSession } from "../core/run_session";
 import { makeQuestPlan } from "../core/quest_plan";
 import type { WaveOption } from "../core/run_state";
-import { monsterCatalog } from "./default_config";
+import { defaultConfig,monsterCatalog } from "./default_config";
 import { drawHud } from "./hud";
 import { loadConfig } from "./load_config";
 import { NativeRuntime } from "./native_runtime";
@@ -16,14 +18,24 @@ import { RecoverySave } from "./recovery_save";
 import { captureRecoveryCommit, commitRecovery } from "./recovery_commit";
 import { BuffService } from "./buff_service";
 import { GachaService } from "./gacha";
-import { DEFAULT_BUFF_AMOUNTS, type RogueConfig } from "../core/config";
+import { DEFAULT_BUFF_AMOUNTS,validateConfig, type RogueConfig } from "../core/config";
 import type { ServiceEffects } from "./shop_window";
 import type { BuffKind } from "./buff_service";
 import { clockSeconds, reframework, rejson, relog } from "./sdk";
 import { entryHostTestScope } from "./entry_host_scope";
 
 try {
-  let config = loadConfig();
+  let config:RogueConfig,configLoadError:string|null=null;
+  try{config=loadConfig();}
+  catch(e){
+    // Keep the inventory recovery machinery alive even if a planner journal
+    // is corrupt. These defaults are RECOVERY ONLY; all new preparation and
+    // config edits stay blocked until the original proposal is resolved.
+    config=validateConfig(defaultConfig);configLoadError=`配置恢复待办：${String(e)}`;
+    relog.warn(`[MhwRogue] ${configLoadError}；仅运行个人原装恢复，禁止新局`);
+  }
+  const configRecovery=new ConfigRecovery();
+  configRecovery.message=configLoadError;
   // Retained across coordinator/session replacement; internal entry quest IDs
   // never overwrite the user's base configuration.
   const configSubmitted=(next: RogueConfig) => {
@@ -38,6 +50,7 @@ try {
   const buffs = new BuffService(config.buffAmounts ?? DEFAULT_BUFF_AMOUNTS);
   const configureServices=(next:RogueConfig) => buffs.configure(next.buffAmounts ?? DEFAULT_BUFF_AMOUNTS);
   let runtime = new NativeRuntime(config, installer, gacha, false, configureServices);
+  runtime.setConfigRecoveryNotice(configRecovery.message);
   let session = new RunSession(core, monsterCatalog, runtime, configSubmitted);
   const recoverySave=new RecoverySave({prepare:()=>session.prepareForNativeSave(),
     capture:captureRecoveryCommit,commit:commitRecovery,report:(event,detail)=>runtime.report(event,detail)});
@@ -59,7 +72,7 @@ try {
   let shopWindow = new ShopWindow(session.core, () => session.canShop(), () => session.shopQuest(), services);
   let entryAttached = false;
   let previousRun: ReturnType<RunSession["runSummary"]> | null = null;
-  const multiplayerEntry = new MultiplayerEntry(() => config, monsterCatalog, () => !entryAttached &&
+  const multiplayerEntry = new MultiplayerEntry(() => config, monsterCatalog, () => !configRecovery.message&&!entryAttached &&
     ((session.stage === "Preparing" && session.startupStatus.prepared) ||
       (["Idle", "Finished", "Fault"].includes(session.stage) && !session.startupStatus.restorePending)), undefined, {
     prepared: () => session.startupStatus.prepared,
@@ -74,7 +87,7 @@ try {
     cancel: () => { if (session.stage === "Preparing") session.stop(); },
   });
   let webConsole: WebConsoleBridge | null = null;
-  try { webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun); }
+  try { webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun,undefined,()=>config); }
   catch (error) { relog.warn(`[MhwRogue] webconsole unavailable: ${String(error)}`); }
   // Offline mock only; NativeRuntime gives an attached real roster priority.
   runtime.setPartySizeSource(() => webConsole?.partyRosterSize() ?? null);
@@ -92,7 +105,8 @@ try {
         if (entry) {
           entryAttached = true;
           if (!session.startupStatus.prepared || session.stage !== "Preparing") throw new Error("联机个人开局准备未完成");
-          multiplayerRun = new MultiplayerRun(entry, core.config, monsterCatalog, session, runtime, () => shopWindow.busy);
+          multiplayerRun = new MultiplayerRun(entry, core.config, monsterCatalog, session, runtime, () => shopWindow.busy,undefined,
+            {userConfig:()=>config,store:new ConfigStore()});
           runtime.setMultiplayer(multiplayerRun);
           const adopted = session.adoptMultiplayerEntry(entry.plan);
           if (!adopted.ok) throw new Error(adopted.message ?? "Cannot adopt multiplayer entry");
@@ -114,10 +128,19 @@ try {
           const adopted = session.adoptPostedEntry(entry.plan);
           if (!adopted.ok) throw new Error(adopted.message ?? "Cannot adopt entry quest");
           shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
-          webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun, nativeUi);
+          webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun, nativeUi,()=>config);
         }
       }
       runtime.tick(); shopWindow.tick(); session.tick();
+      const local=session.readingSnapshot;
+      const previousConfigNotice=configRecovery.message;
+      configRecovery.tick(["Idle","Finished","Fault"].includes(session.stage)&&!session.startupStatus.restorePending&&
+        !!local?.canPost&&!local.quest&&local.players.length>0);
+      if(previousConfigNotice&&!configRecovery.message){
+        try{const restored=loadConfig();session.applyConfig({...restored,quest:{...restored.quest,id:core.config.quest.id}});session.configurationRecovered();}
+        catch(e){configRecovery.message=`配置仍需修复或安全重载：${String(e)}`;}
+      }
+      runtime.setConfigRecoveryNotice(configRecovery.message);
       if (multiplayerRun) multiplayerRun.tick(); else multiplayerEntry.tick();
       const r = session.readingSnapshot;
       if (["Finished", "Fault"].includes(session.stage) && !shopWindow.busy && !session.startupStatus.restorePending &&
@@ -128,7 +151,7 @@ try {
         core = new RunCore(config); session = new RunSession(core, monsterCatalog, runtime, configSubmitted);
         shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
         const nativeUi = webConsole?.newScriptSession();
-        webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun, nativeUi);
+        webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun, nativeUi,()=>config);
         runtime.report("multiplayer-ready-for-new-run", { restored: true });
       }
       buffs.tick(session.readingSnapshot, { stage: session.stage, layer: core.state.layer, questId: core.config.quest.id, multiplayer: runtime.multiplayerValid() || session.stage === "Preparing" });

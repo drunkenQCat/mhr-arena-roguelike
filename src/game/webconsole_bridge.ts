@@ -44,6 +44,9 @@ export class WebConsoleBridge {
   private effect: { id: string; kind: "kill" | "teleport"; unique: number; token: number;
     deadline: number; targets?: number[]; destination?: { x: number; y: number; z: number } } | null = null;
   private purchase: { id: string; version: number } | null = null;
+  private configuration: {id:string;serial:number;receipt?:Outcome}|null=null;
+  private configRevision=0;
+  private externalConfigRevision=0;
 
   private readonly party: PartySession;
 
@@ -53,7 +56,7 @@ export class WebConsoleBridge {
   constructor(private readonly session: RunSession, private readonly runtime: NativeRuntime,
     private readonly shop: ShopWindow, private readonly serviceStatus: () => unknown = () => null,
     party?: PartySession, private readonly multiplayerEntry?: MultiplayerEntry, private readonly previousRun: () => unknown = () => null,
-    nativeUi?: NativeUi) {
+    nativeUi?: NativeUi,private readonly editableConfig:()=>ReturnType<RunSession["configForEditing"]>=()=>this.session.configForEditing()) {
     this.party = party ?? new PartySession(this.session.configForEditing(), { layer: () => this.session.core.state.layer }, `run-${clockSeconds()}`);
     this.transport = loadWebconsole();
     this.bridgeId = `${this.transport.epoch()}-${clockSeconds()}-${Math.floor(Math.random() * 0xffffffff).toString(16)}`;
@@ -74,6 +77,18 @@ export class WebConsoleBridge {
     if (this.closed) return;
     try {
       if (this.pendingReceipt && !this.writeResults(this.pendingReceipt)) return;
+      const revision=this.runtime.multiplayerConfigRevision?.()??0;
+      if(revision!==this.configRevision){this.configRevision=revision;this.configVersion++;}
+      if(this.externalConfigRevision!==this.session.externalConfigRevision){this.externalConfigRevision=this.session.externalConfigRevision;this.configVersion++;}
+      if(this.configuration){
+        const outcome=this.runtime.multiplayerConfigResult?.(this.configuration.serial);
+        if(outcome){
+          const old=this.results.find(r=>r.id===this.configuration!.id);
+          const receipt=Object.assign(old??this.configuration.receipt??{id:this.configuration.id},outcome,{configVersion:this.configVersion});
+          if(!this.writeResults(receipt))return;
+          this.configuration=null;
+        }
+      }
       this.pollEffect();
       const endedQuest = this.session.readingSnapshot?.quest;
       if (["Finished", "Fault"].includes(this.session.stage) && this.session.plan && endedQuest?.id === this.session.plan.questId && !endedQuest.playing)
@@ -175,7 +190,7 @@ export class WebConsoleBridge {
     } else {
       try {
         if (staleBridge) throw new Error("连接会话已更换，请等待同步后重试");
-        if (["choose", "buy", "killAll", "stop", "teleport"].includes(cmd.cmd ?? "")) {
+        if (["choose", "buy", "killAll", "stop", "teleport", "submitConfig"].includes(cmd.cmd ?? "")) {
           if (cmd.questUnique !== this.session.readingSnapshot?.quest?.unique &&
             !(cmd.questUnique === null && !this.session.readingSnapshot?.quest))
             throw new Error("任务实例已变化，此操作已拒绝");
@@ -185,6 +200,7 @@ export class WebConsoleBridge {
         // 指纹已覆盖全部语义字段（评审二轮 #3），缓存条目不再需要 __fp 参与命中
         // 判断（同 id 异载荷已直接拒绝），但保留在回执里供对账。
         result = { id: cmd.id, __fp: fingerprint, ...this.execute(cmd) };
+        if(this.configuration?.id===cmd.id)this.configuration.receipt=result;
       } catch (error) { result = { id: cmd.id, __fp: fingerprint, status: "rejected", message: String(error) }; }
       this.results.push(result);
       if (this.results.length > 30) this.results.shift();
@@ -229,17 +245,26 @@ export class WebConsoleBridge {
         this.nativeUi.beginReturn(q.id, q.unique);
         return { status: "applied", message: "已接管原生结算，请等待返回村庄" };
       }
-      case "getConfig": return { status: "applied", message: "已读取游戏配置（含下一局规则）", config: s.configForEditing(),
+      case "getConfig": {
+        const blocked=this.runtime.configurationRecoveryPending?.();if(blocked)throw new Error(blocked);
+        return { status: "applied", message: "已读取游戏配置（含下一局规则）", config: this.editableConfig(),
         activeRules: { startPt: s.core.config.startPt, maxCarts: s.core.config.maxCarts,
           runtime: s.settings }, configVersion: this.configVersion };
+      }
       case "submitConfig": {
-        if (s.multiplayerRole || s.stage === "Preparing") throw new Error("联机准备或局中不支持单机修改配置；请停局后全队同步配置再开局");
+        const blocked=this.runtime.configurationRecoveryPending?.();if(blocked)throw new Error(blocked);
+        if (s.stage === "Preparing") throw new Error("已准备的个人装备和开局规则不能改变；请先取消准备");
+        if(this.configuration||this.runtime.multiplayerConfigBusy?.())throw new Error("联机配置仍在同步，请等待完整回执");
         if (this.shop.busy) throw new Error("请等待商店交易完成后提交配置");
         if (cmd.configVersion !== this.configVersion) throw new Error("配置已被其他页面修改，请重新载入并合并");
         const cfg = validateConfig(cmd.config);
-        const old = s.configForEditing();
+        const old = this.editableConfig();
         if (cfg.quest.id !== old.quest.id || cfg.quest.baseId !== old.quest.baseId || cfg.quest.mapNo !== old.quest.mapNo)
           throw new Error("任务身份只读，需要离线修改并重载脚本");
+        if(s.multiplayerRole){
+          const serial=this.runtime.submitMultiplayerConfig(cfg);this.configuration={id:cmd.id!,serial};
+          return{status:"queued",serial,message:"等待全队校验、应用并保存；期间暂停选波和交易"};
+        }
         s.validateConfigForSession(cfg);
         validateEquipmentConfig(cfg);
         // Preserve schema arrays: REF's encoder turns empty Lua tables into null.
@@ -448,9 +473,9 @@ export class WebConsoleBridge {
       shopBusy: this.shop.busy, shopNotice: this.shop.notice, message: s.message,
       runtimeStatus: this.runtime.status(),
       ui: this.uiSection(),
-      control: { ready, nextRoute: s.nextRoute, configuredRoute: next.runtime?.route ?? s.settings.route,
+      control: { ready, configRecovery:this.runtime.configurationRecoveryPending?.()??null,nextRoute: s.nextRoute, configuredRoute: next.runtime?.route ?? s.settings.route,
         startReason: canStart ? null : !idle ? "当前一局尚未结束" : s.startupStatus.restorePending ? s.startupMessage ?? "请先回村，等待原装备与背包恢复完成"
-          : !ready ? "等待任务安装和原生接口就绪" : r?.online ? "当前仅支持单人开局" : "请在村庄、未接任务时开局",
+          : !ready ? this.runtime.configurationRecoveryPending?.()??"等待任务安装和原生接口就绪" : r?.online ? "当前仅支持单人开局" : "请在村庄、未接任务时开局",
         startup: s.startupStatus, startupRules: next.startupRules ?? null, armorSets: next.armorSets ?? {},
         testLayers: next.pools.map((pool) => pool.from),
         activeWave: s.plan ? { ...s.plan.wave, token: s.plan.token, monsterIds: s.plan.monsterIds, layer: s.plan.layer } : null,

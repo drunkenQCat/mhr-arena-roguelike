@@ -5,12 +5,12 @@ import { RunCore } from "../core/run_core";
 import { makeQuestPlan } from "../core/quest_plan";
 
 const h=vi.hoisted(()=>({config:null as any,frames:[] as (()=>void)[],bridges:[] as any[],
-  runtimes:[] as any[],entries:[] as any[],gachas:[] as any[],buffs:[] as any[],errors:[] as any[]}));
-vi.mock("./load_config",()=>({loadConfig:()=>h.config}));
+  runtimes:[] as any[],entries:[] as any[],gachas:[] as any[],buffs:[] as any[],errors:[] as any[],configError:false,startupPending:false,restoreCalls:0}));
+vi.mock("./load_config",()=>({loadConfig:()=>{if(h.configError)throw new Error("corrupt configuration journal");return h.config;}}));
 vi.mock("./sdk",()=>({clockSeconds:()=>100,reframework:{
   onFrame:(f:()=>void)=>h.frames.push(f),onDrawUi:()=>{},onScriptReset:()=>{}},
-  rejson:{dump_string:JSON.stringify,dump_file:()=>true},relog:{info:()=>{},warn:()=>{},error:(e:any)=>h.errors.push(e)}}));
-vi.mock("./equip_wear",()=>({startupRecoveryPending:()=>false}));
+  refFs:{read:()=>"",glob:()=>[]},rejson:{dump_string:JSON.stringify,dump_file:()=>true},relog:{info:()=>{},warn:()=>{},error:(e:any)=>h.errors.push(e)}}));
+vi.mock("./equip_wear",()=>({startupRecoveryPending:()=>h.startupPending}));
 vi.mock("./recovery_save",()=>({RecoverySave:class {tick(){}}}));
 vi.mock("./recovery_commit",()=>({captureRecoveryCommit:()=>null,commitRecovery:()=>{}}));
 vi.mock("./entry_host_scope",()=>({entryHostTestScope:()=>false}));
@@ -26,10 +26,11 @@ vi.mock("./buff_service",()=>({BuffService:class {
 vi.mock("./native_runtime",()=>({NativeRuntime:class {
   config:any;constructor(c:any,public installer:any,private gacha:any,_test:boolean,private services:any){this.config=c;h.runtimes.push(this);}
   configureRun(c:any){this.config=c;this.gacha.configure(c.gachaPools??{});this.services(c);}
-  rebind(c:any,i:any){this.config=c;this.installer=i;}setPartySizeSource(){}setMultiplayer(){}tick(){}shutdown(){}
-  now(){return 100;}ready(){return true;}report(){}policy(){}cancelPost(){}takeDeaths(){return [];}postingError(){return null;}
+  configNotice:string|null=null;
+  rebind(c:any,i:any){this.config=c;this.installer=i;}setPartySizeSource(){}setMultiplayer(){}tick(){}shutdown(){}setConfigRecoveryNotice(m:string|null){this.configNotice=m;}
+  now(){return 100;}ready(){return this.configNotice===null;}report(){}policy(){}cancelPost(){}takeDeaths(){return [];}postingError(){return null;}
   read(){return {time:100,quest:null,online:false,canPost:true,enemies:[],deaths:0,players:[{id:0,position:{x:1,y:2,z:3}}]};}
-  startupPrepare(){return {ok:true};}startupRestore(){return {ok:true};}multiplayerValid(){return false;}
+  startupPrepare(){return {ok:true};}startupRestore(){h.restoreCalls++;return {ok:true};}multiplayerValid(){return false;}
 }}));
 vi.mock("./shop_window",()=>({ShopWindow:class {busy=false;tick(){}draw(){}}}));
 vi.mock("./webconsole_bridge",()=>({WebConsoleBridge:class {
@@ -42,7 +43,7 @@ vi.mock("./multiplayer_entry",()=>({MultiplayerEntry:class {
 vi.mock("./multiplayer_run",()=>({MultiplayerRun:class {}}));
 
 beforeEach(async()=>{
-  vi.resetModules();h.config=validateConfig(structuredClone(defaultConfig));
+  vi.resetModules();h.configError=false;h.startupPending=false;h.restoreCalls=0;h.config=validateConfig(structuredClone(defaultConfig));
   for(const key of ["frames","bridges","runtimes","entries","gachas","buffs","errors"] as const)h[key].length=0;
   await import("./main");expect(h.errors).toEqual([]);expect(h.bridges).toHaveLength(1);
 });
@@ -78,4 +79,14 @@ it("keeps the selected solo route when the app creates the next session",()=>{
   expect(h.entries[0].source().quest.id).toBe(900102);
   for(const frame of h.frames)frame();
   expect(h.bridges[1].session.nextRoute).toBe("reentry");
+});
+it("boots a recovery-only coordinator after a corrupt planner journal, without permitting a new run",async()=>{
+ vi.resetModules();h.configError=true;h.startupPending=true;const count=h.bridges.length;await import("./main");
+ expect(h.errors).toEqual([]);expect(h.bridges).toHaveLength(count+1);
+ const runtime=h.runtimes.at(-1),session=h.bridges.at(-1).session;
+ expect(runtime.configNotice).toContain("配置恢复待办");expect(runtime.ready()).toBe(false);
+ expect(session.start(session.core.config.armorOptions[0]).ok).toBe(false);
+ // Recovery callbacks are still registered; bootstrap has not exited early.
+ expect(h.frames.length).toBeGreaterThan(0);
+ session.tick();expect(h.restoreCalls).toBeGreaterThan(0);
 });

@@ -25,6 +25,17 @@ const heartbeat = new Freshness();
 const developerMode = ref(false);
 let alive = true, timer: ReturnType<typeof setTimeout> | undefined, loadedBridge = "";
 const connected = computed(() => !stale.value && state.value?.protocol === 4);
+const configBlockedReason=computed(()=>{
+  const s=state.value,mp=s?.multiplayerRun;
+  if(s?.control?.configRecovery)return '配置恢复尚未完成，暂不能修改方案或开始新局；请保留现场并下载反馈日志。';
+  if(s?.sessionStage==='Preparing')return '个人开局准备已执行；修改规则前请先取消准备。';
+  if(mp?.live){
+    if(mp.configSync?.busy)return '全队正在确认配置；完成前暂停选波和交易。';
+    if(mp.role==='guest')return '联机局内由房主提交配置，队友自动校验；你仍可编辑并导出草稿。';
+    if(!s?.capabilities?.choose)return '房主须等全员清波集结、交易完成后再提交配置。';
+  }
+  return '';
+});
 watch(() => state.value?.sessionStage, (stage, previous) => {
   if (stage === "Preparing" && previous !== stage && page.value === "multiplayer") page.value = "play";
 });
@@ -51,7 +62,7 @@ async function send(cmd: string, extra: Record<string, unknown> = {}): Promise<C
       if (!(error instanceof SubmissionUncertain)) throw error;
       id = error.requestId; notice.value = error.message;
     }
-    const result = await waitForReceipt(id, bridge, { purchase: cmd === "buy", effect: cmd === "killAll" || cmd === "teleport", alive: () => alive,
+    const result = await waitForReceipt(id, bridge, { purchase: cmd === "buy", effect: cmd === "killAll" || cmd === "teleport", configuration:cmd==="submitConfig", alive: () => alive,
       onPacket: (packet) => { results.value = packet.history ?? []; } });
     const labels: Record<string, string> = { startRun: '已开始本局', choose: '已选择波次', setRoute: '路线已更新', setInvincible: '无敌设置已更新', killAll: '目标状态已确认', teleport: '位置已确认', stop: '已停止，正在通过原生结算返回村庄', retryPost: '已提交出发请求', getConfig: '配置已读取', buy: '购买完成' };
     notice.value = result.status === 'applied' ? (cmd === 'buy' ? '购买完成，结果显示在商店中' : labels[cmd] ?? result.message ?? '操作完成') : `${result.status === 'queued' ? '游戏已排队，等待实际结果' : result.status === 'uncertain' ? '结果待核实，请勿重试' : '已拒绝'}：${result.message ?? '请检查当前条件'}`;
@@ -112,6 +123,8 @@ onUnmounted(() => { alive = false; clearTimeout(timer); window.removeEventListen
     <p v-if="state?.testMode" class="alert">隔离验证环境：执行编译后的 Lua，玩家、怪物、背包与传输使用测试替身，不会操作实际游戏。</p>
     <p v-if="state && state.protocol !== 4" class="alert">网页与游戏脚本版本不匹配，操作已暂停。请先安全结束任务、回村并完成保存，再更新匹配版本；不要在任务中重载脚本。</p>
     <NativeNotice :state="state" :connected="connected" :busy="busy" @command="send" />
+    <p v-if="state?.control?.configRecovery" class="alert" role="status">配置需要恢复，开局和调参已暂停。请在“帮助与连接”下载日志反馈；个人原装备恢复仍会继续。</p>
+    <p v-if="state?.multiplayerRun?.configSync?.busy" class="notice" role="status">房主配置正在全队同步：{{ state.multiplayerRun.configSync.message }}。选波与购买暂时暂停，请勿重载脚本。</p>
     <nav class="toolbar topnav" aria-label="控制台导航">
       <button :class="{ selected: page === 'play' }" :aria-pressed="page === 'play'" @click="page = 'play'">当前局</button>
       <button :class="{ selected: page === 'multiplayer' }" :aria-pressed="page === 'multiplayer'" @click="page = 'multiplayer'">联机大厅</button>
@@ -131,7 +144,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); window.removeEventListen
     </template>
     <MultiplayerEntry v-if="page === 'multiplayer'" :entry="state?.multiplayerEntry" :run="state?.multiplayerRun" :connected="connected" :busy="busy || !connected" @command="send" @play="page = 'play'" />
     <PlayWorkspace v-show="page === 'play'" :state="state" :connected="connected" :busy="busy" :notice="notice" :developer-mode="developerMode" @command="send" @multiplayer="page = 'multiplayer'" />
-    <ConfigEditor v-show="page === 'design'" :config="config" :version="loadedVersion" :server-version="state?.configVersion ?? loadedVersion" :session-changed="!!configBridgeId && configBridgeId !== state?.bridgeId" :busy="busy" :connected="connected" :message="configMessage" @load="loadConfig" @submit="submitConfig" />
+    <ConfigEditor v-show="page === 'design'" :config="config" :version="loadedVersion" :server-version="state?.configVersion ?? loadedVersion" :session-changed="!!configBridgeId && configBridgeId !== state?.bridgeId" :busy="busy" :connected="connected" :message="configMessage" :blocked-reason="configBlockedReason" @load="loadConfig" @submit="submitConfig" />
     <section v-if="page === 'events'" class="panel"><div class="section-heading"><h2>命令记录</h2><button @click="downloadJson('console-results.json', results)">导出记录</button></div><label>筛选记录 <input v-model="filter" placeholder="状态 / 请求 ID / 消息" /></label><p class="muted">applied 表示命令已执行；queued 仍需等待游戏结果；rejected 表示未执行。</p><article v-for="r in recent" :key="r.id" class="event"><span :class="['badge', r.status === 'applied' ? 'live' : r.status === 'queued' ? 'pending' : 'warning']">{{ r.status }}</span><span>{{ r.message ?? (r.config ? '已读取游戏配置' : '') }}</span><small class="mono">{{ r.id }}</small></article></section>
   </main>
 </template>

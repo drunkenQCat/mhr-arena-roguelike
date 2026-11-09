@@ -8,11 +8,14 @@ import { validateConfig } from "../core/config";
 import { defaultConfig, monsterCatalog } from "./default_config";
 import type { NativeRuntime } from "./native_runtime";
 import type { NativeWebconsole } from "./sdk";
+import {ConfigStore,CONFIG_FILE} from "./config_store";
 const mock = vi.hoisted(() => ({ now:100, valid:true }));
 vi.mock("./multiplayer_scope", () => ({ multiplayerScope: () => mock.valid }));
 vi.mock("./sdk", () => ({ clockSeconds:()=>mock.now, rejson:{ dump_string:JSON.stringify, load_string:JSON.parse } }));
-function fixture(size=2) {
-  const bus = { plan:"", members:["h","g","g2","g3"].slice(0,size), owner:"h", acks:{} as Record<string,string> };
+vi.mock("./equipment_catalog",()=>({validateEquipmentConfig:()=>{}}));
+function fixture(size=2,configUpdates=false) {
+  const bus = { plan:"", members:["h","g","g2","g3"].slice(0,size), owner:"h", acks:{} as Record<string,string>,
+    configControl:"",configPayload:"",complete:true,configAcks:{} as Record<string,string> };
   const make = (self:string) => {
     const cfg=validateConfig(defaultConfig); cfg.quest={...cfg.quest,id:900103};
     cfg.runtime={...cfg.runtime!,carveSeconds:1,campDwellSeconds:0,pollSeconds:1};
@@ -25,20 +28,33 @@ function fixture(size=2) {
       post:vi.fn(),cancelPost:vi.fn(),postingError:()=>null,takeDeaths:()=>[],finish,guardFailure,report:vi.fn(),
       multiplayerRole:()=>run?.role ?? null, multiplayerValid:()=>run?.valid() ?? false, multiplayerCanChoose:()=>run?.canChoose() ?? false};
     port.partySize=()=>run?.partySize() ?? null;
-    const session=new RunSession(core,monsterCatalog,port);
+    let userConfig={...cfg,quest:{...cfg.quest,id:900102}};
+    const session=new RunSession(core,monsterCatalog,port,next=>{userConfig={...next,quest:{...next.quest,id:900102}};});
+    port.multiplayerConfigBusy=()=>run?.configBusy()??false;
+    const files:Record<string,string>={[CONFIG_FILE]:JSON.stringify(userConfig)};
+    const diskState={fail:""};
+    const store=new ConfigStore({read:name=>files[name]??null,
+      write:(name,text)=>{if(name===diskState.fail)return false;files[name]=text;return true;},
+      digest:text=>createHash("sha256").update(text).digest("hex")});
     const network:NativeWebconsole={ping:s=>s,epoch:()=>1,take_commands:()=>[],publish_state:()=>{},publish_results:()=>{},
       steam_digest:s=>createHash("sha256").update(s).digest("hex"),
       steam_snapshot:()=>({available:true,reason:"",lobbies:[{id:"l",owner:bus.owner,self,plan:bus.plan,
-        members:bus.members.map(id=>({id,ack:bus.acks[id]??""}))}]}),
+        config:{control:bus.configControl,payload:bus.configPayload,complete:bus.complete,digest:createHash("sha256").update(bus.configPayload).digest("hex")},
+        members:bus.members.map(id=>({id,ack:bus.acks[id]??"",configAck:bus.configAcks[id]??""}))}]}),
+      steam_config_payload:(_l,text)=>{bus.configPayload=text;return self==="h";},
+      steam_config_control:(_l,text)=>{bus.configControl=text;return self==="h";},
+      steam_config_ack:(_l,text)=>{bus.configAcks[self]=text;return true;},
       steam_plan:(_l,text)=>{expect(Buffer.byteLength(text)).toBeLessThanOrEqual(2048);bus.plan=text;return self==="h";},
       steam_ack:(_l,text)=>{bus.acks[self]=text;return true;}};
     const mirrorCartRestore=vi.fn(); const runtime={publish,report:vi.fn(),mirrorCartRestore} as unknown as NativeRuntime;
     let busy=false;
-    run=new MultiplayerRun({lobby:"l",owner:"h",self,session:"s",members:[...bus.members]},cfg,monsterCatalog,session,runtime,()=>busy,network);
+    run=new MultiplayerRun({lobby:"l",owner:"h",self,session:"s",members:[...bus.members]},cfg,monsterCatalog,session,runtime,()=>busy,network,
+      configUpdates?{userConfig:()=>userConfig,store}:undefined);
     const wave={index:0,mode:"single" as const,typeTag:"A",label:"entry",monsters:["Great Izuchi"],tier:"weak",hpMul:1,dmgMul:1,rewardMul:0,rewardPt:0};
     expect(session.adoptMultiplayerEntry(makeQuestPlan(cfg,monsterCatalog,wave,1,1,false)).ok).toBe(true);
     session.tick();
-    return {run,session,core,cfg,reading,publish,policy,finish,guardFailure,network,mirrorCartRestore,setBusy:(v:boolean)=>busy=v};
+    return {run,session,core,cfg,reading,publish,policy,finish,guardFailure,network,mirrorCartRestore,setBusy:(v:boolean)=>busy=v,
+      userConfig:()=>userConfig,files,diskState};
   };
   const host=make("h"),guests=bus.members.slice(1).map(make),guest=guests[0]!;
   const tick=()=>{mock.now++;host.session.tick();host.run.tick();for(const peer of guests){peer.session.tick();peer.run.tick();}};
@@ -46,6 +62,63 @@ function fixture(size=2) {
   return {host,guest,guests,bus,tick,clear};
 }
 beforeEach(()=>{mock.now=100;mock.valid=true;});
+it.each([2,3,4])("synchronizes real RunSession rules and persistent user config across %i peers without replacing wallets/current wave",size=>{
+ const f=fixture(size,true);f.tick();f.clear();for(let i=0;i<4;i++)f.tick();
+ expect(f.host.run.canChoose()).toBe(true);
+ const peers=[f.host,...f.guests],wallets=peers.map((p,i)=>(p.core.state.wallet.pt-=i*5));
+ const currentPlans=peers.map(p=>p.session.plan),originalStart=f.host.core.config.startPt,originalCarts=f.host.core.config.maxCarts;
+ const cfg=f.host.userConfig(),next={...cfg,startPt:321,maxCarts:5,
+  shop:cfg.shop.map((item,i)=>i===0?{...item,price:1}:item),scaling:{...cfg.scaling,hpBase:1.3}};
+ const serial=f.host.run.proposeConfig(next);expect(f.host.session.canShop()).toBe(false);expect(f.host.run.canChoose()).toBe(false);
+ for(let i=0;i<12;i++)f.tick();
+ expect(f.host.run.configResult(serial)?.status).toBe("applied");expect(f.host.run.canChoose()).toBe(true);
+ peers.forEach((p,i)=>{
+   expect(p.core.state.wallet.pt).toBe(wallets[i]);expect(p.session.plan).toStrictEqual(currentPlans[i]);
+   expect(p.core.config.startPt).toBe(originalStart);expect(p.core.config.maxCarts).toBe(originalCarts);
+   expect(p.core.config.shop[0]!.price).toBe(1);expect(p.core.config.scaling.hpBase).toBe(1.3);
+   const stored=JSON.parse(p.files[CONFIG_FILE]!);expect(stored.quest.id).toBe(900102);expect(stored.startPt).toBe(321);
+   expect(p.session.stage).toBe("Selecting");expect(p.run.configurationRevision()).toBe(1);
+ });
+ // Current choices were generated before submission. Pick one unchanged, then
+ // the following choice generation must use the new shared scaling formula.
+ expect(f.host.session.choose(0).ok).toBe(true);f.tick();f.clear();for(let i=0;i<5;i++)f.tick();
+ const choice=f.host.core.state.currentChoices[0]!,scale=f.host.core.config.scaling;
+ expect(choice.hpMul).toBeCloseTo((1.3+(f.host.core.state.layer-1)*scale.hpPerLayer)*(size===2?scale.mp2Hp:scale.mp34Hp));
+ expect(f.guests.every(p=>p.core.state.currentChoices[0]!.hpMul===choice.hpMul)).toBe(true);
+});
+it("does not fault on old gameplay frames while the config channel is delayed",()=>{
+ const f=fixture(2,true);f.tick();f.clear();for(let i=0;i<4;i++)f.tick();
+ f.host.run.proposeConfig({...f.host.userConfig(),shop:f.host.userConfig().shop.map(i=>({...i,price:i.price+1}))});
+ f.bus.complete=false;for(let i=0;i<10;i++)f.tick();expect(f.host.session.stage).toBe("Selecting");expect(f.guest.session.stage).toBe("Selecting");
+ expect(f.guest.session.canShop()).toBe(false);f.bus.complete=true;for(let i=0;i<12;i++)f.tick();
+ expect(f.host.run.canChoose()).toBe(true);expect(f.guest.session.stage).toBe("Selecting");
+});
+it("ignores an old-sequence old-config frame even after the first new-config frame was accepted",()=>{
+ const f=fixture(2,true);f.tick();f.clear();for(let i=0;i<4;i++)f.tick();const old=f.bus.plan;
+ f.host.run.proposeConfig({...f.host.userConfig(),scaling:{...f.host.cfg.scaling,hpBase:1.3}});for(let i=0;i<12;i++)f.tick();
+ f.bus.plan=old;mock.now++;f.guest.run.tick();expect(f.guest.session.stage).toBe("Selecting");expect(f.guest.run.valid()).toBe(true);
+});
+it("requires a fresh config epoch ACK even when only next-run fields changed and the active hash is identical",()=>{
+ const f=fixture(2,true);f.tick();f.clear();for(let i=0;i<4;i++)f.tick();const oldAck=f.bus.acks.g;
+ const oldHash=JSON.parse(f.bus.plan).h;
+ f.host.run.proposeConfig({...f.host.userConfig(),startPt:321});for(let i=0;i<12;i++)f.tick();
+ expect(JSON.parse(f.bus.plan).h).toBe(oldHash);expect(f.host.run.canChoose()).toBe(true);expect(f.host.run.snapshot().configEpoch).toBe(1);
+ f.bus.acks.g=oldAck;mock.now++;f.host.run.tick();expect(f.host.run.canChoose()).toBe(false);
+ for(let i=0;i<3;i++)f.tick();expect(f.host.run.canChoose()).toBe(true);
+});
+it("stops the run on a peer's persistence error, restores effective rules, and never reports applied",()=>{
+ const f=fixture(2,true);f.tick();f.clear();for(let i=0;i<4;i++)f.tick();
+ f.guest.diskState.fail=CONFIG_FILE;const old=f.host.core.config;
+ const serial=f.host.run.proposeConfig({...f.host.userConfig(),scaling:{...old.scaling,hpBase:1.3}});
+ for(let i=0;i<10;i++)f.tick();
+ expect(f.host.run.configResult(serial)?.status).toBe("rejected");expect(f.host.session.stage).toBe("Fault");expect(f.guest.session.stage).toBe("Fault");
+ expect(f.host.core.config.scaling).toEqual(old.scaling);expect(f.guest.core.config.scaling).toEqual(old.scaling);
+ expect(f.host.finish).toHaveBeenCalledWith(true);expect(f.guest.finish).not.toHaveBeenCalled();
+});
+it("retains live native host authority until the failure request is queued",()=>{
+ const f=fixture();f.tick();const authority:boolean[]=[];f.host.finish.mockImplementation(()=>authority.push(f.host.run.valid()));
+ f.host.run.fail("stop coordinator");expect(authority).toEqual([true]);expect(f.host.run.valid()).toBe(false);
+});
 it.each([2,3,4])("keeps a fixed %i-player multiplier even when the actor reading is temporarily smaller",(size)=>{
  const f=fixture(size);f.tick();f.clear();f.tick();
  expect(f.host.run.partySize()).toBe(size);f.guests.forEach(g=>expect(g.run.partySize()).toBe(size));

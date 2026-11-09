@@ -8,8 +8,12 @@ import { validateConfig, type RogueConfig } from "../core/config";
 import { rejson, relog } from "./sdk";
 // 由 scripts/build-config.js 在 npm run build 前生成（.gitignore 排除）
 import { defaultConfig } from "./default_config";
+import { ConfigStore } from "./config_store";
 
 export function loadConfig(): RogueConfig {
+  // Recovery errors must escape the fallback block. Starting with embedded
+  // defaults would discard an unresolved configuration transaction.
+  if(new ConfigStore().recover())relog.warn("[MhwRogue] 已恢复未完成联机提案之前的完整配置");
   try {
     const fromDisk = rejson.load_file("mhw_rogue_config.json");
     if (fromDisk && typeof fromDisk === "object") {

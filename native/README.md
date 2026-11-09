@@ -105,6 +105,16 @@ ctest --test-dir native/webconsole/.build/Plugin-Release-x64 -C Release --output
 原来的 `scripts/review-webconsole.py` 使用文件信箱的隔离联调机制，尚未适配新内存后端，不能据此验收此版本；当前使用原生 CTest、Lua 探针语义检查和真实游戏 HTTP 回执验证。
 
 
+## 联机配置通道（0.4.2）
+
+配置通过独立 Steam 大厅键传输，不占用波次计划或出怪 ACK。Lua 模块新增 `steam_config_payload(lobby, text)`、`steam_config_control(lobby, text)`、`steam_config_ack(lobby, text)`；`steam_snapshot()` 在各大厅的 `config` 中返回 `control / payload / digest / complete`，成员增加 `configAck`。没有增加 HTTP 路由；网页和 CLI 仍提交通用业务命令，由宿主 Lua 线程执行。
+
+载荷上限 65536 字节，先编码为 ASCII Base64，再按1800字节分块（最多49块）；最后发布包含块数、原文字节数和 SHA256 的 manifest。读取端核对全部长度与完整摘要，缺块、混合旧块或损坏时不返回可用载荷。控制帧与成员 ACK 各限2048字节。只有房主可写载荷和控制帧，各成员只写自己的 ACK；返回 true 仅表示本地提交，业务层必须等固定名册逐端确认。权限与异步更新依据 [SetLobbyData](https://partner.steamgames.com/doc/api/ISteamMatchmaking#SetLobbyData) 和 [SetLobbyMemberData](https://partner.steamgames.com/doc/api/ISteamMatchmaking#SetLobbyMemberData)。
+
+`write_config(name, text)` 只接受 `mhw_rogue_config.json` 与 `mhw_rogue_config_pending.json`，上限256 KiB，与装备/物资恢复文件隔离。它复用完整写入、刷新、关闭和原子替换的文件原语；Lua 仍精确读回。未完成的配置事务在下次装载前恢复旧方案；损坏的恢复记录会阻止开局与覆盖配置，但继续运行个人原装恢复；默认值仅用于恢复协调器，不作为可游玩方案返回给策划。DLL 更新需退出并重启游戏。
+
+原生 CTest 覆盖 UTF-8/最大载荷、缺块/错块、部分写入失败、房主权限、独立 ACK、配置文件名边界与 Lua API 参数。编译后的 Lua harness 另测四端屏障和缺 ACK：不能先把缺失 ACK 映射为数组中的 null，否则 Lua nil 空洞可能使遍历跳过队友。
+
 ## 同机多个实例的后端端口
 
 每个游戏副本使用独立的 `reframework/data` 目录。在该副本的

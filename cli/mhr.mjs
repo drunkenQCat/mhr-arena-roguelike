@@ -511,7 +511,7 @@ ${v.error}` : "没有记录的脚本错误");
           throw rejected(`配置版本已变化（${identity.configVersion} ≠ ${options.version}）：请重新载入后再合并`);
         }
         const { id, receipt } = await submit(baseUrl, { cmd: "submitConfig", config: raw,
-          configVersion: options.version }, { identity, timeoutMs, receiptTimeoutMs });
+          configVersion: options.version }, { identity, timeoutMs, receiptTimeoutMs:Math.max(receiptTimeoutMs,200000),settleQueued:true });
         output.progress(`回执 ${id}: ${receipt.status}`);
         requireReceipt(receipt);
         output.result({ ok: true, receipt }, () => `已提交：v${receipt.configVersion} ${receipt.message ?? ""}`);

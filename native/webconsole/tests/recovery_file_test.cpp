@@ -44,6 +44,16 @@ int wmain(int argc, wchar_t** argv) try {
     check(!webconsole::write_recovery(name, replacement, refuse_flush), "interrupted write was accepted");
     check(webconsole::read_text(path) == original, "interrupted write damaged original");
 
+    const auto config_path = webconsole::data_path(L"mhw_rogue_config.json");
+    check(webconsole::write_config("mhw_rogue_config.json", original), "atomic config write failed");
+    check(webconsole::write_config("mhw_rogue_config_pending.json", original), "config journal write failed");
+    check(!webconsole::write_config("../mhw_rogue_config.json", replacement), "config traversal accepted");
+    check(!webconsole::write_config(name, replacement), "config writer changed equipment journal");
+    check(!webconsole::write_recovery("mhw_rogue_config.json", replacement), "recovery writer changed config");
+    check(!webconsole::write_config("mhw_rogue_config.json", std::string(262145, 'x')), "oversize config accepted");
+    check(!webconsole::write_config("mhw_rogue_config.json", replacement, refuse_flush), "failed config write accepted");
+    check(webconsole::read_text(config_path) == original, "failed config publication damaged original");
+
     wchar_t executable[32768]{};
     check(GetModuleFileNameW(nullptr, executable, 32768) != 0, "cannot resolve test executable");
     for (int stage = 0; stage <= 3; ++stage) {

@@ -33,6 +33,10 @@ interface RuntimeMultiplayer extends SpawnSync {
   canChoose(): boolean;
   snapshot(): Record<string, unknown>;
   partySize(): number;
+  configBusy?():boolean;
+  configurationRevision?():number;
+  proposeConfig?(config:RogueConfig):number;
+  configResult?(serial:number):{serial:number;status:"applied"|"rejected";message:string}|null;
 }
 
 export class NativeRuntime implements SessionPort {
@@ -46,6 +50,9 @@ export class NativeRuntime implements SessionPort {
   private holdClear = false;
   private hooks = false;
   private bootError: string | null = null;
+  private configRecoveryNotice:string|null=null;
+  setConfigRecoveryNotice(message:string|null):void{this.configRecoveryNotice=message;}
+  configurationRecoveryPending():string|null{return this.configRecoveryNotice;}
   private deaths: DeathReading[] = [];
   private events: Diagnostic[] = [];
   private rateKeys: string[] = [];
@@ -66,6 +73,13 @@ export class NativeRuntime implements SessionPort {
   multiplayerRole(): "host" | "guest" | null { return this.multiplayer?.role ?? null; }
   multiplayerValid(): boolean { return this.multiplayer?.valid() === true; }
   multiplayerCanChoose(): boolean { return this.multiplayer?.canChoose() ?? false; }
+  multiplayerConfigBusy():boolean{return this.multiplayer?.configBusy?.()??false;}
+  multiplayerConfigRevision():number{return this.multiplayer?.configurationRevision?.()??0;}
+  submitMultiplayerConfig(config:RogueConfig):number {
+    if(!this.multiplayer?.proposeConfig)throw new Error("当前联机模块不支持配置提案");
+    return this.multiplayer.proposeConfig(config);
+  }
+  multiplayerConfigResult(serial:number){return this.multiplayer?.configResult?.(serial)??null;}
   private partySizeSource: (() => number | null) | null = null;
 
   constructor(private cfg: RogueConfig, public installer: QuestInstaller,
@@ -109,8 +123,8 @@ export class NativeRuntime implements SessionPort {
     const finished = this.finishEvidence; this.finishEvidence = null;
     if (finished) this.report(finished.event, finished.detail);
   }
-  ready(): boolean { return this.installer.isInstalled() && this.hooks && this.bootError === null; }
-  status(): string { return this.bootError ?? `${this.installer.getStatus()} / counter: ${this.transport.getStatus()} / ${this.inplace.status}`; }
+  ready(): boolean { return this.installer.isInstalled() && this.hooks && this.bootError === null&&this.configRecoveryNotice===null; }
+  status(): string { return this.bootError??this.configRecoveryNotice ?? `${this.installer.getStatus()} / counter: ${this.transport.getStatus()} / ${this.inplace.status}`; }
   publish(plan: QuestPlan, inPlace: boolean): void {
     if (inPlace) this.inplace.prepare(plan);
     else { this.inplace.cancel(); this.installer.publish(plan, false); }

@@ -3,7 +3,10 @@
  * compared before any peer restarts the native loading/synchronization machine. */
 import { canonical } from "./wire_canonical";
 export { canonical } from "./wire_canonical";
-import type { RogueConfig } from "../core/config";
+import { validateConfig, type RogueConfig } from "../core/config";
+import { MultiplayerConfig,type ConfigResult } from "./multiplayer_config";
+import { ConfigStore } from "./config_store";
+import { validateEquipmentConfig } from "./equipment_catalog";
 import { makeQuestPlan, type MonsterCatalog, type QuestPlan } from "../core/quest_plan";
 import type { WaveOption, RunPhase } from "../core/run_state";
 import type { Position, RunSession, SessionStage } from "../core/run_session";
@@ -13,8 +16,10 @@ import { multiplayerScope } from "./multiplayer_scope";
 import { clockSeconds, loadWebconsole, rejson, type NativeWebconsole } from "./sdk";
 
 export interface RunContext { lobby: string; owner: string; self: string; session: string; members: string[] }
+export interface RunConfigOptions { userConfig:()=>RogueConfig; store:ConfigStore }
 type EncodedWave = [number, string, string[], string, number, number, number, number, string];
 interface Frame { v: 4; s: string; o: string; l: string; h: string; n: number;
+  rules:number;
   stage: SessionStage; phase: RunPhase; layer: number; token: number;
   w: EncodedWave; c: EncodedWave[]; earned: number; carts: number; deaths: number; cartUsed: boolean;
   camp: Position | null; killed: string[]; spawn: SpawnTicket | null; commit: boolean; }
@@ -33,8 +38,15 @@ function stateKey(f: Frame): string { return `${f.layer}/${f.token}/${f.stage}/$
 
 export class MultiplayerRun implements SpawnSync {
   readonly role: "host" | "guest";
-  private readonly hash: string;
+  private hash: string;
+  private configSync:MultiplayerConfig<RogueConfig>|null=null;
+  private configRevision=0;
+  private configEpoch=0;
+  private previousHash:string|null=null;
+  private previousEpoch:number|null=null;
+  private changedAt=0;
   private live = true;
+  private failing=false;
   private abortPending = false;
   private lastPoll = -1;
   private lastSeen = clockSeconds();
@@ -52,15 +64,54 @@ export class MultiplayerRun implements SpawnSync {
   private peerHeartbeats = new Map<string, { sequence: number; at: number }>();
   private static readonly FRESH_SECONDS = 15;
   private message = "等待全队进入任务并核对配置";
-  constructor(private readonly context: RunContext, private readonly config: RogueConfig,
+  constructor(private readonly context: RunContext, private config: RogueConfig,
     private readonly catalog: MonsterCatalog, private readonly session: RunSession,
     private readonly runtime: NativeRuntime, private readonly busy: () => boolean,
-    private readonly network: NativeWebconsole = loadWebconsole()) {
+    private readonly network: NativeWebconsole = loadWebconsole(),private readonly configOptions?:RunConfigOptions) {
     this.role = context.self === context.owner ? "host" : "guest";
     if (context.members.length < 2 || context.members.length > 4 || !context.members.includes(context.self) ||
         !context.members.includes(context.owner)) throw new Error("Invalid fixed multiplayer roster");
     this.hash = network.steam_digest?.(canonical(config)) ?? "";
     if (this.hash.length !== 64) throw new Error("Steam configuration digest unavailable");
+    if(configOptions&&network.steam_config_payload&&network.steam_config_control&&network.steam_config_ack) {
+      let original:ReturnType<RunSession["configurationSnapshot"]>|null=null,transactionOpen=false;
+      const active=(user:RogueConfig)=>({...user,quest:{...user.quest,id:this.config.quest.id}});
+      this.configSync=new MultiplayerConfig(context,{
+        boundary:()=>({token:session.plan?.token??-1,layer:session.core.state.layer,
+          ready:session.stage==="Selecting"&&session.preparation().gathered&&!this.busy()&&
+            session.readingSnapshot?.quest?.playing===true&&!session.readingSnapshot.enemies.some(e=>!e.dead&&!e.captured)}),
+        currentHash:()=>this.hash,
+        validate:text=>{
+          const user=validateConfig(rejson.load_string(text)),old=configOptions.userConfig();
+          if(user.quest.id!==old.quest.id||user.quest.baseId!==old.quest.baseId||user.quest.mapNo!==old.quest.mapNo)
+            throw new Error("联机配置不能改变任务身份、模板或地图");
+          const next=active(user);session.validateConfigForSession(next);validateEquipmentConfig(next);
+          return{value:user,effectiveHash:network.steam_digest!(canonical(session.previewConfig(next)))};
+        },
+        apply:user=>{
+          original=session.configurationSnapshot();
+          configOptions.store.begin(configOptions.userConfig(),user,`${context.session}/${this.configSync!.snapshot().serial}`);transactionOpen=true;
+          session.applyConfig(active(user));this.previousHash=this.hash;this.previousEpoch=this.configEpoch;this.changedAt=clockSeconds();
+          this.config=session.core.config;this.hash=network.steam_digest!(canonical(this.config));
+        },
+        finish:()=>configOptions.store.publish(),
+        complete:()=>{configOptions.store.complete();transactionOpen=false;original=null;this.configRevision++;
+          this.configEpoch=Number(this.configSync!.snapshot().serial);this.peerHeartbeats.clear();},
+        restore:()=>{
+          try{if(transactionOpen){configOptions.store.rollback();transactionOpen=false;}}
+          finally{if(original){session.restoreConfiguration(original);this.config=session.core.config;
+            this.hash=network.steam_digest!(canonical(this.config));this.previousHash=null;this.previousEpoch=null;original=null;this.configRevision++;}}
+        },
+        fail:reason=>this.fail(reason),
+      },network);
+    }
+  }
+  configBusy():boolean{return this.configSync?.busy()??false;}
+  configurationRevision():number{return this.configRevision;}
+  configResult(serial:number):ConfigResult|null{return this.configSync?.result(serial)??null;}
+  proposeConfig(config:RogueConfig):number {
+    if(!this.canChoose()||!this.configSync)throw new Error("请全队清波集结并更新 DLL，由房主在波间提交配置");
+    return this.configSync.propose(rejson.dump_string(config,-1).split('"unlockChain":null').join('"unlockChain":[]').split('"weak":null').join('"weak":[]'));
   }
   valid(): boolean { return this.live && multiplayerScope(this.role); }
   partySize(): number { return this.context.members.length; }
@@ -89,16 +140,16 @@ export class MultiplayerRun implements SpawnSync {
     this.message = "全队原生记录一致，启动原生加载与战斗同步";
     return true;
   }
-  canStage(): boolean { return !this.ticket || !this.committed || this.allReady(); }
+  canStage(): boolean { return !this.configBusy()&&(!this.ticket || !this.committed || this.allReady()); }
   private ackPrefix(f: Frame, status: string): string {
-    return `R4|${this.context.session}|${this.hash}|${stateKey(f)}|${ticketKey(this.localTicket)}|${ticketKey(this.activated)}|${status}|`;
+    return `R4|${this.context.session}|${this.hash}:${this.configEpoch}|${stateKey(f)}|${ticketKey(this.localTicket)}|${ticketKey(this.activated)}|${status}|`;
   }
   private ack(f: Frame, status: string): string { return `${this.ackPrefix(f, status)}${f.n}`; }
   private observeHeartbeats(now: number): void {
     for (const member of this.members) {
       if (member.id === this.context.self) continue;
       const parts = member.ack.split("|");
-      if (parts.length !== 8 || parts[0] !== "R4" || parts[1] !== this.context.session || parts[2] !== this.hash) continue;
+      if (parts.length !== 8 || parts[0] !== "R4" || parts[1] !== this.context.session || parts[2] !== `${this.hash}:${this.configEpoch}`) continue;
       const sequence = Number(parts[7]);
       const published = this.publications.find(p => p.sequence === sequence);
       const previous = this.peerHeartbeats.get(member.id);
@@ -120,13 +171,13 @@ export class MultiplayerRun implements SpawnSync {
     return !!this.frame && this.session.readingSnapshot?.quest?.playing === true &&
       this.context.members.every(id => this.peerReady(id));
   }
-  canChoose(): boolean { return this.role === "host" && this.valid() && this.allReady() && !this.busy(); }
+  canChoose(): boolean { return this.role === "host" && this.valid() && this.allReady() && !this.busy()&&!this.configBusy(); }
   private build(): Frame {
     const s = this.session, p = s.plan;
     if (!p) throw new Error("Multiplayer host has no active plan");
     if (this.localTicket && this.localTicket.token !== p.token) { this.localTicket = null; this.activated = null; }
     const spawn = this.ticket?.token === p.token ? this.ticket : null;
-    return { v:4, s:this.context.session, o:this.context.owner, l:this.context.lobby, h:this.hash, n:++this.sequence,
+    return { v:4, s:this.context.session, o:this.context.owner, l:this.context.lobby, h:this.hash, n:++this.sequence,rules:this.configEpoch,
       stage:s.stage, phase:s.core.state.phase, layer:s.core.state.layer, token:p.token,
       w:encode(p.wave), c:s.core.state.currentChoices.map(encode), earned:s.earnedPt,
       carts:s.core.state.cartsLeft, deaths:s.readingSnapshot?.deaths ?? 0, cartUsed:s.core.state.cartRestoreUsed, camp:s.campSnapshot,
@@ -145,8 +196,17 @@ export class MultiplayerRun implements SpawnSync {
     try { f = rejson.load_string(text) as Frame; } catch { return; }
     if (!f || f.v !== 4) return; // Entry prepare/post envelope until host attaches.
     if (f.s !== this.context.session || f.o !== this.context.owner || f.l !== this.context.lobby) throw new Error("Multiplayer session identity changed");
-    if (f.h !== this.hash) throw new Error("房主与本机配置不一致；请安装同一 Nightly 并同步配置后重新开局");
     if (!Number.isInteger(f.n) || f.n <= this.lastSequence) return;
+    if(!Number.isInteger(f.rules)||f.rules<0)throw new Error("联机配置代号无效，请全队更新相同版本");
+    if(f.rules!==this.configEpoch){
+      if(f.rules===this.previousEpoch&&clockSeconds()-this.changedAt<=120)return;
+      throw new Error("联机配置代号不一致，停止加载");
+    }
+    if (f.h !== this.hash) {
+      if(f.h===this.previousHash&&clockSeconds()-this.changedAt<=120)return;
+      throw new Error("房主与本机配置不一致；请安装同一 Nightly 并同步配置后重新开局");
+    }
+    this.previousHash=null;this.previousEpoch=null;
     if (!Number.isInteger(f.layer) || f.layer < 1 || !Number.isInteger(f.token) || f.token < 0 ||
         !Number.isInteger(f.deaths) || f.deaths < 0 || !Number.isInteger(f.earned) || f.earned < 0 || !Number.isInteger(f.carts) || f.carts < 0 || f.carts > this.config.maxCarts ||
         !["AwaitQuest","Combat","Carve","Selecting","Finished","Fault"].includes(f.stage) ||
@@ -180,6 +240,7 @@ export class MultiplayerRun implements SpawnSync {
     // Native return can finish locally before the last Steam frame or lobby teardown.
     // Never turn an already-ended local run back into a synchronization fault.
     if (["Finished", "Fault"].includes(this.session.stage)) {
+      this.configSync?.shutdown("原生任务已结束，撤销尚未完成的配置事务");
       if (this.role === "host") { try { this.publish(); } catch { /* native lobby may already be retired */ } }
       else this.publishAbort();
       this.live = false; this.message = "本局已结束，等待回村恢复后重新开局";
@@ -191,6 +252,9 @@ export class MultiplayerRun implements SpawnSync {
       const lobby = snapshot?.lobbies?.find(l => l.id === this.context.lobby && l.owner === this.context.owner && l.self === this.context.self);
       if (!lobby || lobby.members.map(m => m.id).sort().join(",") !== [...this.context.members].sort().join(",")) throw new Error("固定队伍改变；暂不支持中途加入、离开或房主迁移");
       this.members = lobby.members;
+      this.configSync?.tick();
+      if(!this.live)return;
+      if(this.configBusy()){this.lastSeen=now;return;} // independent barrier owns its bounded timeout
       if (this.role === "host") {
         if (this.members.some(m => m.id !== this.context.self && m.ack.startsWith(`R4ERR|${this.context.session}|stop|`))) {
           this.session.stop(); this.publish(); this.live = false;
@@ -213,12 +277,17 @@ export class MultiplayerRun implements SpawnSync {
     } catch (e) { this.fail(String(e)); }
   }
   fail(reason: string): void {
-    if (!this.live) return;
-    this.message = reason;
-    if (this.role === "host") { try { this.session.failMultiplayer(reason); this.publish(); } catch { /* scope may already be gone */ } }
-    else { this.session.failMultiplayer(reason); this.publishAbort(); }
-    this.live = false;
-    this.runtime.report("multiplayer-run-error", { role:this.role, reason });
+    if (!this.live||this.failing) return;
+    this.failing=true;
+    try {
+      this.configSync?.shutdown(reason);
+      this.message = reason;
+      // NativeRuntime still needs this live authority while it queues the
+      // owned quest's failure. The recursion guard is separate from liveness.
+      if (this.role === "host") { try { this.session.failMultiplayer(reason); this.publish(); } catch { /* scope may already be gone */ } }
+      else { this.session.failMultiplayer(reason); this.publishAbort(); }
+      this.runtime.report("multiplayer-run-error", { role:this.role, reason });
+    }finally{this.live=false;this.failing=false;}
   }
   private publishAbort(): void {
     this.abortPending = this.session.multiplayerAbortPending;
@@ -230,6 +299,8 @@ export class MultiplayerRun implements SpawnSync {
     } catch { /* Retry on the next poll; native return cancels the pending intent. */ }
   }
   snapshot(): Record<string, unknown> { return { role:this.role, live:this.live, message:this.message,
+    configSync:this.configSync?.snapshot()??null,configRevision:this.configRevision,
+    configEpoch:this.configEpoch,
     fixedPartySize:this.partySize(),
     lobby:this.context.lobby, session:this.context.session, members:this.members.map(m => ({ id:m.id, self:m.id === this.context.self,
       ready:this.role === "host" ? this.peerReady(m.id) : !!this.frame && m.ack.startsWith(this.ackPrefix(this.frame,"ready")) })),

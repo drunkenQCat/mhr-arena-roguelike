@@ -188,11 +188,16 @@ export function clockSeconds(): number { return os.time(); }
 export interface NativeWebconsole {
   steam_snapshot?(): { available: boolean; reason: string; lobbies: {
     id: string; owner: string; self: string; plan: string;
-    members: { id: string; ack: string }[] }[] };
+    config?: { control: string; payload: string; digest: string; complete: boolean };
+    members: { id: string; ack: string; configAck?: string }[] }[] };
   steam_plan?(lobby: string, value: string): boolean;
   steam_ack?(lobby: string, value: string): boolean;
+  steam_config_payload?(lobby: string, value: string): boolean;
+  steam_config_control?(lobby: string, value: string): boolean;
+  steam_config_ack?(lobby: string, value: string): boolean;
   steam_digest?(value: string): string;
   write_recovery?(name: string, json: string): boolean;
+  write_config?(name: string, json: string): boolean;
   ping(text: string): string;
   epoch(): number;
   session_id?(): string;

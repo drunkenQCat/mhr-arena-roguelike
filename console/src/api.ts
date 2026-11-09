@@ -13,6 +13,7 @@ export interface ConsoleState {
     activeQuest: number | null; playing: boolean; canPrepare: boolean; nativeQuestPlayerCount: number | null;
     options: { index: number; mode: string; label: string }[] | null };
   multiplayerRun?: { role: "host" | "guest"; live: boolean; message: string; lobby: string; session: string;
+    configSync?:{busy:boolean;host:boolean;message:string;serial:number|null;phase:string|null;result:{serial:number;status:string;message:string}|null}|null;
     members: { id: string; self: boolean; ready: boolean }[] | null; token: number | null;
     staged: { token: number; ordinal: number; type: number; slot: number; id: number; uid: number } | null;
     commit: boolean; verifiedTwoClients: boolean; fixedPartySize?: number } | null;
@@ -34,7 +35,7 @@ export interface ConsoleState {
   capabilities?: { start: boolean; choose: boolean; stop: boolean; route?: boolean; retry?: boolean;
     invincible?: boolean; kill?: boolean; teleport?: boolean; teleportMonster?: boolean; testLayer?: boolean };
   online?: boolean;
-  control?: { ready: boolean; nextRoute: string; configuredRoute: string; startReason: string | null;
+  control?: { ready: boolean; configRecovery?:string|null;nextRoute: string; configuredRoute: string; startReason: string | null;
     startup: { prepared: boolean; restorePending: boolean; message: string | null };
     startupRules: { keepPlayerWeapon: boolean; stripTalismans: boolean; stripInsect: boolean; weaponId: number | null } | null;
     armorSets: Record<string, { series: number; desc?: string }>;
@@ -99,9 +100,9 @@ export async function postCommand(state: ConsoleState, cmd: string, extra: Recor
 }
 
 export async function waitForReceipt(id: string, bridge: string, options: {
-  purchase?: boolean; effect?: boolean; alive?: () => boolean; onPacket?: (packet: ReceiptPacket) => void;
+  purchase?: boolean; effect?: boolean; configuration?:boolean; alive?: () => boolean; onPacket?: (packet: ReceiptPacket) => void;
 } = {}): Promise<CommandResult> {
-  const deadline = performance.now() + (options.effect ? 20000 : 12000);
+  const deadline = performance.now() + (options.configuration?200000:options.effect ? 20000 : 12000);
   while ((options.alive?.() ?? true) && performance.now() < deadline) {
     let packet: ReceiptPacket | null = null;
     try { packet = await getJson<ReceiptPacket>("/api/results", AbortSignal.timeout(3000)); }
@@ -115,7 +116,7 @@ export async function waitForReceipt(id: string, bridge: string, options: {
       options.onPacket?.(packet);
       const result = packet.last?.id === id ? packet.last : packet.history?.find((r) => r.id === id);
       if (result && ["applied", "rejected", "uncertain", "queued"].includes(result.status) &&
-        !((options.purchase || options.effect) && result.status === "queued")) return result;
+        !((options.purchase || options.effect||options.configuration) && result.status === "queued")) return result;
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
