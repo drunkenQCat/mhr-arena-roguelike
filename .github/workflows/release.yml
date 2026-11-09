@@ -174,14 +174,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $releaseCapabilities = Get-Content -LiteralPath mod/data/release_capabilities.json -Raw -Encoding utf8 | ConvertFrom-Json
+          $remainingGates = ($releaseCapabilities.remainingGates | ForEach-Object { '- ' + $_.label }) -join "`n"
           $notes = @"
           自动测试构建，来自提交 ${{ github.sha }}，运行 #${{ github.run_number }}。每天北京时间 04:00 和手动运行构建；测试通过后才替换此下载。
 
           下载 Assets 中的 MHR-Arena-Roguelike-nightly.zip，不要下载 Source code。双方先退出游戏，再安装同一份 ZIP。包内“测试与反馈.txt”有详细步骤；网页“帮助与连接”可一键下载测试日志。
 
-          本轮修复三猫失败后无法重开：完整验证原生 Failed=4、双方回村恢复、不 Reset 直接进入下一局。双方承接前可选初始套装、零物资开局并用150 PT购物，首波正常计分；个人装备抽取新增独立临时条目、局末回收。新增个人清波补给与可保留的结算摘要，修复队友传送的回执和已发货时的钱包刷新。
+          $($releaseCapabilities.playerSummary)
 
-          当前版本已接入：Steam 自动准备、原生任务板入队、局内房主选波、全端原生出怪记录确认、个人 PT 与购物。默认启用，无需 DebugMode。本机双真实引擎已通过多波次、独立购物、共享猫车与三猫自动回村；本地模拟 Steam 传输不能替代不同电脑官方 Steam 验收。普通武器命中、捕获与长局仍需反馈。请按包内说明测试单怪、顺序双怪、同时双怪，并下载双方日志反馈。
+          $($releaseCapabilities.verificationSummary)
+
+          待验收项目：
+          $remainingGates
+
+          默认启用多人入口，无需 DebugMode。请按包内说明测试单怪、顺序双怪、同时双怪、个人购物及失败后重开，并下载双方日志反馈。完整能力声明见包内 release-capabilities.json；本机模拟 Steam 传输不代替官方跨电脑验收。
           "@
           Set-Content -LiteralPath nightly-notes.md -Value $notes -Encoding utf8
           gh release view nightly --repo '${{ github.repository }}' *> $null
