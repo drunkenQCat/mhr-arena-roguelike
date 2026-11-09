@@ -119,6 +119,8 @@ HTTP 传输去重使用 DLL 对完整原始命令文本计算的 SHA256，而不
 
 发布能力以 `data/release_capabilities.json` 为唯一机器可读来源，网页帮助与发行包 `release-capabilities.json` 共用此文件。manifest schema2 仅引用该文件和发布阶段，移除无法区分“已接线”与“官方跨电脑已验收”的旧布尔标记。`scripts/release-capabilities.js` 核对实际 HTTP/入场/运行协议与插件版本，禁止隐藏待验收门槛或把未验收版本标成 stable；这些检查只保证声明一致，不替代实机证据。归档检查同时验证白名单、内容摘要、能力格式和阶段，拒绝重新混入旧矛盾字段。更新验收人数/状态须先核对对应环境、构建和原生记录；当前大厅快照不再带恒为 false 的 `verifiedTwoClients`，不能用运行时自报字段认证测试结果。
 
+Nightly 发布前再次核对 master 的当前提交，较旧的排队构建仅保留 Actions artifact，不覆盖下载、标签或说明；读取失败则停止发布。GitHub 会对目标与默认分支之间的工作流文件差异检查额外权限，`GITHUB_TOKEN` 无法获得该工作流写权限，见[官方发布 API 说明](https://docs.github.com/en/rest/releases/releases#update-a-release)。2026-11-09 的旧构建 ccfa831 在排队时默认分支已更新 release.yml，因此其标签更新被403拒绝；构建、测试和14文件归档均已通过。无需因此扩大仓库默认权限或引入个人令牌。
+
 装备发放共用 `equipment_catalog` 预检：DataShortcut 的显式 `isValid(PlArmorId/WeaponId)` 与 `getArmorBaseData/getPlainWeaponData` 均须通过，并核对返回数据的get_Id与请求一致，拒绝占位或替代记录。防具编码合法不代表系列存在；ID 不得超过原生32位范围，防具系列不得占用部位位段。网页提交先校验所有可选初始套装的五个部位、指定武器与全部奖池，失败不写配置或推进版本。磁盘加载的方案仍在开局前整组预检，`grantEquip` 也在预留槽、写恢复记录和发放前再次检查，覆盖其它调用入口。目录暂未就绪时拒绝操作并允许之后重试，不缓存失败或回退到“先发再看”。这些只读检查不证明装备玩法、模型或数值已经逐项验收。
 
 验证按层推进：纯 TypeScript 规则 → 编译后的 Lua 沙箱与双进程协议 → 原生桥接 → 两个真实游戏引擎 → 不同电脑官方 Steam。单测通过不替代后两层。当前自动检查命令和[本地双客户端步骤](local-multiplayer-testing.md)共同维护；不要为低风险文字修改重复启动游戏。

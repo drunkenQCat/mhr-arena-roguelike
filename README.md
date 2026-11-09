@@ -79,7 +79,7 @@ HTTP 线程不直接调用游戏对象。Lua 发布心跳与业务状态，浏�
 
 ## 最新测试包（Nightly）
 
-[下载最新 Nightly](https://github.com/drunkenQCat/mhr-arena-roguelike/releases/tag/nightly)：选择 Assets 中的 `MHR-Arena-Roguelike-nightly.zip`，不要下载 Source code。私有仓库需要授权；朋友打不开时，请组织者直接发送同一份 ZIP。双方退出游戏后再覆盖安装，包内版本清单记录确切提交。
+[下载最新 Nightly](https://github.com/drunkenQCat/mhr-arena-roguelike/releases/tag/nightly)：选择 Assets 中的 `MHR-Arena-Roguelike-nightly.zip`，不要下载 Source code。朋友打不开时，请组织者确认地址、访问权限，或直接发送同一份 ZIP。双方退出游戏后再覆盖安装，包内版本清单记录确切提交。
 
 每天北京时间 04:00 及 Actions 手动运行构建，通过检查后更新固定 nightly 预发行版。正式版本仍通过 `v*` 标签发布，两者使用同一打包白名单，不包含研究探针、日志、测试 EXE 或构建中间文件。
 
