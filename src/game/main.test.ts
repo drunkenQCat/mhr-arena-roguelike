@@ -5,7 +5,8 @@ import { RunCore } from "../core/run_core";
 import { makeQuestPlan } from "../core/quest_plan";
 
 const h=vi.hoisted(()=>({config:null as any,frames:[] as (()=>void)[],bridges:[] as any[],
-  runtimes:[] as any[],entries:[] as any[],gachas:[] as any[],buffs:[] as any[],errors:[] as any[],configError:false,startupPending:false,restoreCalls:0}));
+  runtimes:[] as any[],entries:[] as any[],gachas:[] as any[],buffs:[] as any[],shops:[] as any[],errors:[] as any[],configError:false,startupPending:false,restoreCalls:0,restoreBlocked:false,
+  nativeReading:null as any}));
 vi.mock("./load_config",()=>({loadConfig:()=>{if(h.configError)throw new Error("corrupt configuration journal");return h.config;}}));
 vi.mock("./sdk",()=>({clockSeconds:()=>100,reframework:{
   onFrame:(f:()=>void)=>h.frames.push(f),onDrawUi:()=>{},onScriptReset:()=>{}},
@@ -29,10 +30,14 @@ vi.mock("./native_runtime",()=>({NativeRuntime:class {
   configNotice:string|null=null;
   rebind(c:any,i:any){this.config=c;this.installer=i;}setPartySizeSource(){}setMultiplayer(){}tick(){}shutdown(){}setConfigRecoveryNotice(m:string|null){this.configNotice=m;}
   now(){return 100;}ready(){return this.configNotice===null;}report(){}policy(){}cancelPost(){}takeDeaths(){return [];}postingError(){return null;}
-  read(){return {time:100,quest:null,online:false,canPost:true,enemies:[],deaths:0,players:[{id:0,position:{x:1,y:2,z:3}}]};}
-  startupPrepare(){return {ok:true};}startupRestore(){h.restoreCalls++;return {ok:true};}multiplayerValid(){return false;}
+  read(){return {time:100,...h.nativeReading};}
+  startupPrepare(){return {ok:true};}startupRestore(){h.restoreCalls++;return {ok:!h.restoreBlocked};}multiplayerValid(){return false;}
 }}));
-vi.mock("./shop_window",()=>({ShopWindow:class {busy=false;tick(){}draw(){}}}));
+vi.mock("./shop_window",()=>({ShopWindow:class {
+  unresolved=false;get busy(){return this.unresolved;}lastTransaction={status:"uncertain",message:"native read failed"};
+  constructor(){h.shops.push(this);}tick(){}draw(){}
+  retireAfterRestore=vi.fn(()=>{this.unresolved=false;return true;});
+}}));
 vi.mock("./webconsole_bridge",()=>({WebConsoleBridge:class {
   constructor(public session:any){h.bridges.push(this);}tick(){}partyRosterSize(){return null;}newScriptSession(){return {};}
 }}));
@@ -43,9 +48,23 @@ vi.mock("./multiplayer_entry",()=>({MultiplayerEntry:class {
 vi.mock("./multiplayer_run",()=>({MultiplayerRun:class {}}));
 
 beforeEach(async()=>{
-  vi.resetModules();h.configError=false;h.startupPending=false;h.restoreCalls=0;h.config=validateConfig(structuredClone(defaultConfig));
-  for(const key of ["frames","bridges","runtimes","entries","gachas","buffs","errors"] as const)h[key].length=0;
+  vi.resetModules();h.configError=false;h.startupPending=false;h.restoreCalls=0;h.restoreBlocked=false;h.config=validateConfig(structuredClone(defaultConfig));
+  h.nativeReading={quest:null,online:false,canPost:true,enemies:[],deaths:0,players:[{id:0,position:{x:1,y:2,z:3}}]};
+  for(const key of ["frames","bridges","runtimes","entries","gachas","buffs","shops","errors"] as const)h[key].length=0;
   await import("./main");expect(h.errors).toEqual([]);expect(h.bridges).toHaveLength(1);
+});
+
+it.each(["restored","fault-restored","restore-pending","still-in-quest","no-player"])("handles uncertain delivery at multiplayer settlement: %s",scenario=>{
+ const first=h.bridges[0].session,shop=h.shops[0];
+ first.core.replaceConfig({...first.core.config,quest:{...first.core.config.quest,id:900103}});
+ first.stage=scenario==="fault-restored"?"Fault":"Finished";shop.unresolved=true;
+ if(scenario==="restore-pending"){first.armStartupRestore();h.restoreBlocked=true;}
+ if(scenario==="still-in-quest")h.nativeReading.quest={id:900103,unique:7,status:"failed",playing:false};
+ if(scenario==="no-player")h.nativeReading.players=[];
+ for(const frame of h.frames)frame();
+ if(scenario==="restored"||scenario==="fault-restored"){
+  expect(h.bridges).toHaveLength(2);expect(shop.retireAfterRestore).toHaveBeenCalledTimes(1);expect(shop.busy).toBe(false);
+ }else{expect(h.bridges).toHaveLength(1);expect(shop.retireAfterRestore).not.toHaveBeenCalled();expect(shop.busy).toBe(true);}
 });
 
 it("uses saved rules for entry preparation, services and the replacement session after multiplayer settlement",()=>{

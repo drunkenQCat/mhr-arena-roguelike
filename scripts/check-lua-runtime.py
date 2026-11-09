@@ -470,3 +470,44 @@ lua.eval('''function(m, config)
   end
 end''')(modules, ending_config)
 print("PASS Lua 5.4: stop vs exhausted carts, delayed local failure, instance binding and preserved result")
+
+# Exercise a real emitted ShopWindow transaction: one write, ambiguous readback,
+# no retry/refund, then retire the lock only at the restored-village boundary.
+host.globals().shop_modules = host.execute(original_bundle.replace(entry, '''return {
+  ShopWindow=require("src.game.shop_window").ShopWindow,
+  RunCore=require("src.core.run_core").RunCore,
+  validateConfig=require("src.core.config").validateConfig,
+  raw=require("src.game.default_config").defaultConfig
+}'''))
+host.execute('''
+  local count,writes,wrongRead=2,0,false
+  local signature="tryAddGameItem(snow.data.ContentsIdSystem.ItemId, System.Int32)"
+  local slot={call=function() if wrongRead then wrongRead=false;return count+1 end;return count end}
+  local pouch={get_type_definition=function()return {get_method=function()return {} end}end}
+  function pouch:call(name,id,n)
+    if name=="findInventoryData"then return slot end
+    if name=="canAddItem"then return true end
+    assert(name==signature and id==68157449 and n==1)
+    count=count+1;writes=writes+1;wrongRead=true
+  end
+  sdk.get_managed_singleton=function(name)
+    if name=="snow.data.DataManager"then return {get_field=function()return pouch end}end
+    return {call=function(_,method)return method=="IsCanInvokeQuestBoard"end}
+  end
+  local m=shop_modules
+  local function new(Class,...)local o=setmetatable({},Class.prototype);o:____constructor(...);return o end
+  local cfg=m.validateConfig(nil,m.raw)
+  cfg.shop={{id="dust_life",name="test",category="test",price=10,cap=10,mode="perUnit"}}
+  local core=new(m.RunCore,cfg,42);assert(core:startRun(cfg.armorOptions[1]).ok);core:generateChoices(1)
+  local shop=new(m.ShopWindow,core,function()return true end)
+  assert(shop:requestPurchase("dust_life").ok);shop:tick()
+  assert(shop.busy and shop.lastTransaction.status=="uncertain" and count==3 and writes==1 and core.state.wallet.pt==140)
+  assert(not shop:requestPurchase("dust_life").ok)
+  local village={canPost=true,players={{id=0,position={x=1,y=2,z=3}}},enemies={},deaths=0,time=10,online=true}
+  assert(not shop:retireAfterRestore("Selecting",false,village))
+  assert(not shop:retireAfterRestore("Finished",true,village) and shop.busy)
+  assert(shop:retireAfterRestore("Finished",false,village) and not shop.busy)
+  assert(shop.lastTransaction.status=="uncertain" and shop.lastTransaction.retiredAfterRestore)
+  assert(core.state.wallet.pt==140 and writes==1 and count==3)
+''')
+print("PASS Lua 5.4: uncertain native delivery stays locked until restored village, no refund or replay")

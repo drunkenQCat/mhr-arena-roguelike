@@ -87,6 +87,10 @@ try {
   const mismatch = await render(Play, { ...props, state:{...state,sessionStage:'Fault',runSummary:{...ended,
     ending:{...ended.ending,native:{...ended.ending.native,status:'success'}}}} });
   assert.match(mismatch,/本机原生结果：成功/);assert.match(mismatch,/不能作为三猫失败验收/);checked++;
+  const retired = await render(Play, { ...props, state:{...state,sessionStage:'Selecting',multiplayerRun:null,services:{...state.services,
+    lastTransaction:{status:'uncertain',message:'native read failed',retiredAfterRestore:true}}} });
+  assert.match(retired,/上局交易结果仍未确认/);assert.match(retired,/旧交易已封存，可以准备新局/);
+  assert.doesNotMatch(retired,/交易结果待核实，请检查背包或装备，不要重复购买/);checked++;
 
   const cfg = editorConfig(JSON.parse(readFileSync(new URL('../../data/rogue_config.json', import.meta.url), 'utf8')));
   const balance = await render(Balance, { draft: cfg, baseline: cfg, layer: 5, players: 2, unlocked: false });

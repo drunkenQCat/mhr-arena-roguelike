@@ -143,8 +143,11 @@ try {
       runtime.setConfigRecoveryNotice(configRecovery.message);
       if (multiplayerRun) multiplayerRun.tick(); else multiplayerEntry.tick();
       const r = session.readingSnapshot;
-      if (["Finished", "Fault"].includes(session.stage) && !shopWindow.busy && !session.startupStatus.restorePending &&
-          r?.canPost && !r.quest && r.players.length > 0 && (entryAttached || core.config.quest.id === 900103)) {
+      const restoredVillage = ["Finished", "Fault"].includes(session.stage) && !session.startupStatus.restorePending &&
+        !!r?.canPost && !r.quest && r.players.length > 0;
+      if (restoredVillage && shopWindow.retireAfterRestore(session.stage, session.startupStatus.restorePending, r))
+        runtime.report("shop-uncertain-retired", { transaction: shopWindow.lastTransaction });
+      if (restoredVillage && !shopWindow.busy && (entryAttached || core.config.quest.id === 900103)) {
         previousRun = session.runSummary(); runtime.report("run-settlement",previousRun);
         buffs.shutdown(); multiplayerEntry.resetForNextRun();
         runtime.rebind(config, installer); multiplayerRun = null; entryAttached = false;

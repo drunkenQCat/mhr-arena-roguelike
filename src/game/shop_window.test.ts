@@ -14,6 +14,7 @@ vi.mock("./sdk", () => ({ clockSeconds: () => 0, rejson: { dump_file: mock.dumps
   button: (label: string) => { if (label.includes("PT") && mock.click) { mock.click = false; return true; } return false; },
 } }));
 import { ShopWindow } from "./shop_window";
+import type { RuntimeReading } from "../core/run_session";
 
 function fixture() {
   const config = validateConfig(defaultConfig);
@@ -66,6 +67,20 @@ describe("shop transaction", () => {
     click(); shop.tick(); click(); shop.tick();
     expect(shop.busy).toBe(true); expect(core.state.wallet.pt).toBe(initial - 10);
     expect(mock.grant).toHaveBeenCalledTimes(1);
+  });
+  it("retires an uncertain old transaction only after native village and personal restoration, without refund or retry",()=>{
+    const {core,shop,click}=fixture();mock.grant.mockReturnValue({granted:false,uncertain:true});
+    click();shop.tick();const pt=core.state.wallet.pt,version=shop.transactionVersion,receipt={...shop.lastTransaction!};
+    const village:RuntimeReading={time:10,quest:null,players:[{id:0,position:{x:1,y:2,z:3}}],enemies:[],deaths:0,online:true,canPost:true};
+    expect(shop.retireAfterRestore("Selecting",false,village)).toBe(false);
+    expect(shop.retireAfterRestore("Finished",true,village)).toBe(false);
+    expect(shop.retireAfterRestore("Finished",false,{...village,canPost:false})).toBe(false);
+    expect(shop.retireAfterRestore("Finished",false,{...village,players:[]})).toBe(false);
+    expect(shop.retireAfterRestore("Finished",false,{...village,quest:{id:900103,unique:7,status:"failed",playing:false}})).toBe(false);
+    expect(shop.busy).toBe(true);expect(shop.retireAfterRestore("Finished",false,village)).toBe(true);
+    expect(shop.busy).toBe(false);expect(shop.lastTransaction).toEqual({...receipt,retiredAfterRestore:true});
+    expect(core.state.wallet.pt).toBe(pt);expect(shop.transactionVersion).toBe(version);expect(mock.grant).toHaveBeenCalledTimes(1);
+    expect(shop.retireAfterRestore("Finished",false,village)).toBe(false);
   });
   it("revalidates the stage after a queued click", () => {
     const { shop, click } = fixture(); click(); mock.selecting = false; shop.tick();

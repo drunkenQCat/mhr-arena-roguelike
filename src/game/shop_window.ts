@@ -6,6 +6,7 @@ import { canTrade, grantFill, grantItem, pouchCount, pouchCanReceive, type Trade
 import { restoreNativeCart } from "./native_cart";
 import type { GachaRollResult } from "./gacha";
 import type { BuffKind } from "./buff_service";
+import type { RuntimeReading, SessionStage } from "../core/run_session";
 import { clockSeconds, imguiApi, rejson } from "./sdk";
 
 type Pending =
@@ -37,7 +38,7 @@ export class ShopWindow
   private catalogueConfig: RunCore["config"] | null = null;
   private cachedCatalogue: { available: boolean; reason: string | null; categories: Record<string, ShopEntry[]> } | null = null;
   transactionVersion = 0;
-  lastTransaction: { status: string; message: string } | null = null;
+  lastTransaction: { status: string; message: string; retiredAfterRestore?: boolean } | null = null;
 
   private complete(status: string, message: string): void {
     this.transactionVersion++;
@@ -49,6 +50,18 @@ export class ShopWindow
     private readonly services: ServiceEffects | null = null) {}
 
   get busy(): boolean { return this.pending !== null || this.unresolved; }
+
+  /** An unknown delivery blocks this run, not all future runs. Only the normal
+   * ending/recovery path may retire it after the engine saved the original
+   * personal inventory and returned to a loaded village. Never retry or refund. */
+  retireAfterRestore(stage: SessionStage, restorePending: boolean, reading: RuntimeReading | null): boolean {
+    if (!this.unresolved || this.pending !== null || !["Finished", "Fault"].includes(stage) || restorePending ||
+        !reading?.canPost || reading.quest || reading.players.length === 0) return false;
+    this.unresolved = false;
+    this.catalogueAt = -1;
+    if (this.lastTransaction) this.lastTransaction = { ...this.lastTransaction, retiredAfterRestore: true };
+    return true;
+  }
 
   /** One source of truth for native UI, web UI and purchase validation. No phase cache. */
   catalogue(fresh = false): { available: boolean; reason: string | null; categories: Record<string, ShopEntry[]> } {

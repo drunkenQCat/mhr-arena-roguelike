@@ -54,6 +54,7 @@ const buyLabel = (mode: string, id: string) => id.startsWith('gacha_') ? '抽取
 const transactionText = computed(() => {
   const t = props.state?.services?.lastTransaction;
   if (!t) return '';
+  if (t.retiredAfterRestore) return '上局交易结果仍未确认；个人装备与背包已恢复，旧交易已封存，可以准备新局。';
   const message = localizeTransaction(t.message ?? '', Object.values(props.state?.shop ?? {}).flat());
   if (t.status === 'applied') return `最近交易：${message || '购买成功'}；当前余额 ${props.state?.pt ?? '—'} PT`;
   if (t.status === 'uncertain') return `交易结果待核实，请检查背包或装备，不要重复购买。${t.message ?? ''}`;
