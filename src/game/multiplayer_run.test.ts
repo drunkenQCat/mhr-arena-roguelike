@@ -23,9 +23,9 @@ function fixture(size=2,configUpdates=false) {
     let run:MultiplayerRun;
     const reading:RuntimeReading={time:mock.now,quest:{id:900103,unique:7,playing:true,status:"play"},
       online:true,canPost:false,deaths:0,players:[{id:0,position:{x:10,y:20,z:30}},{id:1,position:{x:10,y:20,z:30}}],enemies:[]};
-    const publish=vi.fn(), policy=vi.fn(), finish=vi.fn(), guardFailure=vi.fn();
+    const publish=vi.fn(), policy=vi.fn(), finish=vi.fn(), guardFailure=vi.fn(),ultimateDrop=vi.fn(()=>({ok:true}));
     const port:SessionPort={now:()=>mock.now,ready:()=>true,read:()=>({...reading,time:mock.now}),publish,policy,
-      post:vi.fn(),cancelPost:vi.fn(),postingError:()=>null,takeDeaths:()=>[],finish,guardFailure,report:vi.fn(),
+      post:vi.fn(),cancelPost:vi.fn(),postingError:()=>null,takeDeaths:()=>[],finish,guardFailure,ultimateDrop,report:vi.fn(),
       multiplayerRole:()=>run?.role ?? null, multiplayerValid:()=>run?.valid() ?? false, multiplayerCanChoose:()=>run?.canChoose() ?? false};
     port.partySize=()=>run?.partySize() ?? null;
     let userConfig={...cfg,quest:{...cfg.quest,id:900102}};
@@ -53,7 +53,7 @@ function fixture(size=2,configUpdates=false) {
     const wave={index:0,mode:"single" as const,typeTag:"A",label:"entry",monsters:["Great Izuchi"],tier:"weak",hpMul:1,dmgMul:1,rewardMul:0,rewardPt:0};
     expect(session.adoptMultiplayerEntry(makeQuestPlan(cfg,monsterCatalog,wave,1,1,false)).ok).toBe(true);
     session.tick();
-    return {run,session,core,cfg,reading,publish,policy,finish,guardFailure,network,mirrorCartRestore,setBusy:(v:boolean)=>busy=v,
+    return {run,session,core,cfg,reading,publish,policy,finish,guardFailure,ultimateDrop,network,mirrorCartRestore,setBusy:(v:boolean)=>busy=v,
       userConfig:()=>userConfig,files,diskState};
   };
   const host=make("h"),guests=bus.members.slice(1).map(make),guest=guests[0]!;
@@ -209,6 +209,56 @@ it("requires all four fixed members to stage and activate the same native ticket
 it("follows host stop without a guest issuing native failure",()=>{
  const f=fixture();f.tick();f.host.session.stop();f.tick();
  expect(f.guest.session.stage).toBe("Finished");expect(f.guest.run.valid()).toBe(false);expect(f.guest.finish).not.toHaveBeenCalled();
+});
+
+it.each(["stop","fault"])("accepts host %s while guest delivery is unresolved and guards failure before releasing clear policy",kind=>{
+ const f=fixture();f.tick();f.guest.setBusy(true);
+ if(kind==="stop")f.host.session.stop();else f.host.session.failMultiplayer("host error");
+ const guards=f.guest.guardFailure.mock.calls.length;
+ f.tick();
+ expect(f.guest.session.stage).toBe(kind==="stop"?"Finished":"Fault");
+ expect(f.guest.run.valid()).toBe(false);expect(f.guest.finish).not.toHaveBeenCalled();
+ expect(f.guest.guardFailure).toHaveBeenCalledTimes(guards+1);
+ expect(f.guest.guardFailure.mock.invocationCallOrder.at(-1)).toBeLessThan(f.guest.policy.mock.invocationCallOrder.at(-1)!);
+ expect(f.guest.session.runSummary().ending).toEqual({intent:kind==="stop"?"stopped":"fault",native:null});
+ expect(f.bus.acks.g).not.toContain("R4ERR|");
+});
+
+it("settles a terminal host reward without late loot grants or native cart writes",()=>{
+ const f=fixture();f.tick();const frame=JSON.parse(f.bus.plan),before=f.guest.core.state.wallet.pt;
+ Object.assign(frame,{n:frame.n+1,stage:"Finished",phase:"GameOver",endIntent:"stopped",earned:80,cartUsed:true});
+ frame.w[3]="ultimate";f.bus.plan=JSON.stringify(frame);mock.now++;f.guest.run.tick();
+ expect(f.guest.session.stage).toBe("Finished");expect(f.guest.core.state.wallet.pt).toBe(before+80);
+ expect(f.guest.session.runSummary().clearedWaves).toBe(1);
+ expect(f.guest.ultimateDrop).not.toHaveBeenCalled();expect(f.guest.mirrorCartRestore).not.toHaveBeenCalled();
+ expect((f.guest.session as any).pendingSupplies).toEqual([]);
+ expect(f.guest.session.runSummary().ending.native).toBeNull();
+});
+
+it("does not guard native failure for a completed host run",()=>{
+ const f=fixture();f.tick();const frame=JSON.parse(f.bus.plan);
+ Object.assign(frame,{n:frame.n+1,stage:"Finished",phase:"GameOver",endIntent:"cleared-all"});
+ f.bus.plan=JSON.stringify(frame);mock.now++;f.guest.run.tick();
+ expect(f.guest.session.stage).toBe("Finished");expect(f.guest.guardFailure).not.toHaveBeenCalled();
+ expect(f.guest.finish).not.toHaveBeenCalled();expect(f.guest.session.runSummary().ending.native).toBeNull();
+});
+
+it("rejects an ending for a replaced native instance before changing wallets or failure guards",()=>{
+ const f=fixture();f.tick();const wallet=f.guest.core.state.wallet.pt;
+ f.host.session.stop();mock.now++;f.host.run.tick();
+ f.guest.reading.quest!.unique=999;f.guest.run.tick();
+ expect(f.guest.session.stage).toBe("Fault");expect(f.guest.session.questUniqueSnapshot).toBe(7);
+ expect(f.guest.core.state.wallet.pt).toBe(wallet);expect(f.guest.guardFailure).not.toHaveBeenCalled();
+ expect(f.guest.finish).not.toHaveBeenCalled();expect(f.bus.acks.g).not.toContain("R4ERR|");
+});
+
+it("does not revive a terminal guest when a delayed gameplay frame arrives",()=>{
+ const f=fixture();f.tick();const old=JSON.parse(f.bus.plan);f.guest.setBusy(true);
+ f.host.session.stop();f.tick();expect(f.guest.session.stage).toBe("Finished");
+ const guards=f.guest.guardFailure.mock.calls.length,pt=f.guest.core.state.wallet.pt;
+ f.bus.plan=JSON.stringify({...old,n:old.n+100});mock.now++;f.guest.run.tick();
+ expect(f.guest.session.stage).toBe("Finished");expect(f.guest.core.state.wallet.pt).toBe(pt);
+ expect(f.guest.guardFailure).toHaveBeenCalledTimes(guards);expect(f.guest.finish).not.toHaveBeenCalled();
 });
 
 it("propagates guest stop immediately and guards success before releasing local policy",()=>{

@@ -324,8 +324,9 @@ multi.execute('''
       steam_ack=function(_,text) bus.acks[self]=text;return true end,
       steam_snapshot=function() return {lobbies={{id="l",owner="h",self=self,plan=bus.plan,
         members={{id="h",ack=bus.acks.h or ""},{id="g",ack=bus.acks.g or ""}}}}} end}
-    local runtime={publish=function(_,plan) p.published=plan end,report=function() end}
-    local run=new(m.MultiplayerRun,{lobby="l",owner="h",self=self,session="s",members={"h","g"}},cfg,m.catalog,s,runtime,function() return false end,net)
+    local runtime={publish=function(_,plan) p.published=plan end,report=function() end,
+      mirrorCartRestore=function() error("unexpected late native cart write") end}
+    local run=new(m.MultiplayerRun,{lobby="l",owner="h",self=self,session="s",members={"h","g"}},cfg,m.catalog,s,runtime,function() return p.busy or false end,net)
     p.run=run
     local w={index=0,mode="single",typeTag="A",label="entry",monsters={"Great Izuchi"},tier="weak",hpMul=1,dmgMul=1,rewardMul=0,rewardPt=0}
     assert(s:adoptMultiplayerEntry(m.makeQuestPlan(nil,cfg,m.catalog,w,1,1,false)).ok)
@@ -360,8 +361,25 @@ multi.execute('''
   assert(g.core.state.wallet.pt==expected,g.s.message)
   tick();assert(g.core.state.wallet.pt==expected)
   assert(g.core.state.layer==3)
+  -- A terminal frame wins over an unknown local delivery without performing
+  -- late loot/cart writes or fabricating this engine's native failure result.
+  g.p.busy=true
+  local pendingBefore=#g.s.pendingSupplies
+  local guards=0
+  function g.p:guardFailure() guards=guards+1 end
+  function g.p:policy(_,hold) if not hold then assert(guards==1) end end
+  function g.p:ultimateDrop() error("unexpected terminal equipment grant") end
+  function h.p:finish(failed) assert(failed) end
+  clock=clock+1;h.s:stop();h.run:tick()
+  local terminal=wire_load(bus.plan)
+  terminal.earned=terminal.earned+80;terminal.w[4]="ultimate";terminal.cartUsed=true
+  bus.plan=wire_dump(terminal);g.run:tick()
+  assert(g.s.stage=="Finished" and not g.run:valid() and guards==1)
+  assert(g.core.state.wallet.pt==expected+80 and #g.s.pendingSupplies==pendingBefore)
+  assert(g.s:runSummary().ending.intent=="stopped" and g.s:runSummary().ending.native==nil)
+  assert(not string.find(bus.acks.g or "","R4ERR|",1,true))
 ''')
-print("PASS Lua 5.4: two-peer multiplayer choice/staging/commit/activation/reward and personal-wallet isolation")
+print("PASS Lua 5.4: two-peer staging/rewards, wallet isolation and terminal priority over unresolved delivery")
 
 # Exercise the emitted configuration protocol using the exact C-module noSelf
 # conventions. This is a protocol test, not proof that production is wired yet.

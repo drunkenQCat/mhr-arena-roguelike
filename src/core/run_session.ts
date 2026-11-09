@@ -334,7 +334,15 @@ export class RunSession {
     plan: QuestPlan; choices: WaveOption[]; earned: number; carts: number; camp: Position | null;
     cartUsed: boolean; killed: string[];endIntent?:RunEndIntent|null }): void {
     if (this.multiplayerRole !== "guest" || !this.port.multiplayerValid?.()) throw new Error("Guest mirror scope ended");
+    const q = this.readingSnapshot?.quest;
+    if (!q || q.id !== frame.plan.questId || (this.questUnique !== null && q.unique !== this.questUnique))
+      throw new Error("Guest mirror native quest instance changed");
     if (frame.earned < this.mirroredReward) throw new Error("Multiplayer reward total went backwards");
+    const terminal = ["Finished", "Fault"].includes(frame.stage);
+    const intent = frame.endIntent ?? (frame.stage === "Fault" ? "fault" : "native-ended");
+    // Receiving host intent must not release completed native objectives before
+    // the engine receives failure. This guard never ends a guest's native quest.
+    if (terminal && q.playing && ["stopped", "fault", "carts-exhausted"].includes(intent)) this.port.guardFailure?.();
     const newReward = frame.earned > this.mirroredReward;
     this.core.state.wallet.pt += frame.earned - this.mirroredReward;
     this.mirroredReward = frame.earned; this.earnedPt = frame.earned;
@@ -342,21 +350,23 @@ export class RunSession {
     if (cleared && !this.mirroredClears.includes(frame.plan.token)) {
       this.mirroredClears.push(frame.plan.token);
       if (this.mirroredClears.length > 256) this.mirroredClears.shift();
-      this.queueSupplies(frame.plan);
-      if (frame.plan.wave.tier === "ultimate") this.grantUltimateDrop();
+      if (terminal) this.clearedWaves++;
+      else {
+        this.queueSupplies(frame.plan);
+        if (frame.plan.wave.tier === "ultimate") this.grantUltimateDrop();
+      }
     }
-    if(["Finished","Fault"].includes(frame.stage))this.markRunEnd(frame.endIntent??(frame.stage==="Fault"?"fault":"native-ended"));
+    if (terminal) this.markRunEnd(intent);
     this.stage = frame.stage; this.core.state.phase = frame.phase; this.core.state.layer = frame.layer;
     this.core.state.cartsLeft = frame.carts; this.core.state.cartRestoreUsed = frame.cartUsed;
     this.core.state.killedUltimates = [...frame.killed];
     this.core.state.currentChoices = frame.choices; this.core.state.activeWave = frame.phase === "Combat" || frame.phase === "Carve" ? frame.plan.wave : null;
     this.plan = frame.plan; this.token = frame.plan.token; this.camp = frame.camp;
     this.roster = this.readingSnapshot?.players.map(p => p.id) ?? [];
-    const q = this.readingSnapshot?.quest;
     if (q?.playing) this.questUnique = q.unique;
     this.message = frame.stage==="Fault"?"房主因错误停止本局，等待本机原生结算与个人恢复":
       frame.stage==="Finished"?"房主已结束本局，等待本机原生结果与个人恢复":"联机同步：由房主选波，个人 PT 和购物独立结算";
-    this.port.policy(frame.plan, !["Finished", "Fault"].includes(frame.stage));
+    this.port.policy(frame.plan, !terminal);
   }
 
   constructor(readonly core: RunCore, private readonly catalog: MonsterCatalog, private readonly port: SessionPort,

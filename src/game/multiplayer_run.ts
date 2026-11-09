@@ -222,13 +222,18 @@ export class MultiplayerRun implements SpawnSync {
         !Number.isInteger(f.spawn.id) || f.spawn.id < 0 || !Number.isInteger(f.spawn.uid) || f.spawn.uid < 0)) throw new Error("Invalid multiplayer spawn ticket");
     const reading = this.session.readingSnapshot;
     if (!reading?.quest || (!reading.quest.playing && !["Finished","Fault"].includes(f.stage))) return;
+    if (reading.quest.id !== plan.questId || (this.session.questUniqueSnapshot !== null &&
+        reading.quest.unique !== this.session.questUniqueSnapshot)) throw new Error("Guest native quest instance changed");
+    const terminal = ["Finished", "Fault"].includes(f.stage);
     if (this.preparedToken !== f.token && f.layer > 1 && f.stage === "Combat") {
       // Native death delivery can lag host state; wait rather than destroying a live actor.
       if (reading.enemies.some(e => !e.dead && !e.captured) || this.busy()) return;
       this.runtime.publish(plan, true); this.localTicket = null; this.activated = null; this.preparedToken = f.token;
     }
-    if (this.busy() && stateKey(f) !== (this.frame ? stateKey(this.frame) : "")) return;
-    if (f.cartUsed && !this.session.core.state.cartRestoreUsed) this.runtime.mirrorCartRestore(f.deaths);
+    // A pending/unknown purchase freezes gameplay, never the host's ending.
+    // Ending frames carry accounting and intent, not late native service writes.
+    if (!terminal && this.busy() && stateKey(f) !== (this.frame ? stateKey(this.frame) : "")) return;
+    if (!terminal && f.cartUsed && !this.session.core.state.cartRestoreUsed) this.runtime.mirrorCartRestore(f.deaths);
     this.session.mirrorMultiplayer({ stage:f.stage, phase:f.phase, layer:f.layer, plan, choices,
       earned:f.earned, carts:f.carts, cartUsed:f.cartUsed, camp:f.camp, killed:f.killed ?? [], endIntent:f.endIntent });
     this.frame = f; this.lastSequence = f.n; this.lastSeen = clockSeconds();
