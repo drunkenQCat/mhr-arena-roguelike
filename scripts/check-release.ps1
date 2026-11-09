@@ -23,6 +23,16 @@ try {
         try { $actual = [Convert]::ToHexString($hash.ComputeHash($stream)).ToLowerInvariant() } finally { $stream.Dispose(); $hash.Dispose() }
         if ($actual -cne $file.sha256) { throw "Manifest hash mismatch: $($file.path)" }
     }
-    if ($manifest.probesIncluded -ne $false -or $manifest.multiplayerSupported -ne $false -or $manifest.multiplayerEntryExperimental -ne $true -or $manifest.twoClientEntryVerified -ne $false) { throw 'Incorrect playtest capabilities.' }
+    if ($manifest.manifestSchemaVersion -ne 2 -or $manifest.probesIncluded -ne $false -or $manifest.capabilitiesFile -cne 'release-capabilities.json') { throw 'Incorrect release capability manifest.' }
+    foreach ($legacyField in @('multiplayerSupported','multiplayerEntryExperimental','twoClientEntryVerified')) {
+        if ($manifest.PSObject.Properties.Name -contains $legacyField) { throw "Ambiguous legacy capability field: $legacyField" }
+    }
+    $capabilitiesEntry = $zip.GetEntry('release-capabilities.json')
+    $reader = [IO.StreamReader]::new($capabilitiesEntry.Open())
+    try { $capabilitiesText = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    $validated = $capabilitiesText | & node (Join-Path $PSScriptRoot 'release-capabilities.js') --stdin
+    if ($LASTEXITCODE -ne 0) { throw 'Invalid release capabilities in archive.' }
+    $capabilities = $validated | ConvertFrom-Json
+    if ($manifest.releaseStage -cne $capabilities.releaseStage) { throw 'Manifest release stage differs from capabilities.' }
     Write-Host "PASS: $($names.Count) allowlisted files, all hashes verified; no probes, example autoruns, logs or build intermediates."
 } finally { $zip.Dispose() }

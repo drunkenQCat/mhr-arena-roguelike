@@ -303,6 +303,6 @@ export class MultiplayerEntry {
       prepared: this.lifecycle?.prepared() ?? false,
       options: this.choices(this.plan?.seed ?? this.previewSeed, lobby?.members.length ?? 2).map(wave => ({
         index: wave.index, mode: wave.mode, label: wave.label, rewardPt: wave.rewardPt, monsters: wave.monsters })),
-      scope: "native-entry-experiment", verifiedTwoClients: false };
+      scope: "native-multiplayer-entry" };
   }
 }

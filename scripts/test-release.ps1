@@ -11,6 +11,15 @@ $cases = @(
         $entry = $zip.GetEntry('reframework/plugins/console.html'); $entry.Delete()
         $writer = [IO.StreamWriter]::new($zip.CreateEntry('reframework/plugins/console.html').Open())
         try { $writer.Write('tampered') } finally { $writer.Dispose() }
+    } },
+    @{ Name = 'contradictory legacy multiplayer claim'; Mutate = { param($zip)
+        $entry = $zip.GetEntry('build-manifest.json')
+        $reader = [IO.StreamReader]::new($entry.Open())
+        try { $manifest = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+        $manifest | Add-Member -NotePropertyName multiplayerSupported -NotePropertyValue $false
+        $entry.Delete()
+        $writer = [IO.StreamWriter]::new($zip.CreateEntry('build-manifest.json').Open())
+        try { $writer.Write(($manifest | ConvertTo-Json -Depth 12)) } finally { $writer.Dispose() }
     } }
 )
 foreach ($case in $cases) {

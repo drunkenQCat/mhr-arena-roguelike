@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "releaseStage": "multiplayer-playtest",
+  "protocols": { "http": 4, "entryRules": 6, "run": 4, "plugin": "0.4.2" },
+  "multiplayer": { "implemented": true, "stable": false, "maxPlayers": 4 },
+  "verification": {
+    "localNativeGameplayPlayers": [2, 3, 4],
+    "localNativeConfigPlayers": [2],
+    "officialSteamCrossPc": "pending",
+    "longRun": "pending",
+    "reference": "https://github.com/drunkenQCat/mhr-arena-roguelike/blob/master/docs/multiplayer-runtime.md"
+  },
+  "playerSummary": "联机测试版：已接入多人波次、个人购物与装备、共享猫车和局末恢复。",
+  "verificationSummary": "本机 2／3／4 个真实游戏进程已验证基础玩法，使用模拟 Steam 身份；新增局内调参已实测双端。",
+  "remainingGates": [
+    { "id": "official-steam-cross-pc", "label": "不同电脑、官方 Steam 账号间联机" },
+    { "id": "config-native-3-4", "label": "新增局内调参的三／四端实机验证" },
+    { "id": "long-run", "label": "长局与出怪记录上限专项" }
+  ]
+}

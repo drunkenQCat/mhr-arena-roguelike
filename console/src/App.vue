@@ -6,6 +6,7 @@ import MultiplayerEntry from "./MultiplayerEntry.vue";
 import ConnectionHelp from "./ConnectionHelp.vue";
 import SupportBar from "./SupportBar.vue";
 import NativeNotice from "./NativeNotice.vue";
+import ReleaseCapabilities from "./ReleaseCapabilities.vue";
 import { Freshness, SubmissionUncertain, downloadJson, getJson, postCommand, waitForReceipt, type ConsoleState, type CommandResult } from "./api";
 
 const state = ref<ConsoleState | null>(null), stale = ref(true), busy = ref(false);
@@ -140,7 +141,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); window.removeEventListen
     <template v-if="page === 'help'">
       <ConnectionHelp v-model:developer="developerMode" />
       <SupportBar />
-      <p class="muted">联机测试版 · 本机 2／3／4 个真实游戏进程已验证波次、个人购物和三猫恢复，测试使用模拟 Steam 身份。不同电脑的官方 Steam 联机与长局仍待验收。</p>
+      <ReleaseCapabilities />
     </template>
     <MultiplayerEntry v-if="page === 'multiplayer'" :entry="state?.multiplayerEntry" :run="state?.multiplayerRun" :connected="connected" :busy="busy || !connected" @command="send" @play="page = 'play'" />
     <PlayWorkspace v-show="page === 'play'" :state="state" :connected="connected" :busy="busy" :notice="notice" :developer-mode="developerMode" @command="send" @multiplayer="page = 'multiplayer'" />

@@ -20,7 +20,7 @@ export interface ConsoleState {
     configSync?:{busy:boolean;host:boolean;message:string;serial:number|null;phase:string|null;result:{serial:number;status:string;message:string}|null}|null;
     members: { id: string; self: boolean; ready: boolean }[] | null; token: number | null;
     staged: { token: number; ordinal: number; type: number; slot: number; id: number; uid: number } | null;
-    commit: boolean; verifiedTwoClients: boolean; fixedPartySize?: number } | null;
+    commit: boolean; fixedPartySize?: number } | null;
   runSummary?: RunSummary | null;
   previousRun?: RunSummary | null;
   supplyLoot?: {itemId:string;count:number;actual:number;granted:boolean;reason?:string}[] | null;

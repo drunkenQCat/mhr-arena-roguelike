@@ -8,6 +8,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$capabilitiesText = & node (Join-Path $PSScriptRoot 'release-capabilities.js')
+if ($LASTEXITCODE -ne 0) { throw 'Release capabilities differ from the runtime sources.' }
+$capabilities = $capabilitiesText | ConvertFrom-Json
 $frameworkRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot $FrameworkDirectory))
 $stageRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot $StageDirectory))
 $archivePath = [IO.Path]::GetFullPath((Join-Path $repoRoot $OutputArchive))
@@ -37,16 +40,16 @@ foreach ($entry in $spec) {
 Set-Content -LiteralPath (Join-Path $stageRoot 'reframework_pictographic.mode') -Value 'Enable REFramework embedded CJK font.' -Encoding ascii
 Set-Content -LiteralPath (Join-Path $stageRoot '打开电脑控制台.url') -Value "[InternetShortcut]`r`nURL=http://127.0.0.1:11777/console" -Encoding ascii
 $manifest = [ordered]@{
-    product = 'MHR Arena Roguelike - multiplayer entry experiment'
+    manifestSchemaVersion = 2
+    product = 'MHR Arena Roguelike'
     version = $Version
     modRevision = $ModRevision
     sourceDirty = [bool](& git -C $repoRoot status --porcelain)
     reframeworkRevision = $revision.Trim()
     reframeworkRepository = 'https://github.com/drunkenQCat/REFramework'
     game = 'Monster Hunter Rise (Windows x64 Steam)'
-    multiplayerSupported = $false # Official Steam / 3–4P / long-run verification is incomplete.
-    multiplayerEntryExperimental = $true
-    twoClientEntryVerified = $false
+    capabilitiesFile = 'release-capabilities.json'
+    releaseStage = $capabilities.releaseStage
     probesIncluded = $false
     files = @(Get-ChildItem -LiteralPath $stageRoot -Recurse -File | ForEach-Object {
         [ordered]@{ path = [IO.Path]::GetRelativePath($stageRoot, $_.FullName).Replace('\','/'); bytes = $_.Length; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }

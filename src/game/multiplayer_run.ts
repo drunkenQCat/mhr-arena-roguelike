@@ -305,5 +305,5 @@ export class MultiplayerRun implements SpawnSync {
     fixedPartySize:this.partySize(),
     lobby:this.context.lobby, session:this.context.session, members:this.members.map(m => ({ id:m.id, self:m.id === this.context.self,
       ready:this.role === "host" ? this.peerReady(m.id) : !!this.frame && m.ack.startsWith(this.ackPrefix(this.frame,"ready")) })),
-    token:this.frame?.token ?? null, staged:this.localTicket, commit:this.committed, verifiedTwoClients:false }; }
+    token:this.frame?.token ?? null, staged:this.localTicket, commit:this.committed }; }
 }

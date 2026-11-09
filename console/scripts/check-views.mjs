@@ -14,8 +14,13 @@ try {
   const { default: Entry } = await server.ssrLoadModule('/src/MultiplayerEntry.vue');
   const { default: Balance } = await server.ssrLoadModule('/src/BalancePreview.vue');
   const { default: NativeNotice } = await server.ssrLoadModule('/src/NativeNotice.vue');
+  const { default: ReleaseCapabilities } = await server.ssrLoadModule('/src/ReleaseCapabilities.vue');
   const { editorConfig } = await server.ssrLoadModule('/src/editor-model.ts');
   const render = (component, props) => renderToString(createSSRApp(component, props));
+  const coverage = await render(ReleaseCapabilities, {});
+  assert.match(coverage,/已接入多人波次/);assert.match(coverage,/模拟 Steam 身份/);
+  assert.match(coverage,/官方 Steam 账号间联机/);assert.match(coverage,/调参的三／四端实机/);
+  assert.doesNotMatch(coverage,/多人不支持|全部验收通过/);checked++;
   const state = {
     sessionStage: 'Selecting', layer: 3, pt: 75, cartsLeft: 2, maxCarts: 3,
     capabilities: { start: false, choose: true, stop: true }, shopAvailable: true, shopBusy: false,

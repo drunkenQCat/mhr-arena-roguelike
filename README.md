@@ -26,6 +26,8 @@ Windows Steam《怪物猎人：崛起》/ Sunbreak 实验模组。提供同场�
 
 普通界面默认隐藏开发战斗工具，不显示“未运行探针=FAIL”的误导面板。需要测试按钮时在网页帮助页手动开启，本次页面有效。CLI doctor 以实际业务心跳判定可用性，不要求玩家启动实验探针。
 
+“帮助与连接”和发行包的 `release-capabilities.json` 共用能力说明，区分已接入玩法、本机原生验收和待验证环境；`build-manifest.json` schema2 引用该文件并校验摘要。当前仍需官方 Steam 跨电脑、长局和新增调参的三/四端实测，不能把本机模拟传输当作这些验证已通过。
+
 ## 构建、CI 与发行
 
 开发入口见 **[开发与发行说明](docs/development.md)**。CI 支持手动构建 artifact；推送 `v*` 标签才执行 Release 发布。REFramework 固定到经过核对的 commit，避免浮动分支悄悄改变发行依赖。
