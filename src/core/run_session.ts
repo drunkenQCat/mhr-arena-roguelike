@@ -11,6 +11,7 @@ export interface EnemyReading {
   position?: { x: number; y: number; z: number };
 }
 export interface QuestReading { id: number; unique: number; playing: boolean; status: "ready" | "play" | "success" | "failed" | "return" }
+export type QuestIdentity = Pick<QuestReading, "id" | "unique">;
 export interface RuntimeReading {
   time: number;
   quest: QuestReading | null;
@@ -44,9 +45,9 @@ export interface SessionPort {
   retarget?(questId: number): void;
   postingError(): string | null;
   waitingForSpawnCapacity?(): boolean;
-  finish(failed: boolean): void;
+  finish(failed: boolean, expected: QuestIdentity): void;
   /** Pin the owned native instance against success while the host queues failure. No native finish call. */
-  guardFailure?(): void;
+  guardFailure?(expected: QuestIdentity): void;
   takeDeaths(): DeathReading[];
   report(event: string, detail: unknown): void;
   /** M3.5 开局准备（穿装+袋隔离）；实现方保证不抛异常。缺省=测试假 port。notice=非阻断警告。 */
@@ -191,7 +192,7 @@ export class RunSession {
     const q = reading.quest;
     if (!this.multiplayerRole || !q?.playing || q.id !== this.plan?.questId ||
         (this.questUnique !== null && q.unique !== this.questUnique)) return;
-    this.port.guardFailure?.();
+    this.port.guardFailure?.({ id:q.id, unique:q.unique });
     this.abortQuest = { id: q.id, unique: q.unique, kind };
   }
 
@@ -342,7 +343,7 @@ export class RunSession {
     const intent = frame.endIntent ?? (frame.stage === "Fault" ? "fault" : "native-ended");
     // Receiving host intent must not release completed native objectives before
     // the engine receives failure. This guard never ends a guest's native quest.
-    if (terminal && q.playing && ["stopped", "fault", "carts-exhausted"].includes(intent)) this.port.guardFailure?.();
+    if (terminal && q.playing && ["stopped", "fault", "carts-exhausted"].includes(intent)) this.port.guardFailure?.({ id:q.id, unique:q.unique });
     const newReward = frame.earned > this.mirroredReward;
     this.core.state.wallet.pt += frame.earned - this.mirroredReward;
     this.mirroredReward = frame.earned; this.earnedPt = frame.earned;
@@ -570,7 +571,7 @@ export class RunSession {
     this.port.cancelPost();
     this.requestMultiplayerAbort(reading, "stop");
     if ((this.port.canFinishLocal?.() ?? this.multiplayerRole !== "guest") && this.plan && reading.quest?.id === this.plan.questId && reading.quest.playing &&
-        (this.questUnique === null || this.questUnique === reading.quest.unique)) this.port.finish(true);
+        (this.questUnique === null || this.questUnique === reading.quest.unique)) this.finishQuest(true, reading);
     this.port.policy(null, false);
     this.core.abortRun("Run stopped");
     if (this.startupPrepared) this.startupRestorePending = true;
@@ -635,7 +636,7 @@ export class RunSession {
         for (let i = 0; i < delta && this.core.state.phase !== "GameOver"; i++) this.core.cart(reading.quest?.playing === true);
         if (this.core.state.phase === "GameOver") {
           this.markRunEnd("carts-exhausted");
-          if (reading.quest?.playing) this.port.finish(true);
+          if (reading.quest?.playing) this.finishQuest(true, reading);
           this.port.policy(null, false);
           this.stage = "Finished"; this.message = "全队猫车耗尽，等待原生结算与个人恢复";
           return;
@@ -704,7 +705,7 @@ export class RunSession {
         this.markRunEnd(this.core.state.phase==="GameOver"?"carts-exhausted":"native-ended");
         this.core.abortRun("Quest failed");
         this.port.policy(null, false);
-        if (reading.quest.playing) this.port.finish(true);
+        if (reading.quest.playing) this.finishQuest(true, reading);
         this.stage = "Finished"; this.message = "Run over; native return flow is enabled";
         return;
       }
@@ -745,7 +746,7 @@ export class RunSession {
             this.route = "reentry";
             this.retryWave = true;
             this.port.policy(this.plan, false);
-            this.port.finish(false);
+            this.finishQuest(false, reading);
             this.stage = "Returning";
             this.message = "No native spawn after table replacement; falling back to quest reentry (no PT awarded)";
             this.announce("in-place-no-go", { token: this.plan!.token });
@@ -755,7 +756,7 @@ export class RunSession {
             this.plan = { ...this.plan!, sequential: false, token: ++this.token };
             this.retryWave = true;
             this.port.policy(this.plan, false);
-            this.port.finish(false);
+            this.finishQuest(false, reading);
             this.stage = "Returning";
             this.message = "Native sequence did not complete; retrying this layer with simultaneous native targets (no PT awarded)";
             this.announce("sequential-no-go", { token: this.plan.token, fallback: "reentry-simultaneous" });
@@ -817,7 +818,7 @@ export class RunSession {
     if (this.route === "inPlace" && !this.testOnly) this.generate(this.partySize(reading));
     else {
       this.port.policy(this.plan, false);
-      this.port.finish(false);
+      this.finishQuest(false, reading);
       this.stage = "Returning";
       this.message = "Returning through the native quest flow; PT and carts remain in this run";
     }
@@ -830,6 +831,15 @@ export class RunSession {
     this.announce("ultimate-drop", drop);
   }
 
+  /** Carry the already-authorized instance across the native adapter boundary.
+   * The adapter must compare it to live state, never retarget to the latest quest. */
+  private finishQuest(failed: boolean, reading: RuntimeReading): void {
+    const q = reading.quest;
+    if (!q || q.id !== this.plan?.questId || (this.questUnique !== null && q.unique !== this.questUnique))
+      throw new Error("Refusing to finish a changed quest instance");
+    this.port.finish(failed, { id:q.id, unique:q.unique });
+  }
+
   private fault(error: unknown): Result {
     if (this.stage === "Fault" && this.message === String(error)) return fail(this.message);
     this.markRunEnd("fault");
@@ -840,7 +850,7 @@ export class RunSession {
     }
     if (this.multiplayerRole && (this.port.canFinishLocal?.() ?? this.multiplayerRole === "host") && q?.playing && this.plan?.questId === q.id &&
         (this.questUnique === null || this.questUnique === q.unique)) {
-      try { this.port.finish(true); }
+      try { this.finishQuest(true, this.readingSnapshot!); }
       catch (finishError) { this.announce("fault-finish-deferred",String(finishError)); }
     }
     this.stage = "Fault";

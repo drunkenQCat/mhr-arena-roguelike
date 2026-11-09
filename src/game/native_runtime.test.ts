@@ -78,15 +78,15 @@ it("defers finish to native quest update, allows native failure first, and never
     name === "get_ActiveQuestNo" ? plan.questId : name === "getActiveQuestUniqueNo" ? unique : null);
   Object.assign(qm, { get_field: () => status });
   const updated = hooks("snow.QuestManager", "update");
-  runtime.finish(true);
+  runtime.finish(true,{id:plan.questId,unique:12});
   expect(qm.call).not.toHaveBeenCalledWith("setQuestFail", expect.anything());
   updated.post(0);
   expect(qm.call).toHaveBeenCalledWith("setQuestFail", 1);
   const failures = () => qm.call.mock.calls.filter(c => c[0] === "setQuestFail").length;
   updated.post(0); expect(failures()).toBe(1);
-  runtime.finish(true); status = 4;
+  runtime.finish(true,{id:plan.questId,unique:12}); status = 4;
   updated.post(0); expect(failures()).toBe(1);
-  status = 2; runtime.finish(true); unique++;
+  status = 2; runtime.finish(true,{id:plan.questId,unique:12}); unique++;
   updated.post(0); expect(failures()).toBe(1);
 });
 
@@ -94,12 +94,45 @@ it("lets a guest pin failure without calling native finish and releases the pin 
  const {runtime,qm,plan,hooks}=fixture();let unique=12;
  qm.call.mockImplementation((name:string)=>name==="isActiveQuest" || name==="isPlayQuest" ? true :
    name==="get_ActiveQuestNo" ? plan.questId : name==="getActiveQuestUniqueNo" ? unique : null);
- runtime.policy(plan,true);runtime.guardFailure();runtime.policy(null,false);
+ runtime.policy(plan,true);runtime.guardFailure({id:plan.questId,unique:12});runtime.policy(null,false);
  expect(hooks("snow.QuestManager","setQuestClear").pre()).toBe(1);
  expect(hooks("snow.QuestManager","setQuestClearSub").pre()).toBe(1);
  hooks("snow.QuestManager","update").post(0);
  expect(qm.call).not.toHaveBeenCalledWith("setQuestFail",expect.anything());
  unique++;expect(hooks("snow.QuestManager","setQuestClear").pre()).toBe(0);
+});
+
+it.each(["guard","fail","clear"])("rejects a stale sampled instance before %s can affect the new native quest",operation=>{
+ const {runtime,qm,plan,hooks}=fixture();
+ qm.call.mockImplementation((name:string)=>name==="isActiveQuest"||name==="isPlayQuest"?true:
+   name==="get_ActiveQuestNo"?plan.questId:name==="getActiveQuestUniqueNo"?13:null);
+ Object.assign(qm,{get_field:()=>2});
+ const sampled={id:plan.questId,unique:12};
+ expect(()=>operation==="guard"?runtime.guardFailure(sampled):runtime.finish(operation==="fail",sampled)).toThrow();
+ hooks("snow.QuestManager","update").post(0);
+ expect(hooks("snow.QuestManager","setQuestClear").pre()).toBe(0);
+ expect(qm.call.mock.calls.some(c=>c[0]==="setQuestFail"||c[0]==="setQuestClear")).toBe(false);
+});
+
+it.each([null,NaN,12.5])("refuses a completion when native unique is unreadable: %s",unique=>{
+ const {runtime,qm,plan,hooks}=fixture();
+ qm.call.mockImplementation((name:string)=>name==="isActiveQuest"||name==="isPlayQuest"?true:
+   name==="get_ActiveQuestNo"?plan.questId:name==="getActiveQuestUniqueNo"?unique:null);
+ Object.assign(qm,{get_field:()=>2});
+ expect(()=>runtime.finish(false,{id:plan.questId,unique:12})).toThrow();
+ hooks("snow.QuestManager","update").post(0);
+ expect(qm.call.mock.calls.some(c=>c[0]==="setQuestClear")).toBe(false);
+});
+
+it("copies the authorized signed instance into the queued completion instead of retaining caller data",()=>{
+ const {runtime,qm,plan,hooks}=fixture();let unique=-12;
+ qm.call.mockImplementation((name:string)=>name==="isActiveQuest"||name==="isPlayQuest"?true:
+   name==="get_ActiveQuestNo"?plan.questId:name==="getActiveQuestUniqueNo"?unique:null);
+ Object.assign(qm,{get_field:()=>2});
+ const expected={id:plan.questId,unique};runtime.finish(true,expected);expected.unique=99;
+ hooks("snow.QuestManager","update").post(0);
+ expect(qm.call).toHaveBeenCalledWith("setQuestFail",1);
+ unique=99;expect(hooks("snow.QuestManager","setQuestClear").pre()).toBe(0);
 });
 
 describe("native runtime hook scope", () => {
@@ -209,7 +242,7 @@ it("discards a queued native finish when its runtime is detached", () => {
   qm.call.mockImplementation((name: string) => name === "isActiveQuest" || name === "isPlayQuest" ? true :
     name === "get_ActiveQuestNo" ? plan.questId : name === "getActiveQuestUniqueNo" ? 12 : null);
   Object.assign(qm, {get_field: () => 2});
-  runtime.finish(true); runtime.shutdown(); hooks("snow.QuestManager", "update").post(0);
+  runtime.finish(true,{id:plan.questId,unique:12}); runtime.shutdown(); hooks("snow.QuestManager", "update").post(0);
   expect(qm.call.mock.calls.some(c => c[0] === "setQuestFail")).toBe(false);
 });
 
@@ -218,7 +251,7 @@ it("does not release completed native objectives before an owned failure has bee
  const {runtime,qm,plan,hooks,foreign}=fixture();let status=2;
  qm.call.mockImplementation((n:string)=>n==="isActiveQuest"||n==="isPlayQuest"?true:n==="get_ActiveQuestNo"?plan.questId:n==="getActiveQuestUniqueNo"?12:null);
  Object.assign(qm,{get_field:()=>status});runtime.policy(plan,true);
- runtime.policy(null,false);runtime.finish(true);
+ runtime.policy(null,false);runtime.finish(true,{id:plan.questId,unique:12});
  const clear=hooks("snow.QuestManager","setQuestClear"), check=hooks("snow.QuestManager","checkQuestClear");
  expect(clear.pre()).toBe(1);expect(check.post(1)).toBe(0);
  hooks("snow.QuestManager","update").post(0);expect(qm.call).toHaveBeenCalledWith("setQuestFail",1);

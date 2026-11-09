@@ -5,7 +5,7 @@ import { TestTools } from "./test_tools";
 import { entryHostTestScope } from "./entry_host_scope";
 import type { RogueConfig } from "../core/config";
 import { DEFAULT_RUNTIME, type QuestPlan } from "../core/quest_plan";
-import type { DeathReading, EnemyReading, PlayerReading, RuntimeReading, SessionPort } from "../core/run_session";
+import type { DeathReading, EnemyReading, PlayerReading, QuestIdentity, RuntimeReading, SessionPort } from "../core/run_session";
 import { QuestInstaller } from "./quest_installer";
 import { QuestTransport } from "./quest_transport";
 import { equipStartupSet, restoreStartup, reapplyStartup, startupRecoveryPending, type EquipWearPort } from "./equip_wear";
@@ -344,31 +344,31 @@ export class NativeRuntime implements SessionPort {
     return report.ok ? { ok: true } : { ok: false, reason: report.reason };
   }
 
-  guardFailure(): void {
+  private requireEndingQuest(expected: QuestIdentity): void {
     const qm = questManager();
-    if (!qm || callNative(qm, "get_ActiveQuestNo") !== this.cfg.quest.id || !callNative(qm, "isActiveQuest"))
-      throw new Error("Refusing to guard an unrelated quest");
-    const unique = callNative(qm, "getActiveQuestUniqueNo") as number;
-    if (!Number.isInteger(unique)) throw new Error("Native quest identity unavailable");
-    this.failedEnding = { questId: this.cfg.quest.id, unique };
+    if (!expected || !Number.isInteger(expected.id) || !Number.isInteger(expected.unique) || expected.id !== this.cfg.quest.id ||
+        !qm || callNative(qm, "isActiveQuest") !== true || callNative(qm, "get_ActiveQuestNo") !== expected.id ||
+        callNative(qm, "getActiveQuestUniqueNo") !== expected.unique)
+      throw new Error("Refusing to end an unrelated or changed quest instance");
   }
 
-  finish(failed: boolean): void {
-    const qm = questManager();
-    if (!qm || callNative(qm, "get_ActiveQuestNo") !== this.cfg.quest.id || !callNative(qm, "isActiveQuest")) {
-      throw new Error("Refusing to finish an unrelated quest");
-    }
+  guardFailure(expected: QuestIdentity): void {
+    this.requireEndingQuest(expected);
+    this.failedEnding = { questId: expected.id, unique: expected.unique };
+  }
+
+  finish(failed: boolean, expected: QuestIdentity): void {
+    this.requireEndingQuest(expected);
     if (!this.canFinishLocal())
       throw new Error("Only the quest host may finish a multiplayer run");
     // Completed original objectives are still true during inPlace waves. Releasing
     // their clear gate before native failure runs lets success win the next update.
-    if (failed) this.guardFailure();
+    if (failed) this.guardFailure(expected);
     else this.holdClear = false;
     // netSendQuestDone allocates a managed message retained by QuestManager.
     // Run from the engine's update context, after native faint/failure processing,
     // rather than allocating that message from the external Lua frame callback.
-    this.pendingFinish = { failed, questId: this.cfg.quest.id,
-      unique: callNative(qm, "getActiveQuestUniqueNo") as number };
+    this.pendingFinish = { failed, questId: expected.id, unique: expected.unique };
   }
 
   canFinishLocal(): boolean {

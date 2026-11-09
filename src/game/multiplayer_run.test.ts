@@ -128,7 +128,7 @@ it("stops the run on a peer's persistence error, restores effective rules, and n
  for(let i=0;i<10;i++)f.tick();
  expect(f.host.run.configResult(serial)?.status).toBe("rejected");expect(f.host.session.stage).toBe("Fault");expect(f.guest.session.stage).toBe("Fault");
  expect(f.host.core.config.scaling).toEqual(old.scaling);expect(f.guest.core.config.scaling).toEqual(old.scaling);
- expect(f.host.finish).toHaveBeenCalledWith(true);expect(f.guest.finish).not.toHaveBeenCalled();
+ expect(f.host.finish).toHaveBeenCalledWith(true,{id:900103,unique:7});expect(f.guest.finish).not.toHaveBeenCalled();
 });
 it("retains live native host authority until the failure request is queued",()=>{
  const f=fixture();f.tick();const authority:boolean[]=[];f.host.finish.mockImplementation(()=>authority.push(f.host.run.valid()));
@@ -219,6 +219,7 @@ it.each(["stop","fault"])("accepts host %s while guest delivery is unresolved an
  expect(f.guest.session.stage).toBe(kind==="stop"?"Finished":"Fault");
  expect(f.guest.run.valid()).toBe(false);expect(f.guest.finish).not.toHaveBeenCalled();
  expect(f.guest.guardFailure).toHaveBeenCalledTimes(guards+1);
+ expect(f.guest.guardFailure).toHaveBeenLastCalledWith({id:900103,unique:7});
  expect(f.guest.guardFailure.mock.invocationCallOrder.at(-1)).toBeLessThan(f.guest.policy.mock.invocationCallOrder.at(-1)!);
  expect(f.guest.session.runSummary().ending).toEqual({intent:kind==="stop"?"stopped":"fault",native:null});
  expect(f.bus.acks.g).not.toContain("R4ERR|");
@@ -267,14 +268,14 @@ it("propagates guest stop immediately and guards success before releasing local 
  expect(f.guest.guardFailure.mock.invocationCallOrder[0]).toBeLessThan(f.guest.policy.mock.invocationCallOrder.at(-1)!);
  f.tick();expect(f.bus.acks.g).toMatch(/^R4ERR\|s\|/);
  expect(f.guest.run.valid()).toBe(false);expect(f.guest.finish).not.toHaveBeenCalled();
- f.tick();expect(f.host.session.stage).toBe("Finished");expect(f.host.finish).toHaveBeenCalledWith(true);
+ f.tick();expect(f.host.session.stage).toBe("Finished");expect(f.host.finish).toHaveBeenCalledWith(true,{id:900103,unique:7});
  expect(f.host.run.snapshot().message).toContain("队友已请求停止");
 });
 
 it("propagates a guest fault outside the coordinator instead of waiting for a timeout",()=>{
  const f=fixture();f.tick();f.guest.session.failMultiplayer("frame callback failed");
  f.tick();f.tick();expect(f.host.session.stage).toBe("Fault");
- expect(f.host.finish).toHaveBeenCalledWith(true);expect(f.guest.finish).not.toHaveBeenCalled();
+ expect(f.host.finish).toHaveBeenCalledWith(true,{id:900103,unique:7});expect(f.guest.finish).not.toHaveBeenCalled();
 });
 
 it("retries a lost guest abort publication and retires it when native failure arrives",()=>{

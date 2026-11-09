@@ -366,10 +366,10 @@ multi.execute('''
   g.p.busy=true
   local pendingBefore=#g.s.pendingSupplies
   local guards=0
-  function g.p:guardFailure() guards=guards+1 end
+  function g.p:guardFailure(expected) assert(expected.id==900103 and expected.unique==7);guards=guards+1 end
   function g.p:policy(_,hold) if not hold then assert(guards==1) end end
   function g.p:ultimateDrop() error("unexpected terminal equipment grant") end
-  function h.p:finish(failed) assert(failed) end
+  function h.p:finish(failed,expected) assert(failed and expected.id==900103 and expected.unique==7) end
   clock=clock+1;h.s:stop();h.run:tick()
   local terminal=wire_load(bus.plan)
   terminal.earned=terminal.earned+80;terminal.w[4]="ultimate";terminal.cartUsed=true
@@ -380,6 +380,33 @@ multi.execute('''
   assert(not string.find(bus.acks.g or "","R4ERR|",1,true))
 ''')
 print("PASS Lua 5.4: two-peer staging/rewards, wallet isolation and terminal priority over unresolved delivery")
+
+# The live adapter must compare the caller's authorized instance before pinning
+# clear or queueing completion, then compare the copied identity again in update.
+multi.execute('''
+  local q={id=900103,unique=13,writes=0}
+  function q:call(name)
+    if name=="get_ActiveQuestNo" then return self.id end
+    if name=="getActiveQuestUniqueNo" then return self.unique end
+    if name=="isActiveQuest" or name=="isPlayQuest" then return true end
+    if name=="setQuestFail" or name=="setQuestClear" then self.writes=self.writes+1 end
+  end
+  function q:get_field() return 2 end
+  sdk.get_managed_singleton=function(name) if name=="snow.QuestManager" then return q end end
+  local native=setmetatable({cfg={quest={id=900103}}},mpmods.NativeRuntime.prototype)
+  local expected={id=900103,unique=12}
+  assert(not pcall(function() native:guardFailure(expected) end))
+  assert(not pcall(function() native:finish(true,expected) end))
+  assert(not pcall(function() native:finish(false,expected) end))
+  assert(native.failedEnding==nil and native.pendingFinish==nil and q.writes==0)
+  assert(not pcall(function() native:finish(false,nil) end))
+  q.unique=-12;expected.unique=-12
+  native:finish(true,expected);expected.unique=99
+  native:finishInNativeUpdate();assert(q.writes==1 and native.failedEnding.unique==-12)
+  native:finish(true,{id=900103,unique=-12});q.unique=99
+  native:finishInNativeUpdate();assert(q.writes==1 and native.pendingFinish==nil)
+''')
+print("PASS Lua 5.4: native completion uses explicit immutable identity at queue and execution")
 
 # Exercise the emitted configuration protocol using the exact C-module noSelf
 # conventions. This is a protocol test, not proof that production is wired yet.
@@ -468,7 +495,7 @@ lua.eval('''function(m, config)
     local port={ready=function() return true end,read=function() return reading end,
       publish=function() end,policy=function() end,post=function() end,cancelPost=function() end,
       postingError=function() end,takeDeaths=function() return {} end,report=function() end,
-      finish=function(_,failed) assert(failed);finishes=finishes+1 end}
+      finish=function(_,failed,expected) assert(failed and expected.id==reading.quest.id and expected.unique==reading.quest.unique);finishes=finishes+1 end}
     local session=new(m.RunSession,new(m.RunCore,config,42),m.catalog,port)
     local function tick() clock=clock+1;reading.time=clock;session:tick() end
     assert(session:start(config.armorOptions[1],true).ok)
