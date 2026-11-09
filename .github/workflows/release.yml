@@ -60,10 +60,15 @@ jobs:
         working-directory: mod
         run: |
           npm ci
+          if ($LASTEXITCODE -ne 0) { throw 'Mod dependency installation failed' }
           npm run build:nocopy
+          if ($LASTEXITCODE -ne 0) { throw 'Mod Lua build failed' }
           npm run typecheck
+          if ($LASTEXITCODE -ne 0) { throw 'Mod type checking failed' }
           npm test
+          if ($LASTEXITCODE -ne 0) { throw 'Unit tests failed' }
           npm run check
+          if ($LASTEXITCODE -ne 0) { throw 'Lua syntax checks failed' }
           python -m pip install lupa==2.8
           if ($LASTEXITCODE -ne 0) { throw 'Cannot install Lua runtime test dependency' }
           npm run check:runtime
@@ -71,6 +76,7 @@ jobs:
           python scripts/check-multiplayer-process.py
           if ($LASTEXITCODE -ne 0) { throw 'Cross-process Lua multiplayer protocol checks failed' }
           npm run test:cli
+          if ($LASTEXITCODE -ne 0) { throw 'CLI contract checks failed' }
 
       - name: Build web console HTML
         working-directory: mod
