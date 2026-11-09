@@ -16,6 +16,10 @@ it("cannot promote local simulated-Steam evidence to a stable official multiplay
  expect(()=>validateCapabilities(c)).not.toThrow();
 });
 it.each(["official-steam-cross-pc","config-native-3-4","long-run"])("does not hide the pending %s gate",id=>{
- const c=current();c.remainingGates=c.remainingGates.filter((g:{id:string})=>g.id!==id);
+ const c=current();
+ // The checked-in claim can advance after native acceptance. Keep this negative
+ // fixture explicitly pending instead of relying on today's completed counts.
+ if(id==="config-native-3-4")c.verification.localNativeConfigPlayers=[2];
+ c.remainingGates=c.remainingGates.filter((g:{id:string})=>g.id!==id);
  expect(()=>validateCapabilities(c)).toThrow("hidden");
 });

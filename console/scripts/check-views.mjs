@@ -19,7 +19,9 @@ try {
   const render = (component, props) => renderToString(createSSRApp(component, props));
   const coverage = await render(ReleaseCapabilities, {});
   assert.match(coverage,/已接入多人波次/);assert.match(coverage,/模拟 Steam 身份/);
-  assert.match(coverage,/官方 Steam 账号间联机/);assert.match(coverage,/调参的三／四端实机/);
+  const capabilities = JSON.parse(readFileSync(new URL('../../data/release_capabilities.json', import.meta.url), 'utf8'));
+  for (const gate of capabilities.remainingGates) assert.ok(coverage.includes(gate.label), `Missing release gate: ${gate.id}`);
+  assert.match(coverage,/官方 Steam 账号间联机/);assert.match(coverage,/长局与出怪记录上限/);
   assert.doesNotMatch(coverage,/多人不支持|全部验收通过/);checked++;
   const state = {
     sessionStage: 'Selecting', layer: 3, pt: 75, cartsLeft: 2, maxCarts: 3,
