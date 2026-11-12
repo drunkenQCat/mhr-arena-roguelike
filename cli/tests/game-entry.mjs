@@ -16,7 +16,7 @@ async function plugin(t, getUi) {
       return reply({ ok: true, bridgeId: 'test-bridge', counter, questUnique: null, configVersion: 0,
         preparation: { waveToken: null, players: [{ id: 0 }] }, ui });
     }
-    if (req.url === '/api/results') return reply({ bridgeId: 'test-bridge', history: receipts });
+    if (req.url === '/api/results') return reply({ bridgeId: 'test-bridge', last: receipts.at(-1) ?? null, history: receipts });
     if (req.url === '/api/command') {
       let text = ''; for await (const chunk of req) text += chunk;
       const command = JSON.parse(text); commands.push(command);
