@@ -3,14 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const ARMOR_SPELL = "tryAddGameItem(snow.data.DataDef.PlArmorId, snow.data.EquipmentInventoryData)";
 const WEAPON_SPELL = "tryAddGameItem(snow.data.ContentsIdSystem.WeaponId, snow.data.EquipmentInventoryData, System.Boolean)";
 
-interface FakeEntry { _IdType: number; _IdVal: number }
+interface FakeEntry { _IdType: number; _IdVal: number; decos?:number[] }
 
 function entryFacade(e: FakeEntry) {
   return {
     ref: e,
+    add_ref:vi.fn(),
+    call:(n:string,i?:number)=>n==="getName"?`装备 ${e._IdVal}`:n==="getDecoId"?(e.decos?.[i!]??0):n==="getDecorationsSlotList"?{call:(m:string)=>m==="get_Count"?1:{call:()=>1}}:null,
     get_field: (n: string): unknown => {
       if(n === "_IdType") return e._IdType;
       if(n === "_IdVal") return e._IdVal;
+      if(n === "_DecoIdList")return {get_size:()=>3,call:(_n:string,i:number)=>e.decos?.[i]??0};
       if(["_IsSetGuildCard","_IsLock","_CustomEnable"].includes(n)) return false;
       if(n === "_HyakuryuColorData") return null;
       if(["_HyakuryuSkillIdList","_PrevHyakuryuSkillId","_TalismanDecoSlotNumList","_TalismanSkillIdList","_TalismanSkillLvList","_CustomOpenIdArray","_DecoIdList","_CustomBuildup"].includes(n)) return {get_size:()=>0,get_element:()=>null,call:()=>null};
@@ -41,6 +44,17 @@ const host = vi.hoisted(() => ({
   grantThrows: false,
   persisted: null as unknown,
   removedIds: [] as number[],
+  failAtWrite:-1,
+}));
+vi.mock("./equipment_update",()=>({requireEquipmentUpdate:vi.fn(),retainEquipmentObject:vi.fn()}));
+vi.mock("./run_jewel_catalog",()=>({runJewelLevel:()=>1,runJewelName:(id:number)=>{if(id!==13)throw new Error("invalid jewel");return "火炎珠【1】";}}));
+vi.mock("./native_equipment_myset", () => ({
+ captureEquipmentMySet: () => ({indices:[...host.packArr!]}),
+ equipmentMySetMatches: (_manager:unknown,v:any) => v.indices.every((n:number,i:number)=>host.packArr![i]===n),
+ validateEquipmentMySet: (v:any) => {if (!v || v.indices.length!==8) throw new Error("bad preset");},
+ applyEquipmentMySet: (_manager:unknown,v:any) => {v.indices.forEach((n:number,i:number)=>host.packArr![i]=n);},
+ applyEquipmentIndices: (_manager:unknown,v:number[]) => {v.forEach((n,i)=>host.packArr![i]=n);},
+ verifyReferences: vi.fn(),
 }));
 vi.mock("./equipment_catalog",()=>({equipmentUnavailableReason:(_kind:string,id:number)=>id===host.unavailableId ? "游戏中没有此装备" : null}));
 
@@ -52,7 +66,17 @@ vi.mock("./recovery_owner", () => ({
  }
 }));
 vi.mock("./sdk", async () => { const { createHash } = await import("node:crypto"); return ({
-  loadWebconsole: () => ({write_recovery:(_p:string,text:string)=>{host.writeCalls++;if(host.persistFails)return false;host.persisted=JSON.parse(text);return true;},steam_digest:(s:string)=>createHash("sha256").update(s).digest("hex")}),
+  clockSeconds:()=>100,
+  createInstance:()=>entryFacade({_IdType:0,_IdVal:0}),
+  findTypeDefinition:()=>({get_method:()=>({})}),
+  callNativeFunction:(o:any,_t:unknown,m:string,...args:any[])=>{
+    if(m==="copy")Object.assign(o.ref,structuredClone(args[0].ref));
+    if(m.startsWith("setDecorations")){o.ref.decos??=[0,0,0];o.ref.decos[args[0]]=args[1];}
+    if(m==="removeDecorations"){o.ref.decos??=[0,0,0];o.ref.decos[args[0]]=0;}
+    if(m==="removeNotFitDecoSlot"&&o.ref.decos) {o.ref.decos[1]=0;o.ref.decos[2]=0;}
+    if(m==="checkDecoCheat")return false;
+  },
+  loadWebconsole: () => ({write_recovery:(_p:string,text:string)=>{host.writeCalls++;if(host.persistFails||host.writeCalls===host.failAtWrite)return false;host.persisted=JSON.parse(text);return true;},steam_digest:(s:string)=>createHash("sha256").update(s).digest("hex")}),
   refFs: { read: () => host.persisted === null ? "" : JSON.stringify(host.persisted), glob: () => host.persisted === null ? [] : ["mhw_rogue_startup_state.json", "mhw_rogue_pouch_state.json"] },
  getSingleton: (name: string) => {
     if (name === "snow.data.EquipDataManager") {
@@ -76,7 +100,8 @@ vi.mock("./sdk", async () => { const { createHash } = await import("node:crypto"
 }); });
 
 import { armorId, equipStartupSet, grantEquip, loadStartupState, readPack,
-  restoreStartup, reapplyStartup, writePackSlot, appendGrantedEntry, startupCommitRecord, type EquipWearPort } from "./equip_wear";
+  restoreStartup, reapplyStartup, writePackSlot, appendGrantedEntry, startupCommitRecord,
+  runEquipmentSnapshot,wearRunEquipment,grantRunJewel,socketRunJewel,confirmGrantedEntry,type EquipWearPort } from "./equip_wear";
 
 let packFacade: { get_field(n: string): unknown };
 let boxFacade: {
@@ -87,6 +112,7 @@ let boxFacade: {
 
 function buildWorld(initialPack: number[], preOwnedParts: number[], grantWorks = true): void {
   host.persistFails = false;host.writeCalls=0;host.unavailableId=-1;
+  host.failAtWrite=-1;
   host.grantWorks = grantWorks;
   host.grantThrows = false;
   host.removedIds = [];
@@ -152,6 +178,42 @@ const RULES = { stripTalismans: true, stripInsect: false, keepPlayerWeapon: true
 const INITIAL = [90, 11, 12, 13, 14, 15, 60, 70];
 
 beforeEach(() => buildWorld(INITIAL, []));
+
+function prepareWardrobe(){
+ buildWorld([7,0,-1,-1,-1,-1,-1,-1],[1]);host.entries.push({_IdType:1,_IdVal:100});
+ expect(equipStartupSet("iron",9,RULES,pouchPort).ok).toBe(true);
+ return runEquipmentSnapshot();
+}
+it("shows only run instances plus the registered inherited weapon; refuses a stored same-ID item",()=>{
+ const inventory=prepareWardrobe();expect(inventory.reason).toBeNull();expect(inventory.items).toHaveLength(6);
+ expect(inventory.items.some(e=>e.key===0)).toBe(false);expect(inventory.items.find(e=>e.key===7)?.inherited).toBe(true);
+ expect(()=>wearRunEquipment(0)).toThrow("不属于");expect(()=>socketRunJewel(7,0,13)).toThrow("本局登记");
+});
+it("keeps a newly selected reward equipped through native reentry and rolls back a failed wardrobe write",()=>{
+ prepareWardrobe();const grant=grantEquip(boxFacade,armorId(146,1),"armor",appendGrantedEntry,false,confirmGrantedEntry);
+ expect(grant.ok).toBe(true);wearRunEquipment(grant.boxIndex!);
+ host.packArr![1]=0;expect(reapplyStartup().ok).toBe(true);expect(host.packArr![1]).toBe(grant.boxIndex);
+ const previous=host.packArr![1];host.persistFails=true;
+ expect(()=>wearRunEquipment(1)).toThrow("写入失败");expect(host.packArr![1]).toBe(previous);
+});
+it("requires run jewel stock, rejects incompatible sockets, returns stock on removal and restores originals",()=>{
+ const before=prepareWardrobe(),head=before.items.find(e=>e.position===1)!;
+ expect(()=>socketRunJewel(head.key,0,13)).toThrow("没有可用");grantRunJewel(13);
+ expect(()=>socketRunJewel(head.key,1,13)).toThrow("孔位");socketRunJewel(head.key,0,13);
+ expect(runEquipmentSnapshot().jewels[0]!.available).toBe(0);
+ const chest=runEquipmentSnapshot().items.find(e=>e.position===2)!;
+ expect(()=>socketRunJewel(chest.key,0,13)).toThrow("没有可用");
+ socketRunJewel(head.key,0,0);expect(runEquipmentSnapshot().jewels[0]!.available).toBe(1);
+ socketRunJewel(head.key,0,13);expect(restoreStartup(pouchPort).ok).toBe(true);
+ expect(host.entries.filter(e=>e._IdType!==0).map(e=>e._IdVal)).toEqual([armorId(9,1),100]);
+});
+it("locks interrupted socket work and reclaims its pre-journalled endpoint on recovery",()=>{
+ const head=prepareWardrobe().items.find(e=>e.position===1)!;grantRunJewel(13);
+ host.failAtWrite=host.writeCalls+2;
+ expect(()=>socketRunJewel(head.key,0,13)).toThrow("需核验");
+ expect(runEquipmentSnapshot().reason).toContain("事务尚待恢复");
+ host.failAtWrite=-1;expect(restoreStartup(pouchPort).ok).toBe(true);expect(host.entries[head.key]!._IdType).toBe(0);
+});
 
 it("rejects malformed armor before reserving or mutating a native slot",()=>{
  const reserve=vi.fn();const before=structuredClone(host.entries);

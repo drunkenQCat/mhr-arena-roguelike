@@ -9,6 +9,7 @@ import type { DeathReading, EnemyReading, PlayerReading, QuestIdentity, RuntimeR
 import { QuestInstaller } from "./quest_installer";
 import { QuestTransport } from "./quest_transport";
 import { equipStartupSet, restoreStartup, reapplyStartup, startupRecoveryPending, type EquipWearPort } from "./equip_wear";
+import { cancelEquipmentWork, enqueueEquipmentWork, inEquipmentUpdate } from "./equipment_update";
 import { beginPouchIsolation, endPouchIsolation } from "./pouch_backup";
 import { DEFAULT_STARTUP_RULES } from "../core/config";
 import { GachaService } from "./gacha";
@@ -135,14 +136,17 @@ export class NativeRuntime implements SessionPort {
     if (!plan || !holdClear) this.inplace.cancel();
   }
   post(questId: number): void {
-    const ready = reapplyStartup();
-    if (!ready.ok) throw new Error(ready.reason);
-    this.transport.request(questId);
+    this.nativePostError = null;
+    enqueueEquipmentWork(this.postWork, () => {
+      const ready = reapplyStartup();
+      if (!ready.ok) throw new Error(ready.reason);
+      this.transport.request(questId);
+    }, reason => { this.nativePostError = reason; });
   }
-  cancelPost(): void { this.transport.cancel(); }
+  cancelPost(): void { cancelEquipmentWork(this.postWork); this.nativePostError = null; this.transport.cancel(); }
   retarget(questId: number): void { this.transport.retarget(questId); }
   waitingForSpawnCapacity(): boolean { return this.inplace.waitingForCapacity; }
-  postingError(): string | null { return this.transport.getError(); }
+  postingError(): string | null { return this.nativePostError ?? this.transport.getError(); }
   takeDeaths(): DeathReading[] { const events = this.deaths; this.deaths = []; return events; }
   /** Real runs use their fixed native roster, never a leftover offline mock. */
   partySize(): number | null { return this.multiplayer ? this.multiplayer.partySize() : this.partySizeSource?.() ?? null; }
@@ -208,7 +212,7 @@ export class NativeRuntime implements SessionPort {
   }
 
 
-  shutdown(): void { this.pendingFinish = null; this.failedEnding = null; this.finishEvidence = null; this.testTools.shutdown(); this.policy(null, false); this.transport.cancel(); }
+  shutdown(): void { cancelEquipmentWork(this.restoreWork); cancelEquipmentWork(this.postWork); this.nativePostError = null; this.pendingFinish = null; this.failedEnding = null; this.finishEvidence = null; this.testTools.shutdown(); this.policy(null, false); this.transport.cancel(); }
 
   now(): number { return clockSeconds(); }
 
@@ -301,6 +305,9 @@ export class NativeRuntime implements SessionPort {
     endPouchIsolation: (retainUntilSave) => endPouchIsolation(retainUntilSave),
   };
   private startupNotice: string | null = null;
+  private readonly restoreWork = {};
+  private readonly postWork = {};
+  private nativePostError: string | null = null;
 
   /** 开局准备：穿装与零物资隔离均须成功，否则回滚并拒绝准备。 */
   startupPrepare(armor: string): { ok: boolean; reason?: string; notice?: string } {
@@ -338,6 +345,22 @@ export class NativeRuntime implements SessionPort {
 
   /** M3.5 回村恢复（equip_wear.restoreStartup 幂等；失败保持待办由 session 重试）。 */
   startupRestore(): { ok: boolean; reason?: string } {
+    if (!startupRecoveryPending()) {
+      const result = restoreStartup(this.wearPort,true);
+      if (result.ok) this.startupNotice = null;
+      return result;
+    }
+    if (!inEquipmentUpdate()) {
+      enqueueEquipmentWork(this.restoreWork, () => {
+        const result = this.startupRestore();
+        this.startupNotice = result.ok ? null : result.reason ?? null;
+      }, reason => { this.startupNotice = reason; });
+      return {ok:false,reason:this.startupNotice ?? "等待原生装备更新阶段恢复"};
+    }
+    // Re-check after queuing: a new quest or a loading scene must not receive an old recovery.
+    const reading = this.read();
+    if (!reading.canPost || reading.players.length === 0 || reading.quest && !reading.staleQuest)
+      return {ok:false,reason:"等待返回村庄后恢复原装备与背包"};
     const report = restoreStartup(this.wearPort,true);
     if (report.ok && startupRecoveryPending()) return {ok:false,reason:"原装备与背包已恢复；等待原生保存完成。若已回村，请在原生菜单保存后再开局"};
     if (report.ok) this.startupNotice = null;

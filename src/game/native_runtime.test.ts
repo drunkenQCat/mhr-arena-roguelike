@@ -9,9 +9,13 @@ import { defaultConfig, monsterCatalog } from "./default_config";
 const mock = vi.hoisted(() => ({
   singleton: vi.fn(), qm: vi.fn(), find: vi.fn(), hook: vi.fn(), storage: {} as Record<string, unknown>,
   dump: vi.fn(), info: vi.fn(), now: 100,
-  restore: vi.fn(), endPouch: vi.fn(),
+  restore: vi.fn(), endPouch: vi.fn(), recoveryPending: false,
 }));
-vi.mock("./equip_wear",()=>({equipStartupSet:vi.fn(),reapplyStartup:vi.fn(),startupRecoveryPending:()=>false,
+vi.mock("./equipment_update", () => ({
+ enqueueEquipmentWork: (_key:object,run:()=>void) => run(),
+ cancelEquipmentWork: vi.fn(), inEquipmentUpdate: () => true,
+}));
+vi.mock("./equip_wear",()=>({equipStartupSet:vi.fn(),reapplyStartup:vi.fn(),startupRecoveryPending:()=>mock.recoveryPending,
  restoreStartup:(...args:unknown[])=>mock.restore(...args)}));
 vi.mock("./pouch_backup",()=>({beginPouchIsolation:vi.fn(),endPouchIsolation:(retain?:boolean)=>mock.endPouch(retain)}));
 vi.mock("./sdk", () => ({
@@ -59,7 +63,7 @@ function fixture() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mock.storage = {};
+  mock.storage = {}; mock.recoveryPending = false;
   mock.find.mockImplementation((type: string) => ({ get_method: (name: string) => ({ key: `${type}.${name}` }) }));
 });
 
@@ -261,7 +265,8 @@ it("does not release completed native objectives before an owned failure has bee
 });
 
 it("forwards save retention through the runtime's actual pouch adapter",()=>{
- const {runtime}=fixture();mock.endPouch.mockReturnValue({ok:true});
+ const {runtime}=fixture();mock.recoveryPending=true;mock.endPouch.mockReturnValue({ok:true});
+ vi.spyOn(runtime,"read").mockReturnValue({time:1,quest:null,players:[{id:0,position:{x:1,y:1,z:1}}],enemies:[],online:false,deaths:0,canPost:true});
  mock.restore.mockImplementation((pouch,retain)=>{pouch.endPouchIsolation(retain);return {ok:true};});
- expect(runtime.startupRestore().ok).toBe(true);expect(mock.endPouch).toHaveBeenCalledWith(true);
+ expect(runtime.startupRestore().ok).toBe(false);expect(mock.endPouch).toHaveBeenCalledWith(true);
 });

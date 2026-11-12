@@ -5,7 +5,9 @@ export interface RunSummary {layer:number;clearedWaves:number;earnedPt:number;sp
 }
 export interface ShopEntry { id: string; name: string; category: string; price: number; cap: number; owned: number; mode: string; desc?: string; canBuy: boolean; reason?: string; }
 export interface Choice { index: number; label: string; monsters: string[]; mode?: string; hpMul: number; dmgMul: number; rewardPt: number; }
+export interface RunEquipmentInventory { version:string; canEdit:boolean; reason:string|null; items:{key:number;id:number;name:string;position:number;worn:boolean;inherited:boolean;slotLevels:number[]|null;sockets:number[]|null}[]|null; jewels:{id:number;name:string;level:number;count:number;available:number}[]|null }
 export interface ConsoleState {
+  equipment?:RunEquipmentInventory;
   ui?: { scene: string; sceneToken?: string; resultNode?: string | null;
     dialogs?: { token: string; kind: string; text: string; passive?: boolean; supported: boolean; buttons?: string[] | null }[] | null;
     returnFlow?: { state: "waiting" | "complete" | "stopped"; message: string } | null };

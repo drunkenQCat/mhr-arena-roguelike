@@ -6,8 +6,15 @@ import { RunCore } from "../core/run_core";
 import { RunSession, type RuntimeReading, type SessionPort } from "../core/run_session";
 import type { NativeRuntime } from "./native_runtime";
 import { ShopWindow } from "./shop_window";
+const wardrobe=vi.hoisted(()=>({version:"run-1:0",wear:vi.fn(),socket:vi.fn()}));
+vi.mock("./equip_wear",()=>({runEquipmentSnapshot:()=>({version:wardrobe.version,items:[],jewels:[],reason:null}),
+ wearRunEquipment:(...args:unknown[])=>wardrobe.wear(...args),socketRunJewel:(...args:unknown[])=>wardrobe.socket(...args)}));
 
-const host = vi.hoisted(() => ({ now: 10, files: {} as Record<string, any>, count: 0, failWrite: "", commands: [] as string[], equipmentError:false }));
+const host = vi.hoisted(() => ({ now: 10, files: {} as Record<string, any>, count: 0, failWrite: "", commands: [] as string[], equipmentError:false, deferEquipment:false, nativeWork:[] as {key:object,run:()=>void}[] }));
+vi.mock("./equipment_update", () => ({
+ enqueueEquipmentWork: (key:object,run:()=>void) => {if(host.deferEquipment)host.nativeWork.push({key,run});else run();},
+ cancelEquipmentWork: (key:object) => {host.nativeWork=host.nativeWork.filter(w=>w.key!==key);}, inEquipmentUpdate: () => true,
+}));
 vi.mock("./equipment_catalog",()=>({validateEquipmentConfig:()=>{if(host.equipmentError)throw new Error("gachaPools.gacha_1.entries[0].id：游戏中没有此装备");}}));
 vi.mock("./sdk", () => ({ loadWebconsole: () => ({
   epoch: () => 1, steam_digest:(text:string)=>createHash("sha256").update(text).digest("hex"),
@@ -48,7 +55,21 @@ function fixture() {
   const state = () => host.files["webconsole_state.json"];
   return { cfg, core, session, runtime, tools, shop, bridge, command, tick, state, reading };
 }
-beforeEach(() => { host.now = 10; host.files = {}; host.count = 0; host.failWrite = ""; host.commands = []; host.equipmentError=false; });
+beforeEach(() => { host.now = 10; host.files = {}; host.count = 0; host.failWrite = ""; host.commands = []; host.equipmentError=false; host.deferEquipment=false;host.nativeWork=[]; });
+beforeEach(()=>{wardrobe.version="run-1:0";wardrobe.wear.mockClear();wardrobe.socket.mockClear();});
+it("checks run wardrobe versions and personal preparation on the game side",()=>{
+ const f=fixture();vi.spyOn(f.session,"canShop").mockReturnValue(true);
+ expect(f.command("equipment",{sub:"wear",equipmentKey:21,equipmentVersion:"run-1:0"}).status).toBe("applied");
+ expect(wardrobe.wear).toHaveBeenCalledWith(21);
+ expect(f.command("equipment",{sub:"wear",equipmentKey:22,equipmentVersion:"previous-run:0"}).status).toBe("rejected");
+ expect(wardrobe.wear).toHaveBeenCalledTimes(1);
+});
+it("rechecks preparation after a wardrobe command waits in the native queue",()=>{
+ const f=fixture(),allowed=vi.spyOn(f.session,"canShop").mockReturnValue(true);host.deferEquipment=true;
+ f.command("equipment",{sub:"socket",equipmentKey:21,equipmentVersion:"run-1:0",socket:0,jewelId:13});
+ expect(wardrobe.socket).not.toHaveBeenCalled();allowed.mockReturnValue(false);host.nativeWork.shift()!.run();
+ expect(wardrobe.socket).not.toHaveBeenCalled();expect(host.files["webconsole_results.json"].last.status).toBe("rejected");
+});
 
 it("keeps saved rules and version intact when the installed game rejects equipment data",()=>{
  const f=fixture();host.equipmentError=true;
@@ -331,4 +352,18 @@ it("rejects same-ID nested rule changes even when counts, start PT and carts mat
  expect(f.command("submitConfig",{config:changed,configVersion:0},"nested-config").status).toBe("rejected");
  expect(f.session.configForEditing().buffAmounts?.atk).toBe(initial.buffAmounts?.atk);
  expect(host.files["webconsole_results.json"].last.__fp).toHaveLength(64);
+});
+
+it("waits for the native equipment callback and revalidates the live quest scope before starting",()=>{
+ const f=fixture();f.tick();host.deferEquipment=true;f.command("startRun",{},"native-start");
+ expect(f.session.stage).toBe("Idle");expect(host.nativeWork).toHaveLength(1);
+ f.reading.online=true;host.nativeWork.shift()!.run();
+ expect(f.session.stage).toBe("Idle");expect(host.files["webconsole_results.json"].last.status).toBe("rejected");
+});
+it("cancels delayed equipment commands on reset or timeout without blocking title automation",()=>{
+ const f=fixture();f.tick();host.deferEquipment=true;f.command("startRun",{},"timed-start");
+ host.now+=11;f.tick();expect(host.nativeWork).toHaveLength(0);expect(f.session.stage).toBe("Idle");
+ expect(host.files["webconsole_results.json"].last).toMatchObject({id:"timed-start",status:"rejected"});
+ f.command("startRun",{},"reset-start");expect(host.nativeWork).toHaveLength(1);
+ f.bridge.newScriptSession();expect(host.nativeWork).toHaveLength(0);expect(f.session.stage).toBe("Idle");
 });

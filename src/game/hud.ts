@@ -1,3 +1,4 @@
+import { enqueueEquipmentWork } from "./equipment_update";
 import type { Result } from "../core/run_core";
 import type { RunSession } from "../core/run_session";
 import type { NativeRuntime } from "./native_runtime";
@@ -7,6 +8,9 @@ import { imguiApi } from "./sdk";
 /** Real event-driven M2 controls. No simulated clear / next-layer buttons. */
 export function drawHud(session: RunSession, runtime: NativeRuntime, shop: ShopWindow): void {
   if (!imguiApi.tree_node("斗技场肉鸽（单人测试版）")) return;
+  const prepare = (armor: string, spike = false): void => {
+    enqueueEquipmentWork(session, () => action(session.start(armor, spike)), reason => { session.message = reason; });
+  };
   const core = session.core;
   const state = core.state;
   const action = (result: Result): void => { if (!result.ok) session.message = result.message ?? "操作失败"; };
@@ -18,7 +22,7 @@ export function drawHud(session: RunSession, runtime: NativeRuntime, shop: ShopW
     imguiApi.text(runtime.testTools.message);
     if (["Idle", "Finished", "Fault"].includes(session.stage) && imguiApi.button("M2a: test 2 native sequential monsters (0 PT)")) {
       const armor = core.armorOptions()[0];
-      if (armor) action(session.start(armor, true));
+      if (armor) prepare(armor, true);
     }
     } finally { imguiApi.tree_pop(); }
     }
@@ -37,7 +41,7 @@ export function drawHud(session: RunSession, runtime: NativeRuntime, shop: ShopW
     imguiApi.separator();
     if (["Idle", "Finished", "Fault"].includes(session.stage)) {
       for (const armor of core.armorOptions()) {
-        if (imguiApi.button(`开局：${armor}`)) action(session.start(armor));
+        if (imguiApi.button(`开局：${armor}`)) prepare(armor);
       }
       if (imguiApi.button(`切换路线（当前 ${session.settings.route}）`)) {
         session.settings.route = session.settings.route === "reentry" ? "inPlace" : "reentry";

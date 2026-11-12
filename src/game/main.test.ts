@@ -7,6 +7,10 @@ import { makeQuestPlan } from "../core/quest_plan";
 const h=vi.hoisted(()=>({config:null as any,frames:[] as (()=>void)[],bridges:[] as any[],
   runtimes:[] as any[],entries:[] as any[],gachas:[] as any[],buffs:[] as any[],shops:[] as any[],errors:[] as any[],configError:false,startupPending:false,restoreCalls:0,restoreBlocked:false,
   nativeReading:null as any}));
+vi.mock("./equipment_update", () => ({
+ enqueueEquipmentWork: (_key:object,run:()=>void) => run(),
+ cancelEquipmentWork: vi.fn(), inEquipmentUpdate: () => true,
+}));
 vi.mock("./load_config",()=>({loadConfig:()=>{if(h.configError)throw new Error("corrupt configuration journal");return h.config;}}));
 vi.mock("./sdk",()=>({clockSeconds:()=>100,reframework:{
   onFrame:(f:()=>void)=>h.frames.push(f),onDrawUi:()=>{},onScriptReset:()=>{}},

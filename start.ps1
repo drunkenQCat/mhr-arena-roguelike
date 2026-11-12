@@ -1,0 +1,1 @@
+node cli/mhr.mjs run start --base-url "$env:MHR_IN1" --json > .local/native-loadout-integration/start.json

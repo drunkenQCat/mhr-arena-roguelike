@@ -227,7 +227,7 @@ function submit() {
         <p class="muted">提交时会按当前游戏装备目录检查每个 ID，未知或尚无法读取的装备将拒绝保存。权重决定池内相对概率，并非百分比；目录存在不代表该装备的全部玩法已完成测试。</p>
         <details v-for="id in ['gacha_1','gacha_2','gacha_3','gacha_4']" :key="id" class="subpanel"><summary>{{ draft.shop.find(item => item.id === id)?.name ?? id }} · {{ draft.gachaPools?.[id]?.entries.length ?? 0 }} 件</summary>
           <div v-for="(entry, index) in draft.gachaPools?.[id]?.entries ?? []" :key="index" class="equipment-entry">
-            <label>类型<select v-model="entry.kind"><option value="weapon">武器</option><option value="armor">防具</option></select></label>
+            <label>类型<select v-model="entry.kind"><option value="weapon">武器</option><option value="armor">防具</option><option value="decoration">本局珠子</option></select></label>
             <label>游戏 ID<input v-model.number="entry.id" type="number" min="1" max="4294967295" /></label><label>权重<input v-model.number="entry.w" type="number" min="0" step="0.1" /></label>
             <span>{{ ((entry.w / (draft.gachaPools?.[id]?.entries.reduce((a, e) => a + e.w, 0) || 1)) * 100).toFixed(1) }}%</span><button @click="removeGacha(id, index)">移除</button>
           </div><button @click="addGacha(id)">添加装备</button></details>

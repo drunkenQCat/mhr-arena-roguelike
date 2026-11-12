@@ -10,6 +10,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const server = await createServer({ root, server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom' });
 let checked = 0;
 try {
+  const { default: Wardrobe } = await server.ssrLoadModule('/src/RunEquipment.vue');
   const { default: Play } = await server.ssrLoadModule('/src/PlayWorkspace.vue');
   const { default: Entry } = await server.ssrLoadModule('/src/MultiplayerEntry.vue');
   const { default: Balance } = await server.ssrLoadModule('/src/BalancePreview.vue');
@@ -107,6 +108,13 @@ try {
   assert.doesNotMatch(extended, /草稿暂不能预览/);
   assert.match(extended, /class="preview-choice"/);
   checked++;
+  const wardrobeInventory={version:'run-1:2',canEdit:true,reason:null,items:[{key:21,id:202375169,name:'皮制头盔',position:1,worn:false,inherited:false,slotLevels:[1],sockets:[0]},{key:1,id:123,name:'炎火铁刀Ⅰ',position:0,worn:true,inherited:true,slotLevels:[],sockets:[]}],jewels:[{id:13,name:'火炎珠【1】',level:1,count:1,available:1}]};
+  const wardrobe=await render(Wardrobe,{inventory:wardrobeInventory,connected:true,busy:false,notice:''});
+  assert.match(wardrobe,/局内装备箱/);assert.match(wardrobe,/皮制头盔/);assert.match(wardrobe,/火炎珠/);assert.match(wardrobe,/穿戴这件装备/);assert.doesNotMatch(wardrobe,/孔位 2/);checked++;
+  const wardrobeLocked=await render(Wardrobe,{inventory:{...wardrobeInventory,canEdit:false},connected:true,busy:false,notice:''});
+  assert.match(wardrobeLocked,/disabled/);assert.match(wardrobeLocked,/整备阶段调整/);checked++;
+  const wardrobeEmpty=await render(Wardrobe,{inventory:{version:'',canEdit:false,reason:'当前没有可调整的局内装备箱',items:null,jewels:null},connected:true,busy:false,notice:''});
+  assert.match(wardrobeEmpty,/当前没有可调整/);checked++;
   console.log(`Vue component rendering: ${checked} scenarios passed.`);
 } finally {
   await server.close();

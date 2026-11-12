@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import ConfigEditor from "./ConfigEditor.vue";
+import RunEquipment from "./RunEquipment.vue";
 import PlayWorkspace from "./PlayWorkspace.vue";
 import MultiplayerEntry from "./MultiplayerEntry.vue";
 import ConnectionHelp from "./ConnectionHelp.vue";
@@ -10,7 +11,7 @@ import ReleaseCapabilities from "./ReleaseCapabilities.vue";
 import { Freshness, SubmissionUncertain, downloadJson, getJson, postCommand, waitForReceipt, type ConsoleState, type CommandResult } from "./api";
 
 const state = ref<ConsoleState | null>(null), stale = ref(true), busy = ref(false);
-const pages = ['play', 'multiplayer', 'help', 'design', 'events'];
+const pages = ['play', 'equipment', 'multiplayer', 'help', 'design', 'events'];
 const readPage = () => pages.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'play';
 const notice = ref(""), lastSync = ref("—"), page = ref(readPage());
 const toolsOpen = ref(['design', 'events'].includes(page.value));
@@ -128,6 +129,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); window.removeEventListen
     <p v-if="state?.multiplayerRun?.configSync?.busy" class="notice" role="status">房主配置正在全队同步：{{ state.multiplayerRun.configSync.message }}。选波与购买暂时暂停，请勿重载脚本。</p>
     <nav class="toolbar topnav" aria-label="控制台导航">
       <button :class="{ selected: page === 'play' }" :aria-pressed="page === 'play'" @click="page = 'play'">当前局</button>
+      <button :class="{ selected: page === 'equipment' }" :aria-pressed="page === 'equipment'" @click="page = 'equipment'">局内装备箱</button>
       <button :class="{ selected: page === 'multiplayer' }" :aria-pressed="page === 'multiplayer'" @click="page = 'multiplayer'">联机大厅</button>
       <button :class="{ selected: page === 'help' }" :aria-pressed="page === 'help'" @click="page = 'help'">帮助与连接</button>
       <button class="tools-toggle" :aria-expanded="toolsOpen" aria-controls="console-tools" @click="toolsOpen = !toolsOpen">更多工具</button>
@@ -145,6 +147,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); window.removeEventListen
     </template>
     <MultiplayerEntry v-if="page === 'multiplayer'" :entry="state?.multiplayerEntry" :run="state?.multiplayerRun" :connected="connected" :busy="busy || !connected" @command="send" @play="page = 'play'" />
     <PlayWorkspace v-show="page === 'play'" :state="state" :connected="connected" :busy="busy" :notice="notice" :developer-mode="developerMode" @command="send" @multiplayer="page = 'multiplayer'" />
+    <RunEquipment v-if="page === 'equipment'" :inventory="state?.equipment" :connected="connected" :busy="busy" :notice="notice" @command="send" />
     <ConfigEditor v-show="page === 'design'" :config="config" :version="loadedVersion" :server-version="state?.configVersion ?? loadedVersion" :session-changed="!!configBridgeId && configBridgeId !== state?.bridgeId" :busy="busy" :connected="connected" :message="configMessage" :blocked-reason="configBlockedReason" @load="loadConfig" @submit="submitConfig" />
     <section v-if="page === 'events'" class="panel"><div class="section-heading"><h2>命令记录</h2><button @click="downloadJson('console-results.json', results)">导出记录</button></div><label>筛选记录 <input v-model="filter" placeholder="状态 / 请求 ID / 消息" /></label><p class="muted">applied 表示命令已执行；queued 仍需等待游戏结果；rejected 表示未执行。</p><article v-for="r in recent" :key="r.id" class="event"><span :class="['badge', r.status === 'applied' ? 'live' : r.status === 'queued' ? 'pending' : 'warning']">{{ r.status }}</span><span>{{ r.message ?? (r.config ? '已读取游戏配置' : '') }}</span><small class="mono">{{ r.id }}</small></article></section>
   </main>

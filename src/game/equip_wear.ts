@@ -1,18 +1,15 @@
-/**
- * 开局装备与恢复 —— V1.3 §1.2 初始二选一（骨套/铁套）。
- * 全部基于 2026-10-29 实测结论（docs/research-shop-unavailable-and-equipment-wiring.md §3/§4）：
- *  - 权威穿装状态 = EquipDataManager.get_PlEquipPack()._InventoryIndexList（System.Int32[]，8 槽：
- *    [武器, 头, 身, 腕, 腰, 脚, 虫笼, 护石]，-1=空）。sol 下标写安全生效，读回用 get_Item。
- *  - changeEquip/changeEquipment 在村庄是无效摆设；equipPlDefaultData 先抛后写，禁用。
- *  - 装备箱发放必须用显式重载名（防具两参；带空格拼写命中，无空格兜底）。
- *  - 读回验证只用 pack 数组本身。
- * 本模块不抛异常：所有失败都进 Report；中途失败会尝试回滚原装并撤销本局新发条目。
- */
+/** Native personal loadouts restore equipment references, decorations, pigments and
+ * switch-skill selections. Durable owner-bound journals still own recovery and
+ * temporary-item cleanup; no user preset slot or forced save is used. */
 
-import { getSingleton, relog, type REManagedObject, type RETypeDefinition } from "./sdk";
+import { applyEquipmentIndices, applyEquipmentMySet, captureEquipmentMySet, equipmentMySetMatches, validateEquipmentMySet, verifyReferences, type EquipmentMySet } from "./native_equipment_myset";
+import { getSingleton, relog, createInstance, callNativeFunction, findTypeDefinition, clockSeconds, type REManagedObject, type RETypeDefinition } from "./sdk";
+import { requireEquipmentUpdate, retainEquipmentObject } from "./equipment_update";
 import type { StartupRules } from "../core/config";
 import { validArmorId, armorId } from "../core/equipment_id";
 export { armorId } from "../core/equipment_id";
+import { runJewelName, runJewelLevel } from "./run_jewel_catalog";
+export { runJewelName } from "./run_jewel_catalog";
 import { equipmentUnavailableReason } from "./equipment_catalog";
 import { readRecoveryRecord, recoveryPending, writeRecoveryRecord, recoveryWriteFailure } from "./recovery_journal";
 import { assertRecoveryOwner, readRecoveryOwner, type RecoveryOwner } from "./recovery_owner";
@@ -89,19 +86,12 @@ export function readPack(edm: REManagedObject | null): number[] | null {
   }
 }
 
-/** 下标写一格（sol __newindex），写完读回核验。 */
+/** Legacy single-slot entry: resolve references and apply through the native pack. */
 export function writePackSlot(edm: REManagedObject | null, pos: number, boxIndex: number): boolean {
-  if (!edm || pos < 0 || pos >= PACK_LEN) return false;
-  try {
-    const pack = edm.call("get_PlEquipPack") as REManagedObject | null;
-    const arr = pack ? (pack.get_field("_InventoryIndexList") as REManagedObject | null) : null;
-    if (!arr) return false;
-    (arr as unknown as Record<number, number>)[pos] = boxIndex;
-  } catch {
-    return false;
-  }
-  const verify = readPack(edm);
-  return verify !== null && verify[pos] === boxIndex;
+  const indices = readPack(edm);
+  if (!edm || !indices || !Number.isInteger(pos) || pos < 0 || pos >= PACK_LEN) return false;
+  try { indices[pos] = boxIndex; applyEquipmentIndices(edm, indices); return true; }
+  catch { return false; }
 }
 
 /** 扫装备箱找 idVal 对应条目的箱内索引；找不到返回 null。 */
@@ -228,14 +218,14 @@ export function grantEquip(box: REManagedObject | null, idVal: number, kind: "ar
 function identity(obj: REManagedObject): string | undefined {
   try { return String(obj.get_address()); } catch { return undefined; }
 }
-export interface GrantedEntry { boxIndex: number; idVal: number; idType: number; identity?: string; fingerprint?: string; removed?: boolean }
+export interface GrantedEntry { boxIndex: number; idVal: number; idType: number; identity?: string; fingerprint?: string; acceptedFingerprints?: string[]; removed?: boolean }
 
 function recordedEntry(box: REManagedObject, entry: GrantedEntry, relocated = false): REManagedObject | null {
   const hint = boxEntry(box, entry.boxIndex);
   if (!hint) throw new Error("Recorded equipment slot unavailable; cleanup retained");
   if (hint.get_field("_IdType") === 0) return null;
   if (hint.get_field("_IdType") !== entry.idType || hint.get_field("_IdVal") !== entry.idVal ||
-      (relocated ? !entry.fingerprint || equipmentFingerprint(hint) !== entry.fingerprint :
+      (relocated ? !entry.fingerprint || ![entry.fingerprint, ...(entry.acceptedFingerprints ?? [])].includes(equipmentFingerprint(hint)) :
         entry.identity !== undefined && identity(hint) !== entry.identity))
     throw new Error("Equipment ownership uncertain; refusing to delete a matching user item");
   return hint;
@@ -265,9 +255,16 @@ export interface EquipWearPort {
 const STATE_FILE = "mhw_rogue_startup_state.json";
 
 interface PersistedState {
+  wardrobeId?: string;
+  wardrobeRevision?: number;
+  inheritedWeapon?: number;
+  runJewels?: Record<string, number>;
+  runSockets?: Record<string, number[]>;
   schema?: number;
   owner?: RecoveryOwner;
   originalBox?: EquipmentSnapshot;
+  originalMySet?: EquipmentMySet;
+  wornMySet?: EquipmentMySet;
   active: boolean;
   armor: string | null;
   prevPack: number[];
@@ -300,7 +297,28 @@ export function loadStartupState(): PersistedState | null {
         !Number.isInteger(e.idVal) || e.idVal <= 0 || ![1, 2].includes(e.idType)) || typeof raw.pouchIsolated !== "boolean")
     throw new Error("装备恢复记录无效；保留原备份，禁止开新局");
   assertRecoveryOwner(raw.owner);
-  if (raw.schema === 3) {
+  raw.runJewels ??= {}; raw.runSockets ??= {};
+  if(Object.entries(raw.runJewels).some(([id,n])=>!Number.isInteger(Number(id))||Number(id)<=0||!Number.isInteger(n)||n<0||n>100000)||
+     Object.entries(raw.runSockets).some(([key,values])=>!raw.granted.some(e=>String(e.boxIndex)===key)||!Array.isArray(values)||values.length!==3||values.some(id=>!Number.isInteger(id)||id<0))||
+     raw.granted.some(e=>e.acceptedFingerprints!==undefined&&(!Array.isArray(e.acceptedFingerprints)||e.acceptedFingerprints.length>4||e.acceptedFingerprints.some(fp=>typeof fp!=="string"||fp.length!==64))))
+    throw new Error("局内珠子事务记录无效，保留备份");
+  const allocated:Record<string,number>={};
+  for(const values of Object.values(raw.runSockets))for(const id of values)if(id>0)allocated[String(id)]=(allocated[String(id)]??0)+1;
+  if(Object.entries(allocated).some(([id,n])=>n>(raw.runJewels![id]??0)))throw new Error("局内珠子数量记录不一致，保留备份");
+  if (raw.wornPack !== undefined && (!Array.isArray(raw.wornPack) || raw.wornPack.length !== PACK_LEN ||
+      raw.wornPack.some(v => !Number.isInteger(v) || v < -1))) throw new Error("本局装备索引恢复记录无效");
+  if (raw.schema === 4) {
+    if (raw.prevPack.length > 0 && !raw.originalMySet) throw new Error("原装备个人组合缺失");
+    if (raw.originalMySet) {
+      validateEquipmentMySet(raw.originalMySet);
+      if (raw.prevPack.some((v,i) => v !== raw.originalMySet!.indices[i])) throw new Error("原装备索引与个人组合不一致");
+    }
+    if (raw.wornMySet) {
+      validateEquipmentMySet(raw.wornMySet);
+      if (!raw.wornPack || raw.wornPack.some((v,i) => v !== raw.wornMySet!.indices[i])) throw new Error("本局装备索引与个人组合不一致");
+    }
+  }
+  if (raw.schema === 3 || raw.schema === 4) {
     if (!raw.originalBox) throw new Error("Original equipment box snapshot missing");
     validateEquipmentSnapshot(raw.originalBox);
   }
@@ -309,6 +327,164 @@ export function loadStartupState(): PersistedState | null {
 
 export function startupRecoveryPending(): boolean {
   return recoveryPending(STATE_FILE) || recoveryPending("mhw_rogue_pouch_state.json");
+}
+
+function runState(): PersistedState {
+  const state = loadStartupState();
+  if (!state || state.phase === "restored" || state.schema !== 4 || !state.wornPack || !state.originalBox)
+    throw new Error("当前没有可调整的局内装备箱");
+  if(state.granted.some(e=>e.acceptedFingerprints))throw new Error("镶嵌事务尚待恢复，请结束本局并保留日志");
+  return state;
+}
+function runEntry(state: PersistedState, index: number): {entry: GrantedEntry; object: REManagedObject} {
+  const entry = state.granted.find(e => e.boxIndex === index && !e.removed);
+  const box = equipmentBox(dataManager());
+  if (!entry || !box) throw new Error("只能操作本局登记的装备实例");
+  const object = recordedEntry(box, entry, true);
+  if (!object) throw new Error("本局装备已不存在");
+  return {entry, object};
+}
+function equipPosition(entry: GrantedEntry): number {
+  if (entry.idType === 1) return 0;
+  const part = Math.floor(entry.idVal / 0x100000) % 16;
+  if (part < 1 || part > 5) throw new Error("不支持的装备部位");
+  return part;
+}
+function socketLevels(object:REManagedObject):number[]{
+  const list=object.call("getDecorationsSlotList") as REManagedObject|null;
+  if(!list)throw new Error("原生孔位不可读");
+  const n=list.call("get_Count") as number;
+  if(!Number.isInteger(n)||n<0||n>3)throw new Error("原生孔位数量无效");
+  const levels:number[]=[];
+  for(let i=0;i<n;i++){
+    const slot=list.call("get_Item",i) as REManagedObject;
+    const level=slot.call("get_SlotLv") as number;
+    if(!Number.isInteger(level)||level<1||level>4)throw new Error("原生孔位等级无效");
+    levels.push(level);
+  }
+  return levels;
+}
+export function runEquipmentSnapshot() {
+  try {
+    const state = runState(), edm = equipDataManager(), pack = readPack(edm);
+    if (!edm || !pack) throw new Error("穿戴状态不可读");
+    const items = state.granted.filter(e => !e.removed).map(e => {
+      const {object} = runEntry(state, e.boxIndex);
+      const levels=socketLevels(object);
+      return {key:e.boxIndex, id:e.idVal, position:equipPosition(e), name:object.call("getName") as string,
+        worn:pack[equipPosition(e)]===e.boxIndex, inherited:false,
+        slotLevels:levels,sockets:levels.map((_,i) => object.call("getDecoId",i) as number)};
+    });
+    const originalWeapon = state.inheritedWeapon;
+    if (originalWeapon !== undefined && originalWeapon >= 0 && !items.some(e => e.position === 0 && e.key === originalWeapon)) {
+      const weapon = boxEntry(equipmentBox(dataManager()),originalWeapon);
+      if (!weapon || equipmentFingerprint(weapon) !== state.originalBox!.entries[String(originalWeapon)])
+        throw new Error("继承武器已变化，暂停装备操作");
+      items.unshift({key:originalWeapon,id:weapon.get_field("_IdVal") as number,position:0,
+        name:weapon.call("getName") as string,worn:pack[0]===originalWeapon,inherited:true,slotLevels:[],sockets:[]});
+    }
+    const used: Record<string,number> = {};
+    for (const values of Object.values(state.runSockets ?? {})) for (const id of values) if (id > 0) used[String(id)] = (used[String(id)] ?? 0) + 1;
+    return {version:`${state.wardrobeId ?? state.owner?.process}:${state.wardrobeRevision??0}`,items,
+      jewels:Object.entries(state.runJewels ?? {}).map(([id,count]) => ({id:Number(id),name:runJewelName(Number(id)),level:runJewelLevel(Number(id)),count,available:count-(used[id]??0)})),reason:null};
+  } catch (error) { return {version:"",items:[],jewels:[],reason:String(error)}; }
+}
+/** Personal wardrobe changes always execute in the native equipment update. */
+export function wearRunEquipment(index: number): void {
+  requireEquipmentUpdate();
+  const state=runState(), edm=equipDataManager();
+  if (!edm || !Number.isInteger(index)) throw new Error("装备请求无效");
+  const snapshot=runEquipmentSnapshot();
+  if (snapshot.reason) throw new Error(snapshot.reason);
+  const item=snapshot.items.find(e=>e.key===index);
+  if (!item) throw new Error("该实例不属于局内装备箱");
+  const pack=readPack(edm);
+  if (!pack) throw new Error("穿戴状态不可读");
+  const previous=captureEquipmentMySet(edm);
+  pack[item.position]=index;
+  try {
+    applyEquipmentIndices(edm,pack);
+    state.wornPack=pack; state.wornMySet=captureEquipmentMySet(edm);
+    state.wardrobeRevision=(state.wardrobeRevision??0)+1;
+    if (!persistStartupState(state)) throw new Error("局内穿戴记录写入失败");
+  } catch (error) { applyEquipmentIndices(edm,previous.indices); throw error; }
+}
+
+/** Run jewels are entitlements, separate from the player's native jewel stock.
+ * No native inventory-counting overload is used for these temporary sockets. */
+export function grantRunJewel(id:number): void {
+  if (!Number.isInteger(id)||id<=0) throw new Error("珠子 ID 无效");
+  runJewelName(id); // Reject unavailable native catalogue IDs before registering a reward.
+  const state=runState(); state.runJewels ??= {};
+  state.runJewels[String(id)]=(state.runJewels[String(id)]??0)+1;
+  state.wardrobeRevision=(state.wardrobeRevision??0)+1;
+  if (!persistStartupState(state)) throw new Error("本局珠子登记失败");
+}
+function decorationNative(object:REManagedObject,method:string,...args:unknown[]): unknown {
+  const type=findTypeDefinition("snow.data.EquipmentInventoryData");
+  if (!type?.get_method(method)) throw new Error("原生镶嵌接口不可用");
+  return callNativeFunction(object,type,method,...args);
+}
+function setSocket(object:REManagedObject,slot:number,id:number):void {
+  if (id===0) decorationNative(object,"removeDecorations",slot,false);
+  else decorationNative(object,"setDecorations(System.Int32, snow.equip.DecorationsId, System.Boolean)",slot,id,false);
+  if (object.call("getDecoId",slot)!==id) throw new Error("镶嵌读回不一致");
+}
+export function socketRunJewel(index:number,slot:number,id:number):void {
+  requireEquipmentUpdate();
+  if (!Number.isInteger(slot)||slot<0||slot>2||!Number.isInteger(id)||id<0) throw new Error("镶嵌请求无效");
+  const state=runState(), {entry,object}=runEntry(state,index), edm=equipDataManager();
+  if (!edm) throw new Error("装备管理器不可用");
+  const old=[0,1,2].map(i=>object.call("getDecoId",i) as number);
+  const tracked=state.runSockets?.[String(index)] ?? [0,0,0];
+  if (old.some((v,i)=>v!==tracked[i])) throw new Error("装备珠子与局内记录不一致，保留现场");
+  if (old[slot]===id) return;
+  const levels=socketLevels(object);
+  if(slot>=levels.length||id>0&&runJewelLevel(id)>levels[slot]!)throw new Error("珠子不符合原生孔位等级");
+  if (id>0 && !runEquipmentSnapshot().jewels.some(j=>j.id===id&&j.available>0)) throw new Error("没有可用的本局珠子");
+  // Validate on an independent copy before touching the live temporary item.
+  const scratch=createInstance("snow.data.EquipmentInventoryData");
+  if (!scratch) throw new Error("无法预检镶嵌");
+  retainEquipmentObject(scratch); decorationNative(scratch,".ctor"); decorationNative(scratch,"copy",object);
+  setSocket(scratch,slot,0);
+  const empty=equipmentFingerprint(scratch);
+  setSocket(scratch,slot,id);
+  decorationNative(scratch,"removeNotFitDecoSlot",false);
+  if (scratch.call("getDecoId",slot)!==id || decorationNative(scratch,"checkDecoCheat")!==false)
+    throw new Error("珠子不符合原生孔位或合法性规则");
+  const before=entry.fingerprint, after=equipmentFingerprint(scratch);
+  entry.acceptedFingerprints=[before!,empty,after];
+  // Both transaction endpoints are durable before the native write. On interruption
+  // recovery may safely reclaim either version of this exact temporary instance.
+  if (!persistStartupState(state)) throw new Error("镶嵌事务登记失败");
+  try {
+    setSocket(object,slot,id);
+    const pack=readPack(edm); if (!pack) throw new Error("穿戴状态不可读");
+    applyEquipmentIndices(edm,pack);
+    state.runSockets ??= {}; const next=old.slice(); next[slot]=id; state.runSockets[String(index)]=next;
+    entry.fingerprint=equipmentFingerprint(object); entry.acceptedFingerprints=undefined;
+    state.wornPack=pack; state.wornMySet=captureEquipmentMySet(edm);
+    state.wardrobeRevision=(state.wardrobeRevision??0)+1;
+    if (!persistStartupState(state)) throw new Error("镶嵌结果落盘失败，保留事务以供恢复");
+  } catch(error) { throw new Error(`镶嵌结果需核验，请结束本局恢复：${String(error)}`); }
+}
+
+function clearRunSockets(state:PersistedState,box:REManagedObject):void {
+  for(const entry of state.granted){
+    if (!state.runSockets?.[String(entry.boxIndex)] && !entry.acceptedFingerprints) continue;
+    const object=recordedEntry(box,entry,true); if(!object) continue;
+    const scratch=createInstance("snow.data.EquipmentInventoryData");
+    if(!scratch) throw new Error("无法登记珠子回收");
+    retainEquipmentObject(scratch);decorationNative(scratch,".ctor");decorationNative(scratch,"copy",object);
+    const fingerprints=[equipmentFingerprint(object)];
+    for(let i=0;i<3;i++){setSocket(scratch,i,0);fingerprints.push(equipmentFingerprint(scratch));}
+    entry.acceptedFingerprints=fingerprints;
+    if(!persistStartupState(state)) throw new Error("珠子回收事务写入失败");
+    for(let i=0;i<3;i++)setSocket(object,i,0);
+    entry.fingerprint=equipmentFingerprint(object);entry.acceptedFingerprints=undefined;
+    if(state.runSockets)delete state.runSockets[String(entry.boxIndex)];
+    if(!persistStartupState(state))throw new Error("珠子回收结果写入失败");
+  }
 }
 
 /**
@@ -358,7 +534,12 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
   let originalBox: EquipmentSnapshot;
   try { originalBox = captureEquipmentBox(box); }
   catch (error) { return { ...report, reason:String(error) }; }
-  const journal: PersistedState = { schema:3, active: true, owner, originalBox, armor, prevPack: prev, granted, pouchIsolated: false };
+  let originalMySet: EquipmentMySet;
+  try { originalMySet = captureEquipmentMySet(edm); }
+  catch (error) { return { ...report, reason:String(error) }; }
+  const journal: PersistedState = { schema:4, active: true, owner, originalBox, originalMySet, armor, prevPack: prev, granted, pouchIsolated: false,
+    wardrobeId:`${clockSeconds()}-${Math.random()}`,
+    inheritedWeapon:rules.keepPlayerWeapon ? prev[0] : undefined };
   if (!persistStartupState(journal)) { report.reason = recoveryWriteFailure() ?? "Cannot save original equipment"; return report; }
   const reserve = (entry: GrantedEntry): boolean => {
     granted.push(entry);
@@ -370,10 +551,9 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
       reason: `${reason}; recovery ${rollback.ok ? "completed" : "pending: " + rollback.reason}` };
   };
 
+  const desired = prev.slice();
   for (const [pos, strip] of [[PACK_TALISMAN, rules.stripTalismans], [PACK_INSECT, rules.stripInsect]] as const) {
-    if (strip && !writePackSlot(edm, pos, -1)) {
-      return fail(`卸装失败：pack[${pos}] 写入后读回不一致`);
-    }
+    if (strip) desired[pos] = -1;
   }
 
   for (let part = 1 as 1 | 2 | 3 | 4 | 5; part <= 5; part++) {
@@ -383,9 +563,7 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
       return fail(`防具发放失败（部位 ${part}）: ${grant.reason ?? "未知"}${grant.uncertain ? "［结果不明，禁止自动重试］" : ""}`);
     }
 
-    if (!writePackSlot(edm, part, grant.boxIndex)) {
-      return fail(`穿装失败：pack[${part}] 写入后读回不一致`);
-    }
+    desired[part] = grant.boxIndex;
   }
 
   // D1 武器口子：keepPlayerWeapon=false 时按 weaponId 发放并穿上（配置校验保证非空）
@@ -395,11 +573,11 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
       return fail(`武器发放失败: ${grant.reason ?? "未知"}`);
     }
 
-    if (!writePackSlot(edm, PACK_WEAPON, grant.boxIndex)) {
-      return fail("武器穿装失败：pack[0] 读回不一致");
-    }
+    desired[PACK_WEAPON] = grant.boxIndex;
   }
 
+  try { applyEquipmentIndices(edm, desired); }
+  catch (error) { return fail(`原生穿装失败：${String(error)}`); }
   const finalPack = readPack(edm);
   if (!finalPack) {
     return fail("终态 pack 不可读");
@@ -417,6 +595,8 @@ export function equipStartupSet(armor: string, series: number, rules: StartupRul
   report.ok = true;
   report.wornPack = finalPack;
   journal.wornPack = finalPack.slice();
+  try { journal.wornMySet = captureEquipmentMySet(edm); }
+  catch (error) { return fail(`本局个人组合备份失败：${String(error)}`); }
   report.granted = granted;
   if (pouch) {
     // Arm recovery BEFORE any pouch mutation, including partially failed clears.
@@ -505,18 +685,19 @@ export function restoreStartup(pouch: EquipWearPort | null, retainUntilSave = fa
   const result: RestoreReport = { ok: true, restoredPack: false, removedEntries: 0, skippedEntries: 0, pouchRestored: false };
   const removed = (): number => (result.removedEntries ?? 0);
   const skipped = (): number => (result.skippedEntries ?? 0);
+  try { if(box) clearRunSockets(state,box); }
+  catch(error){return {...result,ok:false,reason:String(error)};}
   // prevPack 为空 = 该记录只含发件清理（抽取/掉落），没有 pack 恢复语义
   if (state.prevPack.length === PACK_LEN) {
-    let packOk = true;
-    for (let i = 0; i < PACK_LEN; i++) {
-      if (!writePackSlot(edm, i, state.prevPack[i] ?? -1)) {
-        packOk = false;
-        break;
+    try {
+      if (state.originalMySet) {
+        if (!equipmentMySetMatches(edm, state.originalMySet)) applyEquipmentMySet(edm, state.originalMySet);
+        verifyReferences(edm.call("get_PlEquipPack") as REManagedObject, state.prevPack);
       }
-    }
-    result.restoredPack = packOk;
-    if (!packOk) {
-      return { ...result, ok: false, reason: "pack 恢复读回不一致；恢复保持待办" };
+      else applyEquipmentIndices(edm, state.prevPack); // Legacy schema3 recovery.
+      result.restoredPack = true;
+    } catch (error) {
+      return { ...result, ok:false, reason:`原生装备恢复待办：${String(error)}` };
     }
   }
   // Original resources can be restored even if a temporary item's ownership
@@ -573,8 +754,9 @@ export function startupCommitRecord(): PersistedState | null | undefined {
   if (!box || !state.originalBox) throw new Error("Original equipment save verification unavailable");
   verifyEquipmentBox(box,state.originalBox,[]);
   const pack = readPack(equipDataManager());
-  if (state.prevPack.length && (!pack || pack.some((v,i)=>v!==state.prevPack[i])))
+  if (state.prevPack.length > 0 && (!pack || pack.some((v,i)=>v!==state.prevPack[i])))
     throw new Error("Restored equipment changed before native save");
+  if (state.prevPack.length > 0) verifyReferences(equipDataManager()!.call("get_PlEquipPack") as REManagedObject, state.prevPack);
   return state;
 }
 
@@ -588,7 +770,14 @@ export function reapplyStartup(): { ok: boolean; reason?: string } {
     const box = equipmentBox(dataManager());
     if (!box) throw new Error("Equipment box unavailable");
     for (const entry of state.granted) if (!entry.removed && !recordedEntry(box, entry)) throw new Error("Run equipment disappeared");
-    for (let i = 0; i < PACK_LEN; i++) if (!writePackSlot(edm, i, state.wornPack[i]!)) throw new Error("Run equipment reapply failed");
+    if (Object.values(state.runSockets??{}).some(values=>values.some(id=>id>0))) {
+      // Run jewels never consume/return native stock through a saved-set application.
+      applyEquipmentIndices(edm,state.wornPack);
+    } else if (state.wornMySet) {
+      if (!equipmentMySetMatches(edm, state.wornMySet)) applyEquipmentMySet(edm, state.wornMySet);
+      verifyReferences(edm.call("get_PlEquipPack") as REManagedObject, state.wornPack);
+    }
+    else applyEquipmentIndices(edm, state.wornPack);
     return { ok: true };
   } catch (error) { return { ok: false, reason: String(error) }; }
 }

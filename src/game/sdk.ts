@@ -66,6 +66,7 @@ interface RefSdk {
   create_instance(typeName: string, simplify?: boolean): REManagedObject | null;
   create_managed_string(value: string): REManagedObject;
   create_managed_array(typeName: string, length: number): REManagedArray;
+  call_native_func(instance: REManagedObject, type: RETypeDefinition, method: string, ...args: unknown[]): unknown;
   to_float(value: unknown): number;
   float_to_ptr(value: number): unknown;
   hook(
@@ -167,6 +168,8 @@ export const createManagedArray = sdk.create_managed_array;
 export const toFloat = sdk.to_float;
 export const floatToPtr = sdk.float_to_ptr;
 export const findTypeDefinition = sdk.find_type_definition;
+/** Verified loadout protocol uses the native invoker from EquipDataManager.update. */
+export const callNativeFunction = sdk.call_native_func;
 
 export const reframework = {
   onFrame: re.on_frame,

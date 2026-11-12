@@ -72,7 +72,7 @@ export interface ArmorSetSpec {
 
 /** 抽取奖池条目（第一版只做武器+防具：链路已实测；护石/虫笼后置）。 */
 export interface GachaEntry {
-  kind: "weapon" | "armor";
+  kind: "weapon" | "armor" | "decoration";
   /** weapon: ContentsIdSystem.WeaponId；armor: PlArmorId（0x0C<部位><系列>）。 */
   id: number;
   w: number;
@@ -245,11 +245,11 @@ export function validateConfig(raw: unknown): RogueConfig {
     const entries: GachaEntry[] = [];
     for (let i = 0; i < entriesRaw.length; i++) {
       const e = object(entriesRaw[i], `gachaPools.${key}.entries[${i}]`);
-      if (e.kind !== "weapon" && e.kind !== "armor") fail(`gachaPools.${key}.entries[${i}].kind`);
+      if (e.kind !== "weapon" && e.kind !== "armor" && e.kind !== "decoration") fail(`gachaPools.${key}.entries[${i}].kind`);
       const id = number(e.id, `gachaPools.${key}.entries[${i}].id`, 1, true);
       if (id > 0xffffffff) fail(`gachaPools.${key}.entries[${i}].id：必须是 32 位装备 ID`);
       if (e.kind === "armor" && !validArmorId(id)) fail(`gachaPools.${key}.entries[${i}].id：防具部位必须为 1–5（0x0C1…–0x0C5…）`);
-      entries.push({ kind: e.kind as "weapon" | "armor", id,
+      entries.push({ kind: e.kind as GachaEntry["kind"], id,
         w: number(e.w, `gachaPools.${key}.entries[${i}].w`, 0) });
     }
     gachaPools[key] = { entries };

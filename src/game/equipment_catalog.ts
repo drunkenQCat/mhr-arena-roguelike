@@ -2,6 +2,7 @@
 import { findTypeDefinition, type REManagedObject } from "./sdk";
 import type { RogueConfig } from "../core/config";
 import { armorId } from "../core/equipment_id";
+import { runJewelName } from "./run_jewel_catalog";
 
 export function equipmentUnavailableReason(kind: "armor" | "weapon", id: number): string | null {
   if (!Number.isInteger(id) || id <= 0 || id > 0xffffffff) return "装备 ID 必须是有效的 32 位正整数";
@@ -37,6 +38,7 @@ export function validateEquipmentConfig(config: RogueConfig): void {
     const entries = config.gachaPools![pool]!.entries;
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]!;
+      if(entry.kind === "decoration") { runJewelName(entry.id);continue; }
       check(entry.kind, entry.id, `gachaPools.${pool}.entries[${i}].id`);
     }
   }

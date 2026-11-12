@@ -8,14 +8,14 @@
 
 import { getSingleton, relog, type REManagedObject } from "./sdk";
 import type { GachaEntry, GachaPoolSpec } from "../core/config";
-import { grantEquip, appendGrantedEntry, confirmGrantedEntry } from "./equip_wear";
+import { grantEquip, appendGrantedEntry, confirmGrantedEntry, grantRunJewel, runJewelName } from "./equip_wear";
 
 export interface GachaRollResult {
   ok: boolean;
   uncertain?: boolean;
   /** 游戏内名字（EquipmentInventoryData.getName，实测可用），日志/播报用。 */
   name?: string;
-  kind?: "weapon" | "armor";
+  kind?: "weapon" | "armor" | "decoration";
   id?: number;
   boxIndex?: number;
   /** true=玩家已有该装备，复用未新发（绝不能进局末清理清单）。 */
@@ -67,6 +67,12 @@ export class GachaService {
     const picked = this.deps.rollIndex(weights);
     if (picked < 0 || picked >= pool.entries.length) return { ok: false, reason: "奖池权重非法（全 0？）" };
     const entry: GachaEntry = pool.entries[picked]!;
+    if(entry.kind === "decoration") {
+      let name:string;
+      try {name=runJewelName(entry.id);}catch(error){return {ok:false,reason:String(error)};}
+      try { grantRunJewel(entry.id);return {ok:true,name,kind:entry.kind,id:entry.id}; }
+      catch(error){return {ok:false,uncertain:true,reason:String(error)};}
+    }
     const box = equipmentBox();
     if (!box) return { ok: false, reason: "EquipBox unavailable" };
     const grant = grantEquip(box, entry.id, entry.kind, appendGrantedEntry, false, confirmGrantedEntry);

@@ -56,7 +56,7 @@ export function equipmentFingerprint(e: REManagedObject): string {
 }
 
 export interface EquipmentSnapshot { capacity: number; originalCount: number; entries: Record<string,string> }
-export interface EquipmentReservation { boxIndex: number; idType: number; idVal: number; fingerprint?: string; removed?: boolean }
+export interface EquipmentReservation { boxIndex: number; idType: number; idVal: number; fingerprint?: string; acceptedFingerprints?: string[]; removed?: boolean }
 
 function list(box: REManagedObject): REManagedObject {
   const items = box.get_field("_WeaponArmorInventoryList") as REManagedObject | null;
@@ -111,7 +111,7 @@ export function verifyEquipmentBox(box: REManagedObject, original: EquipmentSnap
         throw new Error("Original equipment changed; automatic recovery refused");
     } else if (e.get_field("_IdType") !== 0) {
       if (!grant || grant.removed && !previousSave || !grant.fingerprint || e.get_field("_IdType") !== grant.idType ||
-          e.get_field("_IdVal") !== grant.idVal || equipmentFingerprint(e) !== grant.fingerprint)
+          e.get_field("_IdVal") !== grant.idVal || ![grant.fingerprint, ...(grant.acceptedFingerprints ?? [])].includes(equipmentFingerprint(e)))
         throw new Error("Unverified equipment occupies an originally empty slot; recovery retained");
     }
   }

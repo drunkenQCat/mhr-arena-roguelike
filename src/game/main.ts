@@ -1,3 +1,4 @@
+import { cancelEquipmentWork, enqueueEquipmentWork } from "./equipment_update";
 import { MultiplayerRun } from "./multiplayer_run";
 import { ConfigStore } from "./config_store";
 import {ConfigRecovery} from "./config_recovery";
@@ -94,6 +95,7 @@ try {
   let lastBuffState = "";
   let lastBuffPoll = -1;
   let multiplayerRun: MultiplayerRun | null = null;
+  const entryWork = {};
   reframework.onFrame(() => {
     try {
       recoverySave.tick();
@@ -124,6 +126,7 @@ try {
           core = new RunCore(entryConfig);
           runtime = new NativeRuntime(entryConfig, entry.installer, gacha, true, configureServices);
           runtime.tick();
+          cancelEquipmentWork(session);
           session = new RunSession(core, monsterCatalog, runtime, configSubmitted);
           const adopted = session.adoptPostedEntry(entry.plan);
           if (!adopted.ok) throw new Error(adopted.message ?? "Cannot adopt entry quest");
@@ -141,7 +144,10 @@ try {
         catch(e){configRecovery.message=`配置仍需修复或安全重载：${String(e)}`;}
       }
       runtime.setConfigRecoveryNotice(configRecovery.message);
-      if (multiplayerRun) multiplayerRun.tick(); else multiplayerEntry.tick();
+      if (multiplayerRun) multiplayerRun.tick();
+      else enqueueEquipmentWork(entryWork, () => {
+        if (!multiplayerRun) multiplayerEntry.tick();
+      }, reason => { session.message = reason; });
       const r = session.readingSnapshot;
       const restoredVillage = ["Finished", "Fault"].includes(session.stage) && !session.startupStatus.restorePending &&
         !!r?.canPost && !r.quest && r.players.length > 0;
@@ -151,6 +157,7 @@ try {
         previousRun = session.runSummary(); runtime.report("run-settlement",previousRun);
         buffs.shutdown(); multiplayerEntry.resetForNextRun();
         runtime.rebind(config, installer); multiplayerRun = null; entryAttached = false;
+        cancelEquipmentWork(session);
         core = new RunCore(config); session = new RunSession(core, monsterCatalog, runtime, configSubmitted);
         shopWindow = new ShopWindow(core, () => session.canShop(), () => session.shopQuest(), services);
         const nativeUi = webConsole?.newScriptSession();
@@ -180,6 +187,7 @@ try {
     catch (error) { relog.error(`[MhwRogue] shop window: ${String(error)}`); }
   });
   reframework.onScriptReset(() => {
+    cancelEquipmentWork(entryWork); cancelEquipmentWork(session);
     multiplayerEntry.shutdown();
     buffs.shutdown();
     runtime.shutdown();

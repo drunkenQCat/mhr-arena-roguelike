@@ -8,8 +8,11 @@ import type { ShopWindow } from "./shop_window";
 import { clockSeconds, getSingleton, refFs, rejson, loadWebconsole, type NativeWebconsole } from "./sdk";
 import { PartySession } from "./party_session";
 import { validateEquipmentConfig } from "./equipment_catalog";
+import { cancelEquipmentWork, enqueueEquipmentWork, inEquipmentUpdate } from "./equipment_update";
+import { runEquipmentSnapshot, wearRunEquipment, socketRunJewel } from "./equip_wear";
 
 interface Command {
+  equipmentVersion?: string; equipmentKey?: number; socket?: number; jewelId?: number;
   id?: string; bridgeId?: string; cmd?: string; armor?: string; index?: number;
   value?: boolean; itemId?: string; route?: string; config?: unknown;
   sceneToken?: string; dialogToken?: string; slot?: number; to?: string;
@@ -41,6 +44,7 @@ export class WebConsoleBridge {
   private counter = 0;
   private results: Outcome[] = [];
   private closed = false;
+  private nativeCommandPending: {id?:string;deadline:number} | null = null;
   private effect: { id: string; kind: "kill" | "teleport"; unique: number; token: number;
     deadline: number; targets?: number[]; destination?: { x: number; y: number; z: number } } | null = null;
   private purchase: { id: string; version: number } | null = null;
@@ -68,6 +72,7 @@ export class WebConsoleBridge {
 
   newScriptSession(): NativeUi {
     this.closed = true;
+    cancelEquipmentWork(this);
     this.nativeUi.shutdown();
     this.transport.publish_state(rejson.dump_string({ ok: false, closed: true, bridgeId: this.bridgeId }, 0));
     return this.nativeUi;
@@ -76,6 +81,11 @@ export class WebConsoleBridge {
   tick(): void {
     if (this.closed) return;
     try {
+      if (this.nativeCommandPending && clockSeconds() > this.nativeCommandPending.deadline) {
+        const id = this.nativeCommandPending.id;
+        cancelEquipmentWork(this); this.nativeCommandPending = null;
+        this.writeResults({id,status:"rejected",message:"等待装备更新超时；请确认角色已载入后重试"});
+      }
       if (this.pendingReceipt && !this.writeResults(this.pendingReceipt)) return;
       const revision=this.runtime.multiplayerConfigRevision?.()??0;
       if(revision!==this.configRevision){this.configRevision=revision;this.configVersion++;}
@@ -151,7 +161,23 @@ export class WebConsoleBridge {
 
   private poll(): void {
     // At most one mutation per poll; pending purchases settle before later commands.
-    for (const text of this.transport.take_commands(1)) this.consume(text);
+    if (this.nativeCommandPending) return;
+    for (const text of this.transport.take_commands(1)) {
+      const cmd = rejson.load_string(text) as Command | null;
+      const hasPlayer = (this.session.readingSnapshot?.players.length ?? 0) > 0;
+      if (hasPlayer && (cmd?.cmd === "equipment" || cmd?.cmd === "startRun" || cmd?.cmd === "mpEntry" && cmd.sub === "choose")) {
+        this.nativeCommandPending = {id:cmd.id,deadline:clockSeconds()+10};
+        try {
+          enqueueEquipmentWork(this, () => {
+            this.nativeCommandPending = null;
+            if (!this.closed) this.consume(text); // All identities checked at execution time.
+          }, reason => { this.nativeCommandPending = null; this.writeResults({id:cmd.id,status:"rejected",message:reason}); });
+        } catch (error) {
+          this.nativeCommandPending = null;
+          this.writeResults({id:cmd.id,status:"rejected",message:String(error)});
+        }
+      } else this.consume(text); // Title/load/dialog automation remains available without a player.
+    }
   }
 
   private consume(text: string): void {
@@ -190,7 +216,7 @@ export class WebConsoleBridge {
     } else {
       try {
         if (staleBridge) throw new Error("连接会话已更换，请等待同步后重试");
-        if (["choose", "buy", "killAll", "stop", "teleport", "submitConfig"].includes(cmd.cmd ?? "")) {
+        if (["equipment", "choose", "buy", "killAll", "stop", "teleport", "submitConfig"].includes(cmd.cmd ?? "")) {
           if (cmd.questUnique !== this.session.readingSnapshot?.quest?.unique &&
             !(cmd.questUnique === null && !this.session.readingSnapshot?.quest))
             throw new Error("任务实例已变化，此操作已拒绝");
@@ -226,9 +252,24 @@ export class WebConsoleBridge {
   private execute(cmd: Command): Outcome {
     const s = this.session;
     switch (cmd.cmd) {
+      case "equipment": {
+        if (!inEquipmentUpdate()) throw new Error("请等待角色装备更新");
+        if (!s.canShop() || this.shop.busy || this.configuration) throw new Error("仅在个人整备且无进行中交易时可以调整装备");
+        const inventory=runEquipmentSnapshot();
+        if (inventory.reason || !cmd.equipmentVersion || cmd.equipmentVersion!==inventory.version)
+          throw new Error(inventory.reason ?? "局内装备箱已变化，请等待刷新后操作");
+        if (!Number.isInteger(cmd.equipmentKey)) throw new Error("装备实例无效");
+        if(cmd.sub==="wear") wearRunEquipment(cmd.equipmentKey!);
+        else if(cmd.sub==="socket") socketRunJewel(cmd.equipmentKey!,cmd.socket!,cmd.jewelId!);
+        else throw new Error("未知装备操作");
+        return {status:"applied",message:"局内装备配置已更新"};
+      }
       case "mpEntry": {
         if (!this.multiplayerEntry) throw new Error("当前构建没有联机入场实验模块。");
-        if (cmd.sub === "choose") this.multiplayerEntry.choose(cmd.index!);
+        if (cmd.sub === "choose") {
+          if (!inEquipmentUpdate()) throw new Error("等待载入角色后再准备装备");
+          this.multiplayerEntry.choose(cmd.index!);
+        }
         else if (cmd.sub === "retrySync") this.multiplayerEntry.retrySync();
         else if (cmd.sub === "post") this.multiplayerEntry.post();
         else if (cmd.sub === "setArmor") this.multiplayerEntry.setArmor(cmd.armor!);
@@ -278,6 +319,7 @@ export class WebConsoleBridge {
           message: "已保存：商店下次交易、曲线与怪池下次生成选择时生效；开局装备、抽取池、增益数值与节奏下一局生效。当前波次保持原计划。" };
       }
       case "startRun": {
+        if (!inEquipmentUpdate()) throw new Error("等待载入角色后再准备装备");
         if (cmd.testLayer !== undefined && (!Number.isInteger(cmd.testLayer) || cmd.testLayer < 1 ||
             !s.configForEditing().pools.some((pool) => cmd.testLayer! >= pool.from && cmd.testLayer! <= pool.to))) {
           throw new Error("测试层数不在已配置的怪物池范围内；未执行开局准备");
@@ -455,6 +497,7 @@ export class WebConsoleBridge {
       counter: ++this.counter, sampledAt: r?.time ?? null, publishedAt: clockSeconds(),
       multiplayerEntry: this.multiplayerEntry?.snapshot() ?? null,
       multiplayerRun: this.runtime.multiplayerState?.() ?? null,
+      equipment: {...runEquipmentSnapshot(),canEdit:s.canShop()&&!this.shop.busy&&!this.configuration},
       configVersion: this.configVersion, sessionStage: s.stage, corePhase: core.state.phase,
       questId: r?.quest?.id ?? null, questUnique: r?.quest?.unique ?? null,
       quest: r?.quest ?? null, online: r?.online ?? false, route: s.route,
