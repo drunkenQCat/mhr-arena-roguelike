@@ -353,3 +353,10 @@ it("legacy cartRestore entry uses the shop price and records the shared limit", 
   expect(c.state.wallet.purchaseLog).toEqual(["cart_restore"]);
   c.state.cartsLeft = 2; expect(c.buy("cart_restore").ok).toBe(false);
 });
+
+it("enforces shop layer windows in listing and purchase",()=>{
+ const config=cfg();config.shop[0]!.unlockLayer=3;config.shop[0]!.endLayer=5;
+ const core=new RunCore(config);core.state.phase="Prep";core.state.wallet.pt=1000;
+ for(const layer of [2,6]){core.state.layer=layer;expect(Object.values(core.getShop()).flat().some(x=>x.id==="secret")).toBe(false);expect(core.buy("secret").ok).toBe(false);}
+ core.state.layer=3;expect(Object.values(core.getShop()).flat().some(x=>x.id==="secret")).toBe(true);expect(core.buy("secret").ok).toBe(true);
+});

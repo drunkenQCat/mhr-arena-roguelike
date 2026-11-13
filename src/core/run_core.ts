@@ -156,6 +156,7 @@ export class RunCore {
   getShop(): Record<string, ShopEntry[]> {
     const groups: Record<string, ShopEntry[]> = {};
     for (const item of this.config.shop) {
+      if (this.state.layer < (item.unlockLayer ?? 1) || this.state.layer > (item.endLayer ?? Infinity)) continue;
       const g = groups[item.category] ?? (groups[item.category] = []);
       g.push(this.toEntry(item));
     }
@@ -223,6 +224,7 @@ export class RunCore {
       if (unavailable) return fail(unavailable);
     }
 
+    if (this.state.layer < (item.unlockLayer ?? 1) || this.state.layer > (item.endLayer ?? Infinity)) return fail("该商品不在当前层数开放");
     const owned = countOf(this.state.wallet, itemId);
     if (item.mode !== "service" && owned >= item.cap) {
       return fail(`${item.name} 已达持有上限（${item.cap}），不能再买`);

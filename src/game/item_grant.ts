@@ -11,13 +11,19 @@ import { itemIds } from "./default_config";
 import { multiplayerScope } from "./multiplayer_scope";
 import { readLobbyIdentity } from "./multiplayer_entry";
 import { entryHostTestScope } from "./entry_host_scope";
-import { getSingleton, relog, type REManagedObject } from "./sdk";
+import { findTypeDefinition, getSingleton, relog, type REManagedObject } from "./sdk";
 
 // Bare-name dispatch may select the other overload and reject two arguments without throwing.
 const ADD_ITEM = "tryAddGameItem(snow.data.ContentsIdSystem.ItemId, System.Int32)";
 
 /** 商店 id → 游戏道具数值（default_config 内嵌；data/item_ids.json 的生成源）。 */
 export function gameIdOf(shopItemId: string): number | null {
+  if (shopItemId.startsWith("native_item_")) {
+    const id=Number(shopItemId.slice(12));
+    if(!Number.isInteger(id)||id<=0||id>0xffffffff)return null;
+    const type=findTypeDefinition("snow.data.ContentsIdSystem.ItemId") as unknown as {get_fields():{is_static():boolean;get_data(o:unknown):unknown}[]}|null;
+    return type?.get_fields().some(f=>f.is_static()&&f.get_data(null)===id)?id:null;
+  }
   return itemIds[shopItemId]?.id ?? null;
 }
 

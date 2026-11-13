@@ -23,6 +23,7 @@ watch(page, value => {
 const results = ref<CommandResult[]>([]), filter = ref("");
 const config = ref<unknown>(null), loadedVersion = ref(0), configMessage = ref("");
 const configBridgeId = ref("");
+const savedConfigVersion = ref<number | null>(null);
 const heartbeat = new Freshness();
 const developerMode = ref(false);
 let alive = true, timer: ReturnType<typeof setTimeout> | undefined, loadedBridge = "";
@@ -78,6 +79,7 @@ async function loadConfig() {
   if (result?.status === "applied" && result.config) {
     config.value = result.config; loadedVersion.value = result.configVersion ?? 0;
     configBridgeId.value = state.value?.bridgeId ?? "";
+    savedConfigVersion.value = null;
     configMessage.value = "已从游戏 Lua 读取配置，包含已提交的下一局规则；当前波次计划保持冻结。";
   } else configMessage.value = notice.value;
 }
@@ -87,6 +89,7 @@ async function submitConfig(value: unknown, version: number) {
   if (result?.status === "applied") {
     // Keep the exact normalized submitted draft as the new baseline after the game confirms.
     config.value = value; loadedVersion.value = result.configVersion!;
+    savedConfigVersion.value = result.configVersion ?? null;
   }
 }
 async function poll() {
@@ -148,7 +151,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); window.removeEventListen
     <MultiplayerEntry v-if="page === 'multiplayer'" :entry="state?.multiplayerEntry" :run="state?.multiplayerRun" :connected="connected" :busy="busy || !connected" @command="send" @play="page = 'play'" />
     <PlayWorkspace v-show="page === 'play'" :state="state" :connected="connected" :busy="busy" :notice="notice" :developer-mode="developerMode" @command="send" @multiplayer="page = 'multiplayer'" />
     <RunEquipment v-if="page === 'equipment'" :inventory="state?.equipment" :connected="connected" :busy="busy" :notice="notice" @command="send" />
-    <ConfigEditor v-show="page === 'design'" :config="config" :version="loadedVersion" :server-version="state?.configVersion ?? loadedVersion" :session-changed="!!configBridgeId && configBridgeId !== state?.bridgeId" :busy="busy" :connected="connected" :message="configMessage" :blocked-reason="configBlockedReason" @load="loadConfig" @submit="submitConfig" />
+    <ConfigEditor v-show="page === 'design'" :config="config" :version="loadedVersion" :saved-version="savedConfigVersion" :server-version="state?.configVersion ?? loadedVersion" :session-changed="!!configBridgeId && configBridgeId !== state?.bridgeId" :busy="busy" :connected="connected" :message="configMessage" :blocked-reason="configBlockedReason" @load="loadConfig" @submit="submitConfig" />
     <section v-if="page === 'events'" class="panel"><div class="section-heading"><h2>命令记录</h2><button @click="downloadJson('console-results.json', results)">导出记录</button></div><label>筛选记录 <input v-model="filter" placeholder="状态 / 请求 ID / 消息" /></label><p class="muted">applied 表示命令已执行；queued 仍需等待游戏结果；rejected 表示未执行。</p><article v-for="r in recent" :key="r.id" class="event"><span :class="['badge', r.status === 'applied' ? 'live' : r.status === 'queued' ? 'pending' : 'warning']">{{ r.status }}</span><span>{{ r.message ?? (r.config ? '已读取游戏配置' : '') }}</span><small class="mono">{{ r.id }}</small></article></section>
   </main>
 </template>

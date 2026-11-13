@@ -35,10 +35,10 @@ const singleReward = computed(() => results.value.current.find(choice => choice.
     <p v-if="results.error" class="notice">草稿暂不能预览：{{ results.error }}</p>
     <p v-if="results.previousError && !results.error" class="muted">原方案在该条件下无可用示例，以下展示当前草稿。</p>
     <article v-for="(choice, i) in results.current" :key="choice.index" class="preview-choice">
-      <b>{{ choice.label }}</b><span>生命 ×{{ choice.hpMul }} · 伤害 ×{{ choice.dmgMul }}</span><strong class="gold">{{ choice.rewardPt }} PT</strong>
-      <small v-if="results.previous[i]">原方案：生命 ×{{ results.previous[i].hpMul }} · 伤害 ×{{ results.previous[i].dmgMul }} · {{ results.previous[i].rewardPt }} PT</small>
+      <b>{{ choice.label }}</b><span>生命 ×{{ stat(choice.hpMul) }} · 伤害 ×{{ stat(choice.dmgMul) }}</span><strong class="gold">{{ choice.rewardPt }} PT</strong>
+      <small v-if="results.previous[i]">原方案：生命 ×{{ stat(results.previous[i].hpMul) }} · 伤害 ×{{ stat(results.previous[i].dmgMul) }} · {{ results.previous[i].rewardPt }} PT</small>
     </article>
-    <details><summary>层段边界对照 · {{ players }} 人</summary><p class="muted">按当前人数与解锁条件比较各层段首尾，最多显示 16 个边界。不同层可能抽到不同怪；“—”表示该条件不能生成示例。</p><div class="table-scroll"><table><thead><tr><th>层</th><th>生命倍率 新 / 原</th><th>PT 新 / 原</th></tr></thead><tbody><tr v-for="point in checkpoints" :key="point.layer"><td>{{ point.layer }}</td><td>{{ point.hp ?? '—' }} / {{ point.oldHp ?? '—' }}</td><td>{{ point.reward ?? '—' }} / {{ point.oldReward ?? '—' }}</td></tr></tbody></table></div></details>
+    <details><summary>层段边界对照 · {{ players }} 人</summary><p class="muted">按当前人数与解锁条件比较各层段首尾，最多显示 16 个边界。不同层可能抽到不同怪；“—”表示该条件不能生成示例。</p><div class="table-scroll"><table><thead><tr><th>层</th><th>生命倍率 新 / 原</th><th>PT 新 / 原</th></tr></thead><tbody><tr v-for="point in checkpoints" :key="point.layer"><td>{{ point.layer }}</td><td>{{ point.hp == null ? '—' : stat(point.hp) }} / {{ point.oldHp == null ? '—' : stat(point.oldHp) }}</td><td>{{ point.reward ?? '—' }} / {{ point.oldReward ?? '—' }}</td></tr></tbody></table></div></details>
     <details @toggle="samplingOpen = ($event.target as HTMLDetailsElement).open"><summary>随机组合范围 · 24 次抽样</summary>
       <p class="muted">当前层数、人数和解锁条件下，用同一组种子生成 24 轮候选。范围与均值仅供比较，不代表完整分布或实测通关率。</p>
       <p v-if="sampled.error" class="notice">{{ sampled.error }}</p>
@@ -53,5 +53,5 @@ const singleReward = computed(() => results.value.current.find(choice => choice.
   </aside>
 </template>
 <style scoped>
-.balance-preview{position:sticky;top:12px;border:1px solid #705c3e;background:#191510;border-radius:8px;padding:16px;max-height:calc(100vh - 24px);overflow:auto}.balance-preview h3{margin-top:0}.preview-controls{display:flex;gap:10px}.preview-controls label{display:grid;gap:6px;font-size:12px}.preview-controls input{width:78px}.preview-controls select{min-width:130px}.preview-choice{display:grid;gap:5px;padding:12px 0;border-top:1px solid #4a3e2c;font-size:13px}.preview-choice span{font-size:12px}.balance-preview .check{margin:12px 0}@media(max-width:950px){.balance-preview{position:static;max-height:none}}
+.balance-preview{position:fixed;right:24px;bottom:78px;width:min(420px,calc(100vw - 32px));z-index:21;border:1px solid #705c3e;background:#191510;border-radius:8px;padding:16px;max-height:calc(100dvh - 110px);overflow:auto}.balance-preview h3{margin-top:0}.preview-controls{display:flex;gap:10px}.preview-controls label{display:grid;gap:6px;font-size:12px}.preview-controls input{width:78px}.preview-controls select{min-width:130px}.preview-choice{display:grid;gap:5px;padding:12px 0;border-top:1px solid #4a3e2c;font-size:13px}.preview-choice span{font-size:12px}.balance-preview .check{margin:12px 0}
 </style>

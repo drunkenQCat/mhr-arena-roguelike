@@ -13,6 +13,8 @@ export type PoolTierName = "low" | "mid" | "adv" | "ultimate";
 export type ShopMode = "perUnit" | "fill" | "service";
 
 export interface ShopItem {
+  unlockLayer?: number;
+  endLayer?: number;
   id: string;
   name: string;
   category: string;
@@ -307,6 +309,8 @@ export function validateConfig(raw: unknown): RogueConfig {
     shopIds.push(id);
     text(item.name, `${path}.name`);
     text(item.category, `${path}.category`);
+    if (item.unlockLayer !== undefined) number(item.unlockLayer, `${path}.unlockLayer`, 1, true);
+    if (item.endLayer !== undefined) { number(item.endLayer, `${path}.endLayer`, 1, true); if ((item.endLayer as number) < ((item.unlockLayer as number) ?? 1)) fail(`${path}.endLayer`); }
     number(item.price, `${path}.price`, 0, true);
     if (!["perUnit", "fill", "service"].includes(item.mode as string)) fail(`${path}.mode`);
     number(item.cap, `${path}.cap`, item.mode === "service" ? 0 : 1, true);

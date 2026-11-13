@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const host = vi.hoisted(() => ({ count: 2, add: true, active: false, online: false, playing: true, questId: 900102, unique: 42, live: false, throwAfter: false,
   readBroken: false, capacity: true, writes: 0, methodAvailable: true, args: [] as unknown[] }));
 vi.mock("./sdk", () => ({
+  findTypeDefinition: () => ({get_fields:()=>[{is_static:()=>true,get_data:()=>68157446}]}),
   getSingleton: (name: string) => {
     if (name === "snow.QuestManager") return { call: (m: string) => m === "isActiveQuest" ? host.active : m === "isPlayQuest" ? host.playing : m === "get_ActiveQuestNo" ? host.questId : m === "getActiveQuestUniqueNo" ? host.unique : null };
     if (name === "snow.enemy.EnemyManager") return { call: (m: string) => m === "getBossEnemyCount" ? 1 : { call: (method: string) => method === "isDieBehaviorActive" && !host.live } };
@@ -28,7 +29,7 @@ vi.mock("./sdk", () => ({
   },
   relog: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
-import { grantItem } from "./item_grant";
+import { grantItem,gameIdOf } from "./item_grant";
 
 beforeEach(() => Object.assign(host, { count: 2, add: true, active: false, online: false,
   playing: true, questId: 900102, unique: 42, live: false, throwAfter: false, readBroken: false, capacity: true, writes: 0, methodAvailable: true, args: [] }));
@@ -78,4 +79,11 @@ it("permits the owned solo arena between waves and rejects live actors or stale 
   host.live = false; host.unique = 43; expect(grantItem("potion", 1, context).granted).toBe(false);
   host.unique = 42; host.online = true; expect(grantItem("potion", 1, context).granted).toBe(false);
   expect(host.writes).toBe(1);
+});
+
+it("resolves imported catalogue items only if present in the native enum",()=>{
+ expect(gameIdOf("native_item_68157446")).toBe(68157446);
+ expect(gameIdOf("native_item_123456")).toBeNull();
+ expect(gameIdOf("native_item_NaN")).toBeNull();
+ expect(gameIdOf("native_item_-1")).toBeNull();
 });

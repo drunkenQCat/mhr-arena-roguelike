@@ -14,6 +14,8 @@ const buffs = computed(() => props.state?.services?.buffs);
 const categories = computed(() => orderedCategories(Object.keys(props.state?.shop ?? {})));
 const idle = computed(() => !props.state || ['Idle', 'Finished'].includes(props.state.sessionStage));
 const summary = computed(() => props.state?.runSummary ?? props.state?.previousRun);
+const summaryOpen=ref(true);
+watch(()=>props.state?.sessionStage,(stage,old)=>{if(stage!==old&&['Finished','Fault'].includes(stage??''))summaryOpen.value=true;});
 const ending = computed(() => runEnding(summary.value));
 const lootName = (id: string) => Object.values(props.state?.shop ?? {}).flat().find(x=>x.id===id)?.name ?? id;
 const finished = computed(() => props.state?.sessionStage === 'Finished');
@@ -74,7 +76,7 @@ const transactionText = computed(() => {
     <nav v-if="selecting" class="prep-switch" aria-label="整备操作"><button :class="{ selected: prepView === 'shop' }" :aria-pressed="prepView === 'shop'" @click="prepView = 'shop'">补给商店</button><button v-if="!preparing" :class="{ selected: prepView === 'choices' }" :aria-pressed="prepView === 'choices'" @click="prepView = 'choices'">{{ guest ? '查看候选波次' : '选择下一波' }}</button></nav>
     </div>
 
-    <section v-if="finished || state?.sessionStage === 'Fault' || (idle && summary)" class="panel run-summary" aria-label="本局结果">
+    <button v-if="finished || state?.sessionStage === 'Fault' || (idle && summary)" class="summary-toggle" @click="summaryOpen=!summaryOpen">{{ summaryOpen?'收起狩猎记录':'查看狩猎记录' }}</button><section v-if="summaryOpen && (finished || state?.sessionStage === 'Fault' || (idle && summary))" class="panel run-summary" aria-label="本局结果" role="region" @keydown.esc="summaryOpen=false"><button class="summary-close" @click="summaryOpen=false" aria-label="关闭狩猎记录">关闭 ×</button>
       <p class="eyebrow">本次狩猎记录</p><h2>{{ ending.title }}</h2>
       <p>{{ ending.detail }}</p>
       <p v-if="ending.warning" role="alert">{{ ending.warning }}</p>
@@ -98,7 +100,7 @@ const transactionText = computed(() => {
       <p v-if="state?.control?.startup.message" class="notice">{{ state.control.startup.message }}</p>
       <button class="primary" :disabled="!allowed.start || !armor" @click="start()">开始单人挑战</button>
       <small v-if="!allowed.start" class="reason">{{ state?.control?.startReason ?? '等待游戏确认可开局状态。' }}</small>
-      <details class="advanced"><summary>高级设置 · 下一局路线：{{ routeName(state?.control?.nextRoute) }}</summary>
+      <details v-if="developerMode" class="advanced"><summary>高级设置 · 下一局路线：{{ routeName(state?.control?.nextRoute) }}</summary>
         <p class="muted">同场续波会留在斗技场；每层重进会重新进入任务。仅在开局前可切换。</p>
         <div class="route-options"><button v-for="route in ['inPlace', 'reentry']" :key="route" :class="{ selected: state?.control?.nextRoute === route }" :disabled="!allowed.route" @click="command('setRoute', { route })">{{ routeName(route) }}</button></div>
       </details>
@@ -125,7 +127,7 @@ const transactionText = computed(() => {
         <div class="chips"><span v-for="(member, index) in state.multiplayerRun.members ?? []" :key="member.id" :class="['badge', member.ready ? 'live' : 'pending']">{{ member.self ? '你' : '队员 ' + (index + 1) }} · {{ member.ready ? '同步已确认' : '等待同步' }}</span></div>
       </template>
     </section>
-    <section v-if="state?.supplyLoot?.length" class="panel" aria-label="清波补给">
+    <section v-if="state?.supplyLoot?.length" class="panel recent-loot" aria-label="清波补给">
       <h2>本局最近掉落</h2><p v-for="(item,index) in state.supplyLoot" :key="index">{{ lootName(item.itemId) }} × {{ item.actual }}<small v-if="!item.granted">{{ item.reason || '背包已满或无法完整接收，未扣 PT' }}</small></p>
     </section>
     <div v-if="selecting" class="prep-workbench" :data-view="prepView">
@@ -166,6 +168,8 @@ const transactionText = computed(() => {
 </template>
 
 <style scoped>
+.recent-loot{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding:12px 18px}.recent-loot h2{font-size:14px;margin:0}.recent-loot p{margin:0;padding:4px 10px;background:#302719;border-radius:5px;font-size:13px}
+
 .play-workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:18px}
 .play-sticky{position:sticky;top:0;z-index:5;background:#14110d;padding:6px 0}
 .status-strip{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:#292117;border:1px solid #766044;border-radius:8px;padding:12px 20px;box-shadow:0 4px 15px #0008}
@@ -195,7 +199,7 @@ const transactionText = computed(() => {
 .end-controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:18px}.tools-panel{padding:16px 20px}
 .compact-panel p{margin-bottom:8px}.compact-panel li{margin:8px 0}.toolbar button{max-width:100%;white-space:normal}
 .route-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}.route-options button{text-align:left}
-.run-summary{border-color:#b68b42}.run-summary p{line-height:1.8}details.panel>summary{font-size:15px}
+.summary-toggle{position:fixed;right:24px;bottom:20px;z-index:30}.summary-close{float:right}.run-summary{position:fixed;right:24px;bottom:76px;width:min(540px,calc(100vw - 32px));max-height:75vh;overflow:auto;z-index:29;box-shadow:0 12px 60px #000a;border-color:#b68b42}.run-summary p{line-height:1.8}details.panel>summary{font-size:15px}
 @media(max-width:900px){
   .prep-workbench{grid-template-columns:minmax(0,1fr);gap:12px}
   .prep-switch{display:flex;gap:8px;padding-top:8px}.prep-switch button{flex:1;min-height:44px}
