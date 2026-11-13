@@ -11,6 +11,7 @@ const server = await createServer({ root, server: { middlewareMode: true, hmr: f
 let checked = 0;
 try {
   const { default: Wardrobe } = await server.ssrLoadModule('/src/RunEquipment.vue');
+  const { default: Qurious } = await server.ssrLoadModule('/src/QuriousPanel.vue');
   const { default: Play } = await server.ssrLoadModule('/src/PlayWorkspace.vue');
   const { default: Entry } = await server.ssrLoadModule('/src/MultiplayerEntry.vue');
   const { default: Balance } = await server.ssrLoadModule('/src/BalancePreview.vue');
@@ -18,6 +19,12 @@ try {
   const { default: ReleaseCapabilities } = await server.ssrLoadModule('/src/ReleaseCapabilities.vue');
   const { editorConfig } = await server.ssrLoadModule('/src/editor-model.ts');
   const render = (component, props) => renderToString(createSSRApp(component, props));
+  const armorView={defense:106,slots:[2,1],skills:[{id:2,name:'挑战者',level:2}],resistance:[-4,1,-1,4,0]};
+  const qInventory={version:'q1',canEdit:true,reason:null,items:[{key:21,position:1,qurious:{supported:true,view:armorView}}],quriousPrice:60};
+  const qBefore=await render(Qurious,{inventory:qInventory,equipmentKey:21,locked:false,pt:100});
+  assert.match(qBefore,/通常炼化/);assert.match(qBefore,/安定型/);assert.match(qBefore,/技能特化/);assert.match(qBefore,/孔位特化/);checked++;
+  const qBlocked=await render(Qurious,{inventory:{...qInventory,quriousPending:{key:21,candidate:{before:armorView,after:armorView,canAccept:false,reason:'超过原生容量',changes:['防御 +5']}}},equipmentKey:21,locked:false,pt:40});
+  assert.match(qBlocked,/无法完整叠加/);assert.match(qBlocked,/超过原生容量/);assert.match(qBlocked,/<button[^>]*disabled[^>]*>接受并叠加/);checked++;
   const coverage = await render(ReleaseCapabilities, {});
   assert.match(coverage,/已接入多人波次/);assert.match(coverage,/模拟 Steam 身份/);
   const capabilities = JSON.parse(readFileSync(new URL('../../data/release_capabilities.json', import.meta.url), 'utf8'));

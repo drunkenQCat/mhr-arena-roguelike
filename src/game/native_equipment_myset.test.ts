@@ -23,6 +23,7 @@ vi.mock("./sdk",()=>({rejson:{dump_string:JSON.stringify},createInstance:()=>{co
   resolve(x);
  }
  if(m==="restoreVariableToRef")resolve(o);
+ if(m==='applyEquipPack')h.manager.values.pack=o;
  if(m.startsWith("applyEquipMySet")){
   if(!h.wrong)h.manager.values.pack=args[0];return true;
  }

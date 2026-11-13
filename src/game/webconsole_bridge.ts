@@ -9,9 +9,10 @@ import { clockSeconds, getSingleton, refFs, rejson, loadWebconsole, type NativeW
 import { PartySession } from "./party_session";
 import { validateEquipmentConfig } from "./equipment_catalog";
 import { cancelEquipmentWork, enqueueEquipmentWork, inEquipmentUpdate } from "./equipment_update";
-import { runEquipmentSnapshot, wearRunEquipment, socketRunJewel } from "./equip_wear";
+import { runEquipmentSnapshot, wearRunEquipment, socketRunJewel,rollRunQurious,resolveRunQurious,QURIOUS_PRICE } from "./equip_wear";
 
 interface Command {
+  quriousMode?:number;
   equipmentVersion?: string; equipmentKey?: number; socket?: number; jewelId?: number;
   id?: string; bridgeId?: string; cmd?: string; armor?: string; index?: number;
   value?: boolean; itemId?: string; route?: string; config?: unknown;
@@ -259,6 +260,16 @@ export class WebConsoleBridge {
         if (inventory.reason || !cmd.equipmentVersion || cmd.equipmentVersion!==inventory.version)
           throw new Error(inventory.reason ?? "局内装备箱已变化，请等待刷新后操作");
         if (!Number.isInteger(cmd.equipmentKey)) throw new Error("装备实例无效");
+        if(cmd.sub==='quriousRoll'){
+          if(s.core.state.wallet.pt<QURIOUS_PRICE)throw new Error('PT 不足');
+          rollRunQurious(cmd.equipmentKey!,cmd.quriousMode!);s.core.spendQurious(QURIOUS_PRICE);
+          return {status:'applied',message:`已支付 ${QURIOUS_PRICE} PT，请比较并确认炼化结果`};
+        }
+        if(cmd.sub==='quriousAccept'||cmd.sub==='quriousKeep'){
+          resolveRunQurious(cmd.equipmentKey!,cmd.sub==='quriousAccept');
+          return {status:'applied',message:cmd.sub==='quriousAccept'?'已应用原生炼化，累计强化已保留':'已保留原装备，本次 PT 不退'};
+        }
+        if(inventory.quriousPending)throw new Error('请先接受或放弃待确认炼化，再换装或镶嵌');
         if(cmd.sub==="wear") wearRunEquipment(cmd.equipmentKey!);
         else if(cmd.sub==="socket") socketRunJewel(cmd.equipmentKey!,cmd.socket!,cmd.jewelId!);
         else throw new Error("未知装备操作");
