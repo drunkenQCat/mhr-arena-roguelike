@@ -35,6 +35,9 @@ int wmain(int argc, wchar_t** argv) try {
     check(!webconsole::write_recovery(name, ""), "empty body accepted");
     check(!webconsole::write_recovery(name, std::string(2097153, 'x')), "oversize body accepted");
     check(webconsole::read_text(path) == original, "invalid input changed original");
+    check(webconsole::write_recovery("mhw_rogue_effect_network.json", original), "effect network journal write failed");
+    check(webconsole::read_text(webconsole::data_path(L"mhw_rogue_effect_network.json")) == original, "effect network journal readback differs");
+    check(!webconsole::write_recovery("mhw_rogue_effect_network.json.bak", replacement), "unlisted effect journal accepted");
 
     auto locked = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
     check(locked != INVALID_HANDLE_VALUE, "cannot lock target");

@@ -11,6 +11,8 @@ const allowed = computed(() => actions(props.state, props.connected, props.busy)
 const prep = computed(() => props.state?.preparation);
 const wave = computed(() => props.state?.control?.activeWave);
 const buffs = computed(() => props.state?.services?.buffs);
+const availablePt=computed(()=>props.state?.economy?.availablePt??props.state?.designerEffects?.availablePt??props.state?.pt??'—');
+const reservedPt=computed(()=>props.state?.economy?.reservedPt??props.state?.designerEffects?.reservedPt??0);
 const categories = computed(() => orderedCategories(Object.keys(props.state?.shop ?? {})));
 const idle = computed(() => !props.state || ['Idle', 'Finished'].includes(props.state.sessionStage));
 const summary = computed(() => props.state?.runSummary ?? props.state?.previousRun);
@@ -58,7 +60,7 @@ const transactionText = computed(() => {
   if (!t) return '';
   if (t.retiredAfterRestore) return '上局交易结果仍未确认；个人装备与背包已恢复，旧交易已封存，可以准备新局。';
   const message = localizeTransaction(t.message ?? '', Object.values(props.state?.shop ?? {}).flat());
-  if (t.status === 'applied') return `最近交易：${message || '购买成功'}；当前余额 ${props.state?.pt ?? '—'} PT`;
+  if (t.status === 'applied') return `最近交易：${message || '购买成功'}；当前可用 ${availablePt.value} PT`;
   if (t.status === 'uncertain') return `交易结果待核实，请检查背包或装备，不要重复购买。${t.message ?? ''}`;
   return `购买未完成：${t.message ?? '请检查当前条件'}`;
 });
@@ -70,7 +72,7 @@ const transactionText = computed(() => {
     <section class="status-strip" aria-label="本局状态">
       <div><small>{{ state?.multiplayerRun?.live ? (guest ? '联机 · 队友' : '联机 · 房主') : '当前状态' }}</small><strong>{{ connected ? (stageNames[state?.sessionStage ?? ''] ?? '等待游戏') : '等待同步' }}</strong></div>
       <div><small>层数</small><strong>{{ state?.layer ?? '—' }}</strong></div>
-      <div><small>可用 PT</small><strong class="gold">{{ state?.pt ?? '—' }}</strong></div>
+      <div><small>可用 PT</small><strong class="gold">{{ availablePt }}</strong><small v-if="reservedPt">待生效预留 {{ reservedPt }} PT</small></div>
       <div><small>剩余猫车</small><strong>{{ state?.cartsLeft ?? '—' }} / {{ state?.maxCarts ?? '—' }}</strong></div>
     </section>
     <nav v-if="selecting" class="prep-switch" aria-label="整备操作"><button :class="{ selected: prepView === 'shop' }" :aria-pressed="prepView === 'shop'" @click="prepView = 'shop'">补给商店</button><button v-if="!preparing" :class="{ selected: prepView === 'choices' }" :aria-pressed="prepView === 'choices'" @click="prepView = 'choices'">{{ guest ? '查看候选波次' : '选择下一波' }}</button></nav>
@@ -131,7 +133,7 @@ const transactionText = computed(() => {
       <h2>本局最近掉落</h2><p v-for="(item,index) in state.supplyLoot" :key="index">{{ lootName(item.itemId) }} × {{ item.actual }}<small v-if="!item.granted">{{ item.reason || '背包已满或无法完整接收，未扣 PT' }}</small></p>
     </section>
     <div v-if="selecting" class="prep-workbench" :data-view="prepView">
-      <section class="panel shop-panel"><div class="section-heading"><div><p class="eyebrow">波次间整备</p><h2>购买补给</h2></div><div class="balance">可用 <strong>{{ state?.pt ?? '—' }} PT</strong></div></div>
+      <section class="panel shop-panel"><div class="section-heading"><div><p class="eyebrow">波次间整备</p><h2>购买补给</h2></div><div class="balance">可用 <strong>{{ availablePt }} PT</strong><small v-if="reservedPt">待生效预留 {{reservedPt}} PT</small></div></div>
         <p v-if="!state?.shopAvailable" class="notice">{{ state?.shopReason || '当前无法购买，请等待游戏准备完成。' }}</p><p v-else class="muted">{{ guest ? '按需购买补给，完成后等待房主选波。' : '补给按需购买，准备完毕后选择下一波。' }}</p>
         <div v-if="transactionText" :class="['transaction', { 'transaction-warning': state?.services?.lastTransaction?.status !== 'applied' }]" role="status">{{ transactionText }}</div>
         <p v-if="busy || notice.includes('待核实') || notice.includes('未及时') || notice.includes('已拒绝')" class="notice" role="status">{{ notice }}</p>
@@ -150,7 +152,7 @@ const transactionText = computed(() => {
     </div>
 
     <section v-if="!idle || finished" class="panel compact-panel"><div class="section-heading"><h2>{{ finished ? '本局购买与讨伐' : '本局成长' }}</h2><span class="muted">{{ routeName(state?.route) }} · {{ state?.armor ?? '保留原装备' }}</span></div>
-      <p v-if="buffs && !finished">生效增益：攻击 +{{ stat(buffs.active.atk) }} · 防御 +{{ stat(buffs.active.def) }} · 会心 +{{ stat(buffs.critBonus) }}%</p>
+      <p v-if="buffs && !finished">原商店生效增益：攻击 +{{ stat(buffs.active.atk) }} · 防御 +{{ stat(buffs.active.def) }} · 会心 +{{ stat(buffs.critBonus) }}%</p>
       <p v-if="buffs && !finished && buffs.critBonus > 0" class="muted">{{ buffs.nativeCritical ? `最近一次本机攻击会心：${stat(buffs.nativeCritical.base)}% → ${stat(buffs.nativeCritical.result)}%` : '会心强化已就绪，尚未记录本波本机攻击计算。' }}</p>
       <p v-if="buffs && (buffs.pending.atk || buffs.pending.def || buffs.pending.crit)" class="muted">待应用：攻击 +{{ stat(buffs.pending.atk) }} · 防御 +{{ stat(buffs.pending.def) }} · 会心服务 {{ buffs.pending.crit }} 次</p>
       <p class="muted">猫车恢复：{{ state?.services?.cartRestoreUsed ? '本局已使用' : '本局尚未使用' }}</p>

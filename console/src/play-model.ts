@@ -12,6 +12,7 @@ export function chooseReason(s: ConsoleState | null, connected: boolean, busy: b
   if (!connected || !s) return '等待游戏状态恢复后再选择。';
   if (s.multiplayerRun?.role === 'guest') return '由房主选择下一波；你可以先购买补给。';
   if (busy || s.shopBusy) return '请等待当前操作确认后再选择。';
+  if(s.designerEffects?.blockedReason)return s.designerEffects.blockedReason;
   if (!s.capabilities?.choose) return '暂不能出战，请检查集结与队伍同步状态。';
   return '';
 }
@@ -27,7 +28,7 @@ export function entryGuidance(entry: ConsoleState['multiplayerEntry'], connected
   if (entry.canPost) return '任务已准备好，可以承接联机任务；出发前在游戏内确认参战名单。';
   return '选择入场波次，等待所有队友的任务表一致后承接任务。';
 }
-export const stageNames: Record<string, string> = { Idle: '未开局', Preparing: '联机开局整备', Selecting: '整备 · 选择波次', AwaitQuest: '等待进入任务', Combat: '战斗中', Carve: '剥取 · 集结', Returning: '返回村庄', Finished: '本局结束', Fault: '需要处理' };
+export const stageNames: Record<string, string> = { Idle: '未开局', Preparing: '联机开局整备', Selecting: '整备 · 选择波次', PreparingCombat: '开战前效果核验', AwaitQuest: '等待进入任务', Combat: '战斗中', Carve: '剥取 · 集结', Returning: '返回村庄', Finished: '本局结束', Fault: '需要处理' };
 export function runEnding(summary:RunSummary|null|undefined):{title:string;detail:string;warning:string} {
   const end=summary?.ending,native=end?.native;
   const intentNames:Record<string,string>={'cleared-all':'已通关全部层数','carts-exhausted':'猫车次数耗尽',stopped:'主动终止',fault:'因错误停止','native-ended':'原生任务结束','quest-left':'已离开任务','entry-cancelled':'入场已取消'};
@@ -87,6 +88,7 @@ export function nextStep(s: ConsoleState | null, connected: boolean): string {
   switch (s.sessionStage) {
     case 'Preparing': return '已穿戴初始装备并隔离背包，可用初始 PT 购物；全队加入任务后，由房主手动出发。';
     case 'Selecting': if (s.multiplayerRun?.role === 'guest') return '可在本机购买补给，等待房主选择下一波；请留在起点集结。'; return '先购买补给或服务，再选择下一波。选定后自动开始战斗流程。';
+    case 'PreparingCombat': return '场地载入后核验预订效果。战斗操作与怪物更新暂未放行；请在效果订单中处理失败，或停止本局。';
     case 'AwaitQuest': return '等待任务接取与出发；失败时查看提示，再使用重试出发。';
     case 'Combat': return '讨伐本波全部目标；两只怪之间的空场不会结算。';
     case 'Carve': {

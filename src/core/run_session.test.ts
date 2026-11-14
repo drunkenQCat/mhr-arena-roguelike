@@ -7,6 +7,8 @@ import { makeQuestPlan, type MonsterCatalog, type QuestPlan } from "./quest_plan
 
 const catalog: MonsterCatalog = JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8"));
 class FakeGame implements SessionPort {
+  preparation={pending:false,reason:''};
+  combatPreparation(){return this.preparation;}
   reading: RuntimeReading = { time: 0, quest: null, players: [{ id: 0, position: { x: 10, y: 20, z: 30 } }],
     enemies: [], deaths: 0, online: false, canPost: true };
   publications: { plan: QuestPlan; inPlace: boolean }[] = [];
@@ -59,6 +61,20 @@ function setup(route: "reentry" | "inPlace" = "reentry") {
   };
   return { config, core, game, session, tick, start, enter, clear, village };
 }
+
+it('keeps a protected native preparation outside combat and pauses entry timeouts until verified',()=>{
+ const f=setup('inPlace');f.start();f.game.preparation={pending:true,reason:'核验失败，请处理订单'};f.enter(-9);
+ expect(f.session.stage).toBe('PreparingCombat');expect(f.session.questUniqueSnapshot).toBe(-9);
+ f.tick(600);expect(f.session.stage).toBe('PreparingCombat');expect(f.game.finishes).toEqual([]);expect(f.core.state.wallet.pt).toBe(150);
+ f.game.preparation.pending=false;f.tick();expect(f.session.stage).toBe('Combat');expect(f.session.preparation().camp).toEqual({x:10,y:20,z:30});
+});
+it('honors native failure and quest departure while waiting for paid-effect preparation',()=>{
+ for(const leave of [false,true]){
+  const f=setup('inPlace');f.start();f.game.preparation.pending=true;f.enter(-9);
+  if(leave)f.game.reading.quest=null;else f.game.reading.quest!.status='failed';f.tick();
+  expect(f.session.stage).toBe('Finished');expect(f.game.policies.at(-1)).toEqual({plan:null,hold:false});
+ }
+});
 
 describe("run ending evidence",()=>{
   it("records delayed local failure after stop without calling it a successful completion",()=>{
@@ -649,4 +665,12 @@ it("configures new-run services before solo preparation and freezes active equip
   buffAmounts:{atk:23,def:34,crit:45},gachaPools:{only:{entries:[{kind:"armor" as const,id:202375177,w:1}]}}};
  f.session.applyConfig(edited);expect(f.core.config.startupRules).toEqual(original.startupRules);
  expect(f.core.config.buffAmounts).toEqual(original.buffAmounts);expect(f.session.configForEditing().buffAmounts).toEqual(edited.buffAmounts);
+});
+
+it("stages effect product changes for the next run, leaving the current run's offers unchanged",()=>{
+ const f=setup("inPlace");f.start(true);const original=f.core.config.effectShop;
+ const edited={...f.core.config,effectShop:{groups:{},products:[]}};
+ f.session.applyConfig(edited);
+ expect(f.core.config.effectShop).toEqual(original);
+ expect(f.session.configForEditing().effectShop).toEqual(edited.effectShop);
 });

@@ -35,6 +35,13 @@ int main() try {
             assert(not pcall(b.ping, {}))
             assert(not pcall(b.take_commands, 999))
             assert(type(b.steam_config_payload)=='function' and type(b.steam_config_control)=='function' and type(b.steam_config_ack)=='function')
+            assert(type(b.steam_subscribe)=='function' and type(b.steam_lobby_message)=='function' and type(b.steam_member_message)=='function')
+            assert(b.steam_subscribe('effects.v1')==true)
+            assert(b.steam_subscribe('../escape')==false)
+            assert(b.steam_lobby_message('1000','effects.v1','{}')==false)
+            assert(b.steam_member_message('1000','effects.v1','{}')==false)
+            assert(not pcall(b.steam_member_message,'1000','effects.v1',string.rep('x',2049)))
+            assert(not pcall(b.steam_subscribe,string.rep('x',25)))
             assert(b.steam_config_payload('1000','{}')==false) -- No Steam module in this harness.
             assert(not pcall(b.steam_config_payload,'1000',string.rep('x',65537)))
             assert(not pcall(b.steam_config_control,'1000',string.rep('x',2049)))

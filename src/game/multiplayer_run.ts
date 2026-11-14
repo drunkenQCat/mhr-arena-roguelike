@@ -210,7 +210,7 @@ export class MultiplayerRun implements SpawnSync {
     this.previousHash=null;this.previousEpoch=null;
     if (!Number.isInteger(f.layer) || f.layer < 1 || !Number.isInteger(f.token) || f.token < 0 ||
         !Number.isInteger(f.deaths) || f.deaths < 0 || !Number.isInteger(f.earned) || f.earned < 0 || !Number.isInteger(f.carts) || f.carts < 0 || f.carts > this.config.maxCarts ||
-        !["AwaitQuest","Combat","Carve","Selecting","Finished","Fault"].includes(f.stage) ||
+        !["AwaitQuest","PreparingCombat","Combat","Carve","Selecting","Finished","Fault"].includes(f.stage) ||
         (f.endIntent != null && (!RUN_END_INTENTS.includes(f.endIntent) || !["Finished","Fault"].includes(f.stage))) ||
         !["Prep","Choosing","Combat","Carve","GameOver"].includes(f.phase) ||
         (f.camp !== null && (!f.camp || ![f.camp.x,f.camp.y,f.camp.z].every(x => Number.isFinite(x))))) throw new Error("Invalid multiplayer state");
@@ -232,7 +232,7 @@ export class MultiplayerRun implements SpawnSync {
       this.lastSequence=f.n;
       return;
     }
-    if (this.preparedToken !== f.token && f.layer > 1 && f.stage === "Combat") {
+    if (this.preparedToken !== f.token && f.layer > 1 && ["PreparingCombat","Combat"].includes(f.stage)) {
       // Native death delivery can lag host state; wait rather than destroying a live actor.
       if (reading.enemies.some(e => !e.dead && !e.captured) || this.busy()) return;
       this.runtime.publish(plan, true); this.localTicket = null; this.activated = null; this.preparedToken = f.token;

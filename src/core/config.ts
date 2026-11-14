@@ -5,6 +5,7 @@
 
 import { DEFAULT_RUNTIME, type RuntimeSettings } from "./quest_plan";
 import { validArmorId } from "./equipment_id";
+import type { EffectGroup, EffectProduct } from "./effect_contract";
 
 export type QuestType = "A" | "B" | "C" | "D";
 /** AU = 极强怪高阶单怪（V1.3 §2.2），仅出现在 ultimate 层。 */
@@ -118,6 +119,7 @@ export interface QuestSpec {
 export interface SupplyDropSpec { chance: number; entries: { itemId: string; count: number; weight: number }[] }
 
 export interface RogueConfig {
+  effectShop?: { groups: Record<string, EffectGroup>; products: EffectProduct[] };
   supplyDrops?: SupplyDropSpec;
   simultaneousBalance?: { reward: number; hp: number; damage: number };
   startPt: number;
@@ -316,6 +318,50 @@ export function validateConfig(raw: unknown): RogueConfig {
     number(item.cap, `${path}.cap`, item.mode === "service" ? 0 : 1, true);
     if (item.desc !== undefined) text(item.desc, `${path}.desc`);
     if (item.globalLimit !== undefined) number(item.globalLimit, `${path}.globalLimit`, 0, true);
+  }
+
+  if (c.effectShop !== undefined) {
+    // TSTL ArrayIsArray({}) is true in Lua, and native JSON cannot retain the
+    // empty map/list distinction. At known record fields normalize empty to a
+    // record, while rejecting any nonempty positional array.
+    const effectRecord=(value:unknown,path:string):Record<string,unknown>=>{
+      if(value===null||typeof value!=="object")fail(path);
+      const keys=Object.keys(value as object);
+      if(Array.isArray(value)&&keys.length>0)fail(path);
+      return keys.length===0?{}:value as Record<string,unknown>;
+    };
+    const effects=object(c.effectShop,"effectShop");
+    const groups=effectRecord(effects.groups??{},"effectShop.groups");effects.groups=groups;
+    for(const id of Object.keys(groups)){
+      text(id,"effectShop.group ID");const group=object(groups[id],`effectShop.groups.${id}`);
+      if(!["add","replace","unique"].includes(group.policy as string))fail(`effectShop.groups.${id}.policy`);
+      if(number(group.cap,`effectShop.groups.${id}.cap`,0)===0)fail(`effectShop.groups.${id}.cap`);
+    }
+    const products=array(effects.products??[],"effectShop.products");effects.products=products;
+    if(products.length>128)fail("effectShop.products (maximum 128)");
+    const ids:string[]=[];
+    for(let i=0;i<products.length;i++){
+      const path=`effectShop.products[${i}]`,p=object(products[i],path);
+      const id=text(p.id,`${path}.id`);if(ids.includes(id)||shopIds.includes(id))fail(`${path}.id (duplicate)`);ids.push(id);
+      text(p.name,`${path}.name`);const price=number(p.price,`${path}.price`,0,true);if(price>9007199254740991)fail(`${path}.price`);
+      if(typeof p.enabled!=="boolean")fail(`${path}.enabled`);
+      const effect=object(p.effect,`${path}.effect`);text(effect.id,`${path}.effect.id`);text(effect.version,`${path}.effect.version`);
+      const params=effectRecord(effect.parameters??{},`${path}.effect.parameters`);effect.parameters=params;
+      for(const key of Object.keys(params))if(typeof params[key]!=="number"||!Number.isFinite(params[key]))fail(`${path}.effect.parameters.${key}`);
+      const conditions=object(p.conditions,`${path}.conditions`);
+      const phases=strings(conditions.phases,`${path}.conditions.phases`,true);
+      if(phases.some(phase=>!["Preparing","Selecting","Carve","Combat"].includes(phase)))fail(`${path}.conditions.phases`);
+      const first=number(conditions.fromLayer,`${path}.conditions.fromLayer`,1,true);
+      number(conditions.toLayer,`${path}.conditions.toLayer`,first,true);
+      const weapons=array(conditions.weapons??[],`${path}.conditions.weapons`);conditions.weapons=weapons;
+      for(const weapon of weapons)if(number(weapon,`${path}.conditions.weapons`,0,true)>13)fail(`${path}.conditions.weapons`);
+      const exclusive=strings(conditions.exclusiveGroups??[],`${path}.conditions.exclusiveGroups`);conditions.exclusiveGroups=exclusive;
+      for(const group of exclusive)if(!groups[group])fail(`${path}.conditions.exclusiveGroups (unknown group ${group})`);
+      if(conditions.limit!=null){const limit=object(conditions.limit,`${path}.conditions.limit`);
+        number(limit.count,`${path}.conditions.limit.count`,0,true);
+        if(!["playerWave","playerRun","teamWave","teamRun"].includes(limit.scope as string))fail(`${path}.conditions.limit.scope`);
+      }else delete conditions.limit;
+    }
   }
 
   if (c.supplyDrops !== undefined) {

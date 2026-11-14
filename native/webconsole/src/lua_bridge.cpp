@@ -133,12 +133,18 @@ int lua_steam_snapshot(lua_State* L) {
         }
         lua_pushboolean(L, lobby.config.complete); lua_setfield(L, -2, "complete");
         lua_setfield(L, -2, "config");
+        lua_newtable(L);
+        for(const auto& [channel,value] : lobby.messages) { lua_pushlstring(L,value.data(),value.size());lua_setfield(L,-2,channel.c_str()); }
+        lua_setfield(L,-2,"messages");
         lua_newtable(L); int member_index = 1;
         for (const auto& member : lobby.members) {
             lua_newtable(L);
             lua_pushlstring(L, member.id.data(), member.id.size()); lua_setfield(L, -2, "id");
             lua_pushlstring(L, member.ack.data(), member.ack.size()); lua_setfield(L, -2, "ack");
             lua_pushlstring(L, member.config_ack.data(), member.config_ack.size()); lua_setfield(L, -2, "configAck");
+            lua_newtable(L);
+            for(const auto& [channel,value] : member.messages) { lua_pushlstring(L,value.data(),value.size());lua_setfield(L,-2,channel.c_str()); }
+            lua_setfield(L,-2,"messages");
             lua_rawseti(L, -2, member_index++);
         }
         lua_setfield(L, -2, "members"); lua_rawseti(L, -2, index++);
@@ -157,6 +163,28 @@ int lua_steam_write(lua_State* L, bool plan) {
 }
 int lua_steam_plan(lua_State* L) { return lua_steam_write(L, true); }
 int lua_steam_ack(lua_State* L) { return lua_steam_write(L, false); }
+int lua_steam_subscribe(lua_State* L) {
+    size_t length=0;const auto* name=luaL_checklstring(L,1,&length);
+    luaL_argcheck(L,length>0&&length<=24,1,"invalid message channel");
+    bool ok=false;
+    try { ok=webconsole::steam_subscribe(std::string(name,length)); } catch(...) {}
+    lua_pushboolean(L,ok);return 1;
+}
+int lua_steam_message(lua_State* L,bool owner) {
+    size_t id_length=0,channel_length=0,length=0;
+    const auto* id=luaL_checklstring(L,1,&id_length);
+    const auto* channel=luaL_checklstring(L,2,&channel_length);
+    const auto* body=luaL_checklstring(L,3,&length);
+    luaL_argcheck(L,id_length>0&&id_length<=20,1,"invalid lobby ID");
+    luaL_argcheck(L,channel_length>0&&channel_length<=24,2,"invalid message channel");
+    luaL_argcheck(L,length<=webconsole::STEAM_MESSAGE_MAX_BYTES,3,"message exceeds 2048 bytes");
+    bool ok=false;
+    try { ok=owner?webconsole::steam_write_lobby_message(std::string(id,id_length),std::string(channel,channel_length),std::string(body,length)):
+        webconsole::steam_write_member_message(std::string(id,id_length),std::string(channel,channel_length),std::string(body,length)); } catch(...) {}
+    lua_pushboolean(L,ok);return 1;
+}
+int lua_steam_lobby_message(lua_State* L) { return lua_steam_message(L,true); }
+int lua_steam_member_message(lua_State* L) { return lua_steam_message(L,false); }
 int lua_steam_config_write(lua_State* L, int kind) {
     size_t id_length = 0, length = 0;
     const auto* id = luaL_checklstring(L, 1, &id_length);
@@ -212,6 +240,9 @@ const luaL_Reg MODULE_FUNCS[] = {
     { "steam_snapshot", lua_steam_snapshot },
     { "steam_plan", lua_steam_plan },
     { "steam_ack", lua_steam_ack },
+    { "steam_subscribe", lua_steam_subscribe },
+    { "steam_lobby_message", lua_steam_lobby_message },
+    { "steam_member_message", lua_steam_member_message },
     { "steam_config_payload", lua_steam_config_payload },
     { "steam_config_control", lua_steam_config_control },
     { "steam_config_ack", lua_steam_config_ack },

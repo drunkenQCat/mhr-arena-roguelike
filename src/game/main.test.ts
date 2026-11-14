@@ -43,11 +43,11 @@ vi.mock("./shop_window",()=>({ShopWindow:class {
   retireAfterRestore=vi.fn(()=>{this.unresolved=false;return true;});
 }}));
 vi.mock("./webconsole_bridge",()=>({WebConsoleBridge:class {
-  constructor(public session:any){h.bridges.push(this);}tick(){}partyRosterSize(){return null;}newScriptSession(){return {};}
+  constructor(public session:any){h.bridges.push(this);}tick(){}partyRosterSize(){return null;}newScriptSession(){return {};}replacementReady(){return true;}
 }}));
 vi.mock("./multiplayer_entry",()=>({MultiplayerEntry:class {
   constructor(public source:any,_catalog:any,_ready:any,_network:any,public lifecycle:any){h.entries.push(this);}
-  runEntry(){return null;}hostTestEntry(){return null;}tick(){}resetForNextRun(){}shutdown(){}
+  preparedEntry(){return null;}runEntry(){return null;}hostTestEntry(){return null;}tick(){}resetForNextRun(){}shutdown(){}
 }}));
 vi.mock("./multiplayer_run",()=>({MultiplayerRun:class {}}));
 
@@ -69,6 +69,12 @@ it.each(["restored","fault-restored","restore-pending","still-in-quest","no-play
  if(scenario==="restored"||scenario==="fault-restored"){
   expect(h.bridges).toHaveLength(2);expect(shop.retireAfterRestore).toHaveBeenCalledTimes(1);expect(shop.busy).toBe(false);
  }else{expect(h.bridges).toHaveLength(1);expect(shop.retireAfterRestore).not.toHaveBeenCalled();expect(shop.busy).toBe(true);}
+});
+it('does not erase a saving bridge before its terminal receipt is published',()=>{
+ const bridge=h.bridges[0],ready=vi.spyOn(bridge,'replacementReady').mockReturnValue(false),first=bridge.session;
+ first.core.replaceConfig({...first.core.config,quest:{...first.core.config.quest,id:900103}});first.stage='Fault';
+ for(const frame of h.frames)frame();expect(h.bridges).toHaveLength(1);
+ ready.mockReturnValue(true);for(const frame of h.frames)frame();expect(h.bridges).toHaveLength(2);
 });
 
 it("uses saved rules for entry preparation, services and the replacement session after multiplayer settlement",()=>{

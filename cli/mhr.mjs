@@ -28,6 +28,13 @@ const HELP = `用法: node cli/mhr.mjs <命令> [选项]
   ui [--json]                            视角/场景观察（原生界面分类，未识别即 unknown）
   shop list [--json] [--category X]      商店目录与购买资格
   config get [--json]                    读取当前生效配置
+  effects list [--json]                  效果目录、商品资格与本局订单
+  effects buy --item ID [--offer-version HASH]  预订或立即购买效果商品
+  effects cancel --order-id ID           取消尚未锁定的预订
+  effects inspect --order-id ID          只读核实未知交付，不重复执行
+  effects dismiss --order-id ID          确认放弃已证实未交付的失败订单
+  effects cleanup --order-id ID          安全阶段核验并清理已付费效果
+  effects continue                      处理失败订单后重新核验开战准备
 
 写入（提交后等待终态回执）:
   run start --armor <名称>               开局
@@ -57,6 +64,7 @@ const HELP = `用法: node cli/mhr.mjs <命令> [选项]
 脚本控制（需 fork 版框架 dinput8）:
   game return --timeout 120              继续结束任务的原生结算并等待回村
   game reset                             重置全部脚本（下一帧生效，epoch +1）
+  game save [--receipt-timeout 35]        原生 Agent 保存当前角色，等待写入及完成回调
   game run-script <文件> [--timeout S]   执行一个 Lua 文件并等待其 publish_probe 报告；
                                          本地存在该文件则按内容上传，否则视为游戏目录相对路径
   game last-error                        读取框架记录的最近脚本错误文本
@@ -80,6 +88,8 @@ function parseArgs(argv) {
     report: undefined, category: undefined, probeTimeoutS: undefined };
   const valueFlags = {
     "--base-url": (v) => { options.baseUrl = v; },
+    "--offer-version": (v) => { options.offerVersion = v; },
+    "--order-id": (v) => { options.orderId = v; },
     "--timeout": (v) => { options.timeoutS = Number(v); options.timeout = Number(v); },
     "--receipt-timeout": (v) => { options.receiptTimeoutS = Number(v); },
     "--sample-ms": (v) => { options.sampleMs = Number(v); },
@@ -170,7 +180,28 @@ async function main() {
   };
 
   switch (group) {
+    case "effects": {
+      const identity = await captureIdentity(baseUrl, timeoutMs);
+      if (sub === "list") { output.result(identity.state.designerEffects ?? {message:"当前 Lua 未发布效果目录"}); return EXIT.OK; }
+      if (!["buy", "cancel", "inspect", "cleanup", "reload", "dismiss", "continue"].includes(sub)) throw usage("effects 支持 list/buy/cancel/inspect/cleanup/reload/dismiss/continue");
+      const payload = {cmd:"designerEffects",sub};
+      if (sub === "buy") {
+        if (!options.item) throw usage("effects buy 需要 --item ID");
+        const entry = identity.state.designerEffects?.offers?.find(e => e.offer.id === options.item);
+        if (!entry) throw rejected("效果商品不存在");
+        payload.itemId = options.item; payload.offerVersion = options.offerVersion ?? entry.offer.revision;
+      } else if (!["reload","continue"].includes(sub)) {
+        if (!options.orderId) throw usage("需要 --order-id ID"); payload.orderId = options.orderId;
+      }
+      const result = await submit(baseUrl,payload,{identity,timeoutMs,receiptTimeoutMs:Math.max(receiptTimeoutMs,60000)});
+      requireReceipt(result.receipt);output.result(result.receipt);return EXIT.OK;
+    }
     case "game": {
+      if(sub==="save"){
+        const identity=await captureIdentity(baseUrl,timeoutMs);
+        const result=await submit(baseUrl,{cmd:"saveGame"},{identity,timeoutMs,receiptTimeoutMs:Math.max(receiptTimeoutMs,35000),settleQueued:true});
+        requireReceipt(result.receipt);output.result({ok:true,receipt:result.receipt});return EXIT.OK;
+      }
       if (sub === "launch") {
         const { launchGame } = await import("./lib/game-process.mjs");
         output.result(await launchGame(baseUrl)); return EXIT.OK;
@@ -458,27 +489,19 @@ ${v.error}` : "没有记录的脚本错误");
         throw usage("test party create|buy|state|reset");
       }
       if (sub === "kill-all") {
-        // killAll is acknowledged as queued; the native kill happens on a later frame.
-        // Waiting for a second receipt never terminates, so require an observable
-        // post-condition instead of claiming success from the queue ack.
+        // The bridge's terminal applied receipt certifies only its frozen UID
+        // targets. A sequential wave can already have spawned another living
+        // monster by then; it is not part of this kill request.
         const { id, receipt } = await submit(baseUrl, { cmd: "killAll" },
           { identity, timeoutMs, receiptTimeoutMs });
         output.progress(`回执 ${id}: ${receipt.status}`);
         requireReceipt(receipt);
-        const deadline = Date.now() + 10000;
-        let last = identity.state;
-        while (Date.now() < deadline) {
-          await sleep(250);
-          const state = await snapshot();
-          last = state;
-          const enemies = state.enemies ?? [];
-          if (enemies.length > 0 && enemies.every((enemy) => enemy.dead || enemy.captured)) break;
-        }
-        const enemies = last.enemies ?? [];
-        const allDown = enemies.length > 0 && enemies.every((enemy) => enemy.dead || enemy.captured);
-        output.result({ ok: allDown, receipt, enemies: enemies.map((enemy) => ({ uid: enemy.uid, dead: enemy.dead, captured: enemy.captured })) },
-          (value) => `击杀请求已执行；在场 ${value.enemies.length} 只，${allDown ? "全部死亡/捕获" : "仍有存活"}`);
-        return allDown ? EXIT.OK : EXIT.TIMEOUT;
+        if (!Array.isArray(receipt.targets) || receipt.targets.length === 0 ||
+            receipt.targets.some(uid => !Number.isInteger(uid) || uid < 0))
+          throw new CliError(EXIT.UNCERTAIN, "终态回执缺少本次击杀的 UID 证据；请读取状态，勿重发", { receipt });
+        output.result({ ok: true, receipt, targets: receipt.targets },
+          (value) => `本次目标已通过原生死亡／捕获核验：${value.targets.join(", ")}`);
+        return EXIT.OK;
       }
       throw usage(`未知 test 子命令：${fmt(sub)}`);
     }

@@ -199,6 +199,13 @@ it("blocks next choice while a guest transaction is busy",()=>{
  const f=fixture();f.tick();f.clear();f.tick();f.guest.setBusy(true);f.tick();f.tick();
  expect(f.host.session.canChoose()).toBe(false);f.guest.setBusy(false);f.tick();f.tick();expect(f.host.session.canChoose()).toBe(true);
 });
+it('stages the next logical wave from a protected preparation frame before combat opens',()=>{
+ const f=fixture();f.tick();f.clear();f.tick();expect(f.host.session.choose(0).ok).toBe(true);
+ f.host.session.stage='PreparingCombat';mock.now++;f.host.run.tick();f.guest.run.tick();
+ expect(f.guest.publish).toHaveBeenCalledOnce();expect(f.guest.publish.mock.calls[0]![0].token).toBe(f.host.session.plan!.token);
+ expect(f.guest.session.stage).toBe('PreparingCombat');expect(f.guest.session.core.state.phase).toBe('Combat');
+ expect(f.guest.finish).not.toHaveBeenCalled();
+});
 it("stops every writer on roster change, and never makes guest finish the native quest",()=>{
  const f=fixture();f.tick();f.bus.members=["h"];f.tick();
  expect(f.host.run.valid()).toBe(false);expect(f.guest.run.valid()).toBe(false);

@@ -18,6 +18,9 @@ type Pending =
 
 /** 翻盘服务效果交付（main.ts 注入；缺省=仅猫车恢复可用）。 */
 export interface ServiceEffects {
+  availablePt?(): number;
+  transactionUnavailable?():string|null;
+  buffUnavailable?(kind:BuffKind):string|null;
   buffBuy(kind: BuffKind): { ok: boolean; total: number };
   gachaBuy(poolId: string): GachaRollResult;
   hasGachaPool(poolId: string): boolean;
@@ -50,6 +53,11 @@ export class ShopWindow
     private readonly services: ServiceEffects | null = null) {}
 
   get busy(): boolean { return this.pending !== null || this.unresolved; }
+  economy():{totalPt:number;availablePt:number;reservedPt:number}{
+    const totalPt=this.core.state.wallet.pt;
+    const availablePt=this.services?.availablePt?.()??totalPt;
+    return {totalPt,availablePt,reservedPt:totalPt-availablePt};
+  }
 
   /** An unknown delivery blocks this run, not all future runs. Only the normal
    * ending/recovery path may retire it after the engine saved the original
@@ -65,13 +73,13 @@ export class ShopWindow
 
   /** One source of truth for native UI, web UI and purchase validation. No phase cache. */
   catalogue(fresh = false): { available: boolean; reason: string | null; categories: Record<string, ShopEntry[]> } {
-    const now = clockSeconds(), selecting = this.selecting();
-    const key = `${this.core.state.phase}:${this.core.state.layer}:${this.core.state.wallet.pt}:${this.busy}:${selecting}:${this.core.state.cartsLeft}`;
+    const now = clockSeconds(), selecting = this.selecting(),economy=this.economy(),blocked=this.services?.transactionUnavailable?.()??null;
+    const key = `${this.core.state.phase}:${this.core.state.layer}:${economy.totalPt}:${economy.availablePt}:${this.busy}:${blocked}:${selecting}:${this.core.state.cartsLeft}`;
     if (!fresh && this.cachedCatalogue && this.catalogueAt === now && this.catalogueKey === key && this.catalogueConfig === this.core.config)
       return this.cachedCatalogue;
-    const available = selecting && !this.busy && canTrade(this.questContext());
-    const reason = this.busy ? "交易处理中或结果待核实" : !this.selecting()
-      ? "清波后返回集结点，等待进入整备阶段" : !available ? "等待任务身份和原生发货条件就绪" : null;
+    const available = selecting && !this.busy && !blocked && canTrade(this.questContext());
+    const reason = this.busy ? "交易处理中或结果待核实" : blocked ?? (!this.selecting()
+      ? "清波后返回集结点，等待进入整备阶段" : !available ? "等待任务身份和原生发货条件就绪" : null);
     const unreadable: string[] = [];
     for (const item of this.core.config.shop) if (item.mode !== "service") {
       try {
@@ -81,6 +89,8 @@ export class ShopWindow
     }
     const categories = this.core.getShop();
     for (const category of Object.keys(categories)) for (const item of categories[category]!) {
+      if (item.price > economy.availablePt) {item.canBuy=false;item.reason="可用 PT 不足（部分 PT 已预留给待生效效果）";continue;}
+      if(item.id.startsWith('buff_')){const blocked=this.services?.buffUnavailable?.(item.id as BuffKind);if(blocked){item.canBuy=false;item.reason=blocked;continue;}}
       // service 开放范围：猫车恢复（已接线）、单轮增益（buff 服务）、抽取（有奖池配置才开）
       if (item.id === "cart_restore" && this.questContext()?.multiplayer && readLobbyIdentity().role !== "host") {
         item.canBuy = false; item.reason = "共享猫车次数由房主购买恢复"; continue;
@@ -109,7 +119,7 @@ export class ShopWindow
     if (!entry?.canBuy) return { ok: false, message: entry?.reason ?? listing.reason ?? "无此商品" };
     const item = this.core.config.shop.find((entry) => entry.id === id);
     if (!item) return { ok: false, message: "无此商品" };
-    const pt = this.core.state.wallet.pt;
+    const pt = this.economy().availablePt;
     if (pt < item.price) return { ok: false, message: `PT不足（需要 ${item.price}，持有 ${pt}）` };
     if (item.mode === "fill") this.pending = { kind: "fill", id };
     else if (item.id === "cart_restore") this.pending = { kind: "cartRestore" };
@@ -140,6 +150,7 @@ export class ShopWindow
     let debited = false;
     try {
       const context = this.questContext();
+      const transactionBlock=this.services?.transactionUnavailable?.();if(transactionBlock)throw new Error(transactionBlock);
       if (req.kind === "cartRestore" && context?.multiplayer && readLobbyIdentity().role !== "host") throw new Error("共享猫车恢复仅允许房主购买");
       if (!this.selecting() || !canTrade(context)) throw new Error("需要在村庄整备或清波后的斗技场波次间购买");
       const item = this.core.config.shop.find((entry) => entry.id ===
@@ -152,6 +163,7 @@ export class ShopWindow
       }
       // 快照用于"未发货即回滚扣款与限购"
       const snapshot = this.core.purchaseCheckpoint();
+      if (this.services?.availablePt && item.price > this.services.availablePt()) throw new Error("可用 PT 不足，不能使用已预留的余额");
       const result = this.core.buy(item.id);
       if (!result.ok) { this.notice = result.message; this.complete("rejected", result.message ?? "购买未完成"); return; }
       debited = true;
@@ -187,6 +199,8 @@ export class ShopWindow
       if (req.kind === "buff") {
         const kind = req.id as BuffKind;
         if (!this.services) { this.settle(false, "服务未装配；PT 与限购记录已恢复。", snapshot); return; }
+        const blocked=this.services.buffUnavailable?.(kind);
+        if(blocked){this.settle(false,`${blocked}；PT 与限购记录已恢复。`,snapshot);return;}
         const applied = this.services.buffBuy(kind);
         if (applied.ok) this.settle(true, `增益已累计（当前总加值 ${applied.total}），下一场狩猎生效`);
         else this.settle(false, "增益登记失败；PT 与限购记录已恢复。", snapshot);
@@ -242,7 +256,8 @@ export class ShopWindow
     this.visible = imguiApi.begin_window("肉鸽商店###MhrRogueShop", true, 0);
     try {
     if (!this.visible) return;
-    imguiApi.text(`第 ${this.core.state.layer} 层整备 · 余额 ${this.core.state.wallet.pt} PT`);
+    const economy=this.economy();
+    imguiApi.text(`第 ${this.core.state.layer} 层整备 · 可用 ${economy.availablePt} PT · 待生效预留 ${economy.reservedPt} PT`);
     imguiApi.text("拖动标题栏移动，拖动边缘缩放；右上角 × 关闭。");
     imguiApi.text("鼠标操作请保持 REFramework 菜单开启，主面板可以收起。");
     imguiApi.separator();

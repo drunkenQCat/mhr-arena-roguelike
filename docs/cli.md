@@ -104,6 +104,7 @@ node cli/mhr.mjs wait --scene village --timeout 120
 
 ```powershell
 node cli/mhr.mjs game reset --json
+node cli/mhr.mjs game save --base-url "$env:MHR_IN1" --json
 node cli/mhr.mjs game run-script cli/tests/probe-sample.lua --timeout 20 --json
 node cli/mhr.mjs game last-error --json
 ```
@@ -123,6 +124,8 @@ node cli/mhr.mjs game last-error --json
 `dialogsKnown=false` 表示覆盖范围有限；dialogCoverage 列出网络错误、通用确认和信息窗口，并不代表已经识别全部原生窗口。地图编号仍无已验证访问器，不伪造 mapNo。原生观察分区不存在时，CLI 保持 unknown。
 
 ## 验证与当前边界
+
+效果订单参见 [策划商品效果实验](designer-effects.md)。`effects continue` 仅在受保护的 `PreparingCombat` 阶段、已处理失败订单后请求重新核验；命令成功不等于已经开放战斗，须继续检查 `nativePreparation` 和 sessionStage。未交付可以放弃，未知交付不能通过此入口重放或退款。
 
 - 原生适配器与桥回归：`npm test -- --run src/game/native_ui.test.ts src/game/webconsole_bridge.test.ts`。
 - CLI 传输合同：`npm run test:cli`；自动进村合同：`node --test cli/tests/game-entry.mjs`。

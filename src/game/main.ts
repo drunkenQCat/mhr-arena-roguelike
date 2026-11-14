@@ -24,6 +24,7 @@ import type { ServiceEffects } from "./shop_window";
 import type { BuffKind } from "./buff_service";
 import { clockSeconds, reframework, rejson, relog } from "./sdk";
 import { entryHostTestScope } from "./entry_host_scope";
+import { DesignerEffects } from "./designer_effects";
 
 try {
   let config:RogueConfig,configLoadError:string|null=null;
@@ -53,8 +54,32 @@ try {
   let runtime = new NativeRuntime(config, installer, gacha, false, configureServices);
   runtime.setConfigRecoveryNotice(configRecovery.message);
   let session = new RunSession(core, monsterCatalog, runtime, configSubmitted);
+  let legacyShopBusy:()=>boolean=()=>false;
+  const designer = new DesignerEffects(() => session, () => config, gacha,group=>{
+    if(legacyShopBusy())return "原商店交易处理中或交付结果待核实；请先核实或安全结束本局";
+    const kind=group==="attack.flat"?"atk":group==="defense.flat"?"def":null;if(!kind)return null;
+    const old=buffs.diagnostic();return old.pending[kind]>0||old.active[kind]>0?"本波已有原商店同类强化；两套交付不能共同修改同一属性，请下一波选择一种":null;
+  });
+  try { designer.initialize(); } catch(error) { relog.warn(`[MhwRogue] effect catalog unavailable: ${String(error)}`); }
+  let earlyEffectPlan:()=>ReturnType<typeof makeQuestPlan>|null=()=>null;
+  const connectDesignerRuntime=(target:NativeRuntime):void=>{
+    target.effectPreparation=()=>designer.prepareWave();
+    target.effectNativeRequired=()=>designer.requiresNativePreparation();
+    target.effectNativePrepare=unique=>designer.prepareNativeCombat(unique);
+    target.effectBlocker=()=>designer.blockingReason();
+    target.effectEarlyPlan=()=>target===runtime?earlyEffectPlan():null;
+  };
+  connectDesignerRuntime(runtime);
   const recoverySave=new RecoverySave({prepare:()=>session.prepareForNativeSave(),
-    capture:captureRecoveryCommit,commit:commitRecovery,report:(event,detail)=>runtime.report(event,detail)});
+    canRequest:()=>!["Idle","Finished","Fault"].includes(session.stage)?"本局仍在进行，不能保存临时装备与背包":
+      session.startupStatus.restorePending&&captureRecoveryCommit()===null?"原装备与背包仍未恢复，暂不能保存":null,
+    capture:captureRecoveryCommit,commit:token=>{
+      if(captureRecoveryCommit()!==token)throw new Error("Recovery changed while native saving; original journals retained");
+      // Retire dependent effect obligations first. If that write fails, retain
+      // the original recovery token so the next certified save can retry it.
+      designer.afterInventoryRecovery(token);
+      commitRecovery(token);
+    },report:(event,detail)=>runtime.report(event,detail)});
   // 上局中断留下的未恢复状态（重载/崩溃）：回到村庄后由 session tick 自动恢复。
   if (startupRecoveryPending()) {
     session.armStartupRestore();
@@ -62,6 +87,10 @@ try {
   }
   // M3.6 翻盘服务：单轮增益（叠加购买）+ 装备抽取（发件并入局末清理）
   const services: ServiceEffects = {
+    availablePt: () => designer.availablePt(),
+    transactionUnavailable:()=>designer.blockingReason(),
+    buffUnavailable:kind=>designer.runtimeGroupInUse(kind==="buff_atk"?"attack.flat":kind==="buff_def"?"defense.flat":"legacy.critical")?
+      "本波已预订或应用效果商店的同类强化，请勿重复从原商店购买":null,
     buffBuy: (kind: BuffKind) => buffs.addPending(kind),
     gachaBuy: (poolId: string) => {
       const result = gacha.roll(poolId);
@@ -71,6 +100,7 @@ try {
     hasGachaPool: (poolId: string) => gacha.hasPool(poolId),
   };
   let shopWindow = new ShopWindow(session.core, () => session.canShop(), () => session.shopQuest(), services);
+  legacyShopBusy=()=>shopWindow.busy;
   let entryAttached = false;
   let previousRun: ReturnType<RunSession["runSummary"]> | null = null;
   const multiplayerEntry = new MultiplayerEntry(() => config, monsterCatalog, () => !configRecovery.message&&!entryAttached &&
@@ -87,6 +117,7 @@ try {
     },
     cancel: () => { if (session.stage === "Preparing") session.stop(); },
   });
+  earlyEffectPlan=()=>designer.multiplayerAttached()&&!['Idle','Finished','Fault'].includes(session.stage)?multiplayerEntry.preparedEntry()?.plan??null:null;
   let webConsole: WebConsoleBridge | null = null;
   try { webConsole = new WebConsoleBridge(session, runtime, shopWindow, () => buffs.diagnostic(), undefined, multiplayerEntry, () => previousRun,undefined,()=>config); }
   catch (error) { relog.warn(`[MhwRogue] webconsole unavailable: ${String(error)}`); }
@@ -99,6 +130,10 @@ try {
   reframework.onFrame(() => {
     try {
       recoverySave.tick();
+      if(session.stage==='Preparing'&&session.startupStatus.prepared){
+        const entry=multiplayerEntry.preparedEntry();if(entry)designer.attachMultiplayer({lobby:entry.lobby,owner:entry.owner,self:entry.self,
+          session:entry.session,members:entry.members});
+      }
       // Production multiplayer: adopt the already ACKed and posted entry on every peer.
       // Only the host owns progression; guests mirror business state and stage native slots.
       if (!entryAttached && (!session.startupStatus.restorePending || session.startupStatus.prepared) &&
@@ -107,7 +142,7 @@ try {
         if (entry) {
           entryAttached = true;
           if (!session.startupStatus.prepared || session.stage !== "Preparing") throw new Error("联机个人开局准备未完成");
-          multiplayerRun = new MultiplayerRun(entry, core.config, monsterCatalog, session, runtime, () => shopWindow.busy,undefined,
+          multiplayerRun = new MultiplayerRun(entry, core.config, monsterCatalog, session, runtime, () => shopWindow.busy||designer.transactionBusy(),undefined,
             {userConfig:()=>config,store:new ConfigStore()});
           runtime.setMultiplayer(multiplayerRun);
           const adopted = session.adoptMultiplayerEntry(entry.plan);
@@ -125,6 +160,7 @@ try {
           const entryConfig = { ...config, quest: { ...config.quest, id: entry.plan.questId } };
           core = new RunCore(entryConfig);
           runtime = new NativeRuntime(entryConfig, entry.installer, gacha, true, configureServices);
+          connectDesignerRuntime(runtime);
           runtime.tick();
           cancelEquipmentWork(session);
           session = new RunSession(core, monsterCatalog, runtime, configSubmitted);
@@ -135,6 +171,9 @@ try {
         }
       }
       runtime.tick(); shopWindow.tick(); session.tick();
+      designer.tick();
+      if (webConsole) webConsole.designer = designer;
+      if (webConsole) webConsole.nativeSave = recoverySave;
       const local=session.readingSnapshot;
       const previousConfigNotice=configRecovery.message;
       configRecovery.tick(["Idle","Finished","Fault"].includes(session.stage)&&!session.startupStatus.restorePending&&
@@ -153,7 +192,7 @@ try {
         !!r?.canPost && !r.quest && r.players.length > 0;
       if (restoredVillage && shopWindow.retireAfterRestore(session.stage, session.startupStatus.restorePending, r))
         runtime.report("shop-uncertain-retired", { transaction: shopWindow.lastTransaction });
-      if (restoredVillage && !shopWindow.busy && (entryAttached || core.config.quest.id === 900103)) {
+      if (restoredVillage && !shopWindow.busy && (!webConsole||webConsole.replacementReady()) && (entryAttached || core.config.quest.id === 900103)) {
         previousRun = session.runSummary(); runtime.report("run-settlement",previousRun);
         buffs.shutdown(); multiplayerEntry.resetForNextRun();
         runtime.rebind(config, installer); multiplayerRun = null; entryAttached = false;
@@ -187,6 +226,7 @@ try {
     catch (error) { relog.error(`[MhwRogue] shop window: ${String(error)}`); }
   });
   reframework.onScriptReset(() => {
+    designer.shutdown();
     cancelEquipmentWork(entryWork); cancelEquipmentWork(session);
     multiplayerEntry.shutdown();
     buffs.shutdown();

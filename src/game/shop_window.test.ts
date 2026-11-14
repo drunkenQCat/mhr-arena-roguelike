@@ -31,6 +31,28 @@ beforeEach(() => {
   mock.begin.mockReset().mockReturnValue(true); mock.end.mockReset(); mock.text.mockReset();
 });
 describe("shop transaction", () => {
+  it('blocks ordinary purchases during uncertain designer delivery before any native mutation',()=>{
+    const {core}=fixture();let blocked:string|null=null;
+    const shop=new ShopWindow(core,()=>true,()=>undefined,{transactionUnavailable:()=>blocked,buffBuy:()=>({ok:true,total:1}),gachaBuy:()=>({ok:false}),hasGachaPool:()=>false});
+    expect(shop.requestPurchase('potion').ok).toBe(true);blocked='效果交付待核实';shop.tick();
+    expect(mock.grant).not.toHaveBeenCalled();expect(core.state.wallet.pt).toBe(150);expect(shop.catalogue().available).toBe(false);expect(shop.catalogue().reason).toBe(blocked);
+  });
+  it('rejects legacy attribute delivery when a designer order owns its field, including a queued purchase',()=>{
+    const {core}=fixture();core.config.shop=[{id:'buff_atk',name:'Attack',category:'Services',price:10,cap:1,mode:'service'}];
+    let conflict:string|null=null;const buffBuy=vi.fn(()=>({ok:true,total:1}));
+    const shop=new ShopWindow(core,()=>true,()=>undefined,{buffBuy,gachaBuy:()=>({ok:false}),hasGachaPool:()=>false,buffUnavailable:()=>conflict});
+    expect(shop.requestPurchase('buff_atk').ok).toBe(true);conflict='效果订单已预留';shop.tick();
+    expect(buffBuy).not.toHaveBeenCalled();expect(core.state.wallet.pt).toBe(150);expect(core.state.wallet.purchaseLog).toEqual([]);
+    expect(shop.catalogue(true).categories.Services![0]!.reason).toBe(conflict);
+  });
+  it('invalidates eligibility within the same second when another product reserves PT',()=>{
+    const {core}=fixture();let available=150;
+    const shop=new ShopWindow(core,()=>true,()=>undefined,{availablePt:()=>available,buffBuy:()=>({ok:true,total:1}),gachaBuy:()=>({ok:false}),hasGachaPool:()=>false});
+    expect(shop.catalogue().categories.Items![0]!.canBuy).toBe(true);
+    available=5;expect(shop.economy()).toEqual({totalPt:150,availablePt:5,reservedPt:145});
+    expect(shop.catalogue().categories.Items![0]!.canBuy).toBe(false);expect(shop.requestPurchase('potion').ok).toBe(false);
+    shop.draw();expect(mock.text).toHaveBeenCalledWith('第 1 层整备 · 可用 5 PT · 待生效预留 145 PT');
+  });
   it("opens independently, stays closed after X, and can be reopened or auto-opened next prep", () => {
     const { shop } = fixture();
     mock.begin.mockReturnValueOnce(false); shop.draw();

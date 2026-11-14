@@ -58,6 +58,14 @@ it("does not interpret nullable offline indices as a host", () => {
   expect(() => fixture().host.choose(0)).toThrow("房主");
   expect(mock.publish).not.toHaveBeenCalled();
 });
+it('exposes only the locally prepared fixed entry identity before questStart',()=>{
+ const lifecycle={prepare:vi.fn(),prepared:()=>true,cancel:vi.fn()};const f=fixture(lifecycle);
+ expect(f.host.preparedEntry()).toBeNull();f.prepare();
+ expect(f.as(0,()=>f.host.preparedEntry())).toMatchObject({lobby:'1000',owner:'100',self:'100',members:['100','200'],plan:{questId:900103}});
+ expect(f.as(1,()=>f.guest.preparedEntry())).toMatchObject({self:'200'});expect(mock.playing).toBe(false);
+ mock.active=true;mock.quest=101;expect(f.as(0,()=>f.host.preparedEntry())).toBeNull();
+ mock.active=false;f.server.members.push('300');f.tick(0,f.host);expect(f.as(0,()=>f.host.preparedEntry())).toBeNull();
+});
 it("automatically prepares the guest and requires fresh ACKs before hall posting", () => {
   const f = fixture(); f.prepare();
   expect(mock.publish.mock.calls[0]![0]).toMatchObject({ questId: 900103, sequential: false });

@@ -115,6 +115,31 @@ ctest --test-dir native/webconsole/.build/Plugin-Release-x64 -C Release --output
 
 原生 CTest 覆盖 UTF-8/最大载荷、缺块/错块、部分写入失败、房主权限、独立 ACK、配置文件名边界与 Lua API 参数。编译后的 Lua harness 另测四端屏障和缺 ACK：不能先把缺失 ACK 映射为数组中的 null，否则 Lua nil 空洞可能使遍历跳过队友。
 
+## 通用业务信箱（0.4.3）
+
+新增 Lua API：`steam_subscribe(channel)`、`steam_lobby_message(lobby, channel, text)`、
+`steam_member_message(lobby, channel, text)`。订阅后，`steam_snapshot()` 的大厅及成员
+记录通过 `messages[channel]` 返回相应值。它们与已有计划、ACK、配置通道使用独立键，
+没有为每种业务增加 HTTP 路由，也不向原生聊天处理器注入消息。
+
+频道名称为1至24个小写字母、数字、`_`、`.`或`-`，首字符必须是字母或数字。
+每个插件实例最多订阅8个频道，重复订阅幂等；单条值最多2048字节且不能含 NUL。
+只能在已观察到且本机仍为成员的大厅操作；大厅值仅房主可写，成员值只能写自己。
+权限来自原生 Steam 身份，不能使用消息正文里的自称身份替代。DLL 更新需重启游戏。
+
+返回 `true` 只表示本地提交，不能当作对端收到、更不能当作商品交付成功。
+`PeerMailbox` 使用序号、脚本代数、载荷摘要和准确回执确认处理丢失与重复；
+固定名册或房主变化即停止接纳。`EffectAuthority` 另行持久化全队名额与冻结许可，
+购买者仍在自己的引擎里核验原生写入和扣款。恢复旧授权记录不自动重放许可。
+`EffectParticipant` 已将其接入商品预订、原生交付回执和全员开战屏障。
+同机双引擎验收与尚未覆盖的范围见 [效果实验记录](../docs/designer-effects.md)。
+纯协议测试不替代原生验收；官方 Steam 跨电脑与3／4人新效果事务仍待验证。
+
+Steam 的[大厅数据接口](https://partner.steamgames.com/doc/api/ISteamMatchmaking)
+使用异步缓存更新；因此协议必须处理延迟、陈旧值与回执，而不能把键值更新当作可靠队列。
+原生 CTest 覆盖权限、大小、频道隔离和 Lua 生命周期；`npm run check:effects`
+执行实际编译 Lua 的两端丢包模拟。两者均不能替代两个 Rise 引擎的实机验收。
+
 ## 同机多个实例的后端端口
 
 每个游戏副本使用独立的 `reframework/data` 目录。在该副本的

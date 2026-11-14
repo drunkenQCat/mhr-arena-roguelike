@@ -60,6 +60,8 @@ HTTP 线程不直接调用游戏对象。Lua 发布心跳与业务状态，浏�
 
 已有接口包括 `/api/health`、`/api/state`、`/api/results`、`/api/config`、`POST /api/command` 和 `/api/script/*`。详细命令见 [CLI 说明](docs/cli.md)；原生构建及依赖来源见 [native 说明](native/README.md)。
 
+此实验分支新增“策划工作台 → 商品效果”，可用中文表单绑定 Lua 效果、配置购买条件并导出 JSON 交接；玩家端提供预留、核实和恢复订单。操作见 [商品效果配置说明](docs/effect-designer-guide.md)（包内同名 TXT），实现与实机证据见 [开发验收记录](docs/designer-effects.md)。新增效果事务已在同机两个真实游戏引擎中验证，使用模拟 Steam 身份；官方跨电脑、3／4人新效果事务及长局仍需独立验收。全队须完整更新 DLL、脚本和效果资源，不能混装旧版本。
+
 ## 代码导航
 
 | 路径 | 用途 |

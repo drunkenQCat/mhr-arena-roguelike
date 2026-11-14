@@ -32,6 +32,10 @@ export function editorConfig(raw: unknown): RogueConfig {
     if (copy.unlockChain === null) copy.unlockChain = [];
   }
   const cfg = validateConfig(copy);
+  if(cfg.effectShop){
+    cfg.effectShop.products??=[];
+    for(const p of cfg.effectShop.products){p.conditions.weapons??=[];p.conditions.exclusiveGroups??=[];}
+  }
   cfg.simultaneousBalance ??= { hp: 0.9, damage: 0.95, reward: 1.15 };
   return cfg;
 }

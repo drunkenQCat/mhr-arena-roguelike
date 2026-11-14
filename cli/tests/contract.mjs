@@ -96,7 +96,7 @@ function createPlugin(behaviour = {}) {
         received.push(command);
         if (!behaviour.neverReceipt) {
           const receipt = { id: command.id, status: behaviour.receiptStatus ?? "applied",
-            message: "ok" };
+            message: "ok", ...(behaviour.receiptPatch?.(command) ?? {}) };
           receipts.push(receipt);
         }
         json(200, { ok: true, queued: true, bytes: body.length });
@@ -337,6 +337,18 @@ await withPlugin({ noProbe: true }, async (baseUrl) => {
   const body = JSON.parse(result.stdout);
   check("player release is healthy without an automatic Lua probe", result.code === 0 && body.ok &&
     body.layers.lua.state === "unreported" && body.layers.business.state === "live", result.stdout);
+});
+
+await withPlugin({receiptPatch:()=>({targets:[0]}),statePatch:()=>({enemies:[
+ {uid:0,dead:true,captured:false},{uid:100,dead:false,captured:false}
+]})},async(baseUrl,plugin)=>{
+ const result=await runCli(["test","kill-all","--json"],{baseUrl});
+ const body=JSON.parse(result.stdout);
+ check("kill certifies frozen targets without waiting for a newly spawned sequential enemy",result.code===0&&body.ok&&body.targets?.[0]===0&&plugin.received.length===1,result.stdout);
+});
+await withPlugin({},async(baseUrl,plugin)=>{
+ const result=await runCli(["test","kill-all","--json"],{baseUrl});
+ check("kill receipt without UID evidence is uncertain and never retried",result.code===6&&plugin.received.length===1,result.stderr);
 });
 
 console.log(failures === 0 ? "\nALL CLI CONTRACT CHECKS PASSED" : `\n${failures} CHECK(S) FAILED`);

@@ -127,7 +127,7 @@ export class MultiplayerEntry {
     return this.digest();
   }
   private rulesDigest(): string {
-    const hash = this.network?.steam_digest?.(canonical({ rules:this.config, runtimeProtocol:6 })) ?? "";
+    const hash = this.network?.steam_digest?.(canonical({ rules:this.config, runtimeProtocol:7 })) ?? "";
     if (hash.length !== 64) throw new Error("Cannot hash multiplayer rules");
     return hash;
   }
@@ -267,6 +267,17 @@ export class MultiplayerEntry {
     const plan = this.installer?.getPlan();
     return readLobbyIdentity().role === "host" && questManager()?.call("get_ActiveQuestNo") === ENTRY_QUEST_ID && plan && this.installer
       ? { installer: this.installer, plan } : null;
+  }
+  /** Validated, locally prepared entry identity, available BEFORE native
+   * questStart. This is only an effect preparation capability, not authority
+   * to advance business state, finish a quest or expose online test commands. */
+  preparedEntry(): {plan:QuestPlan;lobby:string;owner:string;self:string;session:string;members:string[]}|null{
+    const p=this.installer?.getPlan(),l=this.lobby,wire=this.plan;
+    if(!p||!l||!wire||wire.intent==='cancel'||!this.lifecycle?.prepared()||this.applied!==key(wire)||
+       wire.lobby!==l.id||wire.owner!==l.owner||l.members.map(m=>m.id).sort().join(',')!==[...wire.members].sort().join(','))return null;
+    const role=readLobbyIdentity().role;if(role!=='host'&&role!=='guest')return null;
+    const qm=questManager();if(qm?.call('isActiveQuest')===true&&qm.call('get_ActiveQuestNo')!==ENTRY_QUEST_ID)return null;
+    return {plan:p,lobby:l.id,owner:l.owner,self:l.self,session:wire.session,members:[...wire.members]};
   }
   runEntry(): { installer: QuestInstaller; plan: import("../core/quest_plan").QuestPlan;
     lobby: string; owner: string; self: string; session: string; members: string[] } | null {

@@ -13,7 +13,7 @@ vi.mock("./sdk", () => ({
 
 function fixture() {
   const state = { active: false, playing: false, counter: false, counterType: 0, branch: 0, openSelect: false, execute: 0, questId: 900102,
-    hallStatus: 1, questHost: false, postedId: -1, session: true };
+    hallStatus: 1, questHost: false, postedId: -1, session: true,autoCounterReady:true };
   const identifier = { get_field: (name: string) => name === "_QuestNo" ? state.questId : null };
   const member = { get_field: (name: string): any => name === "_hallStatus" ? state.hallStatus
     : name === "_questHost" ? state.questHost : name === "_questIdentifier" ? {
@@ -44,7 +44,7 @@ function fixture() {
     return null;
   }) };
   const facility = { call: vi.fn((name: string) => { state.counter = name === "activateOnly"; }) };
-  const counter = { call: vi.fn((name: string, value?: number) => {
+  const counter = {get_address:()=>2345, call: vi.fn((name: string, value?: number) => {
     if (name === "set_QuestCounterType") state.counterType = value!;
     if (name === "get_QuestCounterType") return state.counterType;
     if (name === "get_BaseBranchValue") return state.branch;
@@ -69,7 +69,11 @@ function fixture() {
     const entry = mock.hook.mock.calls.find((args) => args[0].key === `${type}.${name}`)!;
     return { pre: entry[1] as (...args: any[]) => any, post: entry[2] as (...args: any[]) => any };
   };
-  return { state, transport: new QuestTransport(() => quest, 45), hooks, scroll, cursor, flow, action, arg, counter, lobby, identifier };
+  const transport=new QuestTransport(()=>quest,45),tick=transport.tick.bind(transport);
+  // Simulate the engine updating its already-started top action before the
+  // external poll. A singleton alone deliberately does not satisfy readiness.
+  transport.tick=()=>{if(state.counter&&state.autoCounterReady)hooks('snow.gui.fsm.questcounter.GuiQuestCounterFsmTopMenuAction','update(via.behaviortree.ActionArg)').pre();tick();};
+  return { state, transport, hooks, scroll, cursor, flow, action, arg, counter, lobby, identifier };
 }
 
 beforeEach(() => {
@@ -77,6 +81,12 @@ beforeEach(() => {
   mock.find.mockImplementation((type: string) => ({ get_method: (name: string) => ({ key: `${type}.${name}` }) }));
 });
 describe("bounded native quest transport", () => {
+  it('waits for the original top action to initialize before invoking native session creation',()=>{
+    const f=fixture();f.state.autoCounterReady=false;f.transport.request(900103,true);f.transport.tick();f.transport.tick();
+    expect(f.state.counter).toBe(true);expect(f.action.call).not.toHaveBeenCalledWith('start',f.arg);
+    const top=f.hooks('snow.gui.fsm.questcounter.GuiQuestCounterFsmTopMenuAction','start(via.behaviortree.ActionArg)');
+    expect(top.pre()).toBe(0);top.post(0);f.transport.tick();expect(f.action.call).toHaveBeenCalledWith('start',f.arg);
+  });
   it("ticks the native routine, selects solo, confirms the correct return enum and departs", () => {
     const { state, transport, hooks, scroll, cursor, flow, action } = fixture();
     transport.request(900102);

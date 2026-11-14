@@ -1,6 +1,7 @@
 import {canTrade,grantItem} from "./item_grant";
 import {readLobbyIdentity} from "./multiplayer_entry";
 import { InplaceWaves, type SpawnSync } from "./inplace_waves";
+import {NativeCombatPreparation,type PreparationEnemy} from './native_combat_preparation';
 import { TestTools } from "./test_tools";
 import { entryHostTestScope } from "./entry_host_scope";
 import type { RogueConfig } from "../core/config";
@@ -41,6 +42,41 @@ interface RuntimeMultiplayer extends SpawnSync {
 }
 
 export class NativeRuntime implements SessionPort {
+  effectPreparation: (() => {ok:boolean;reason?:string}) | null = null;
+  effectNativeRequired:(()=>boolean)|null=null;
+  effectNativePrepare:((unique:number)=>{ok:boolean;pending?:boolean;reason?:string})|null=null;
+  effectBlocker:(()=>string|null)|null=null;
+  effectEarlyPlan:(()=>QuestPlan|null)|null=null;
+  effectPreparationBlocker():string|null{return this.effectBlocker?.()??null;}
+  prepareEffectWave(): {ok:boolean;reason?:string} { return this.effectPreparation?.() ?? {ok:true}; }
+  private readonly combatGate=new NativeCombatPreparation({now:()=>clockSeconds(),
+    required:()=>this.effectNativeRequired?.()??false,
+    valid:identity=>(this.inScope()||this.effectEarlyPlan?.()?.questId===identity.id)&&
+      questManager()?.call('get_ActiveQuestNo')===identity.id&&questManager()?.call('getActiveQuestUniqueNo')===identity.unique,
+    nativeReady:()=>{const r=this.read();const p=getSingleton('snow.player.PlayerManager')?.call('findMasterPlayer') as REManagedObject|null;
+      return r.entryReady===true&&r.localPlayerId!=null&&r.players.some(v=>v.id===r.localPlayerId)&&p?.call('isDie')===false;},
+    prepare:unique=>this.effectNativePrepare?.(unique)??{ok:true},
+    enemies:()=>{const em=getSingleton('snow.enemy.EnemyManager');if(!em)return [];
+      const count=em.call('getBossEnemyCount') as number;if(!Number.isInteger(count)||count<0||count>64)throw new Error('原生首领列表不可核验');
+      const out:PreparationEnemy[]=[];const append=(e:REManagedObject|null)=>{if(e&&!out.some(v=>v.address===e.get_address()))out.push(this.preparationEnemy(e));};
+      for(let i=0;i<count;i++)append(em.call('getBossEnemy',i) as REManagedObject|null);
+      // A first-entry actor paused inside activate() is not in the active boss
+      // list yet. Its set record already owns it, and remains enumerable while
+      // inactive. Do not create a retained native pointer or guess by UID alone.
+      const sets=em.get_field('_EnemySetInfoList') as REManagedObject|null;
+      if(sets){const n=sets.call('get_Count') as number;if(!Number.isInteger(n)||n<0||n>512)throw new Error('原生出怪记录列表不可核验');
+        for(let i=0;i<n;i++){const info=sets.call('get_Item',i) as REManagedObject|null;append(info?.get_field('<OwnerEnemy>k__BackingField') as REManagedObject|null);}}
+      return out;},
+    report:(event,detail)=>this.report(event,detail)});
+  combatPreparation(){return this.combatGate.snapshot();}
+  continueCombatPreparation():boolean{return this.combatGate.retry();}
+  private preparationEnemy(enemy:REManagedObject):PreparationEnemy {
+    return {uid:enemy.call('get_UniqueId') as number,address:enemy.get_address(),
+      resolved:()=>{const dead=enemy.call('isDieBehaviorActive');const captured=enemy.call('isCapture');
+        if(typeof dead!=='boolean'||typeof captured!=='boolean')throw new Error('原生讨伐状态不可读');return dead||captured;},
+      active:()=>{const value=enemy.call('isActivateUpdate');if(typeof value!=='boolean')throw new Error('原生更新开关不可读');return value;},
+      setActive:value=>{enemy.call('setActivateUpdateForPause',value);}};
+  }
   readonly transport: QuestTransport;
   readonly testTools = new TestTools((event, detail) => this.report(event, detail), () => (this.entryHostTest && entryHostTestScope()) || this.multiplayerValid());
   /** Test-only seam: lets the CLI verify the started-run flow without native menus. */
@@ -116,7 +152,8 @@ export class NativeRuntime implements SessionPort {
       catch (error) { this.bootError = String(error); this.report("hook-install-error", this.bootError); }
     }
     this.transport.tick();
-    this.inplace.tick(clockSeconds());
+    this.combatGate.tick();
+    if(!this.combatGate.blocksInput())this.inplace.tick(clockSeconds());
     this.testTools.tick();
     const rates = this.rateEvidence;
     this.rateEvidence = [];
@@ -131,9 +168,13 @@ export class NativeRuntime implements SessionPort {
     else { this.inplace.cancel(); this.installer.publish(plan, false); }
   }
   policy(plan: QuestPlan | null, holdClear: boolean): void {
-    if (this.activePlan?.token !== plan?.token) this.rateKeys = [];
+    if(!plan||!holdClear)this.combatGate.end();
+    const changed=this.activePlan?.token!==plan?.token;
+    if (changed) this.rateKeys = [];
     this.activePlan = plan; this.holdClear = holdClear;
     if (!plan || !holdClear) this.inplace.cancel();
+    else if(changed&&this.inScope()&&questManager()?.call('isPlayQuest')===true)
+      this.combatGate.begin({id:plan.questId,unique:questManager()!.call('getActiveQuestUniqueNo') as number},plan.token);
   }
   post(questId: number): void {
     this.nativePostError = null;
@@ -362,7 +403,7 @@ export class NativeRuntime implements SessionPort {
     if (!reading.canPost || reading.players.length === 0 || reading.quest && !reading.staleQuest)
       return {ok:false,reason:"等待返回村庄后恢复原装备与背包"};
     const report = restoreStartup(this.wearPort,true);
-    if (report.ok && startupRecoveryPending()) return {ok:false,reason:"原装备与背包已恢复；等待原生保存完成。若已回村，请在原生菜单保存后再开局"};
+    if (report.ok && startupRecoveryPending()) return {ok:false,reason:"原装备与背包已恢复；等待原生保存完成。回村后点击“原生保存并确认恢复”，完成后即可开局"};
     if (report.ok) this.startupNotice = null;
     return report.ok ? { ok: true } : { ok: false, reason: report.reason };
   }
@@ -481,6 +522,26 @@ export class NativeRuntime implements SessionPort {
     const vital = lookup(emType, "getDifficultyRateVital");
     const attack = lookup(emType, "getDifficultyRateAttack");
     const questUpdate = lookup(qmType, "update");
+    const questStart=lookup(qmType,'questStart');
+    hookMethod(questStart,()=>{
+      const plan=this.activePlan&&this.inScope()?this.activePlan:this.effectEarlyPlan?.();
+      if(plan)this.combatGate.begin({id:plan.questId,unique:questManager()!.call('getActiveQuestUniqueNo') as number},plan.token);
+      return PRE_HOOK.CALL_ORIGINAL;
+    });
+    hookMethod(lookup('snow.gui.GuiManager','IsPlayerAllInputDisable'),()=>{},value=>this.combatGate.blocksInput()?toPtr(1):value);
+    for(const name of ['activate','setActivateUpdate','setActivateUpdateForPause']){
+      const key=`mhw_rogue_effect_activation_${name}_${this.cfg.quest.id}`;
+      hookMethod(lookup(emType,name),args=>{
+        let enemy:REManagedObject|null=null;
+        if(this.combatGate.blocksInput())try{const e=toManagedObject(args[2]);const plan=this.activePlan??this.effectEarlyPlan?.();
+          if(plan?.monsterIds.includes(e.call('get_EnemyType') as number))enemy=e;}catch{/* Not a matching prepared native boss. */}
+        reframework.getHookStorage()[key]=enemy;
+        return PRE_HOOK.CALL_ORIGINAL;
+      },value=>{const storage=reframework.getHookStorage();const enemy=storage[key] as REManagedObject|null;storage[key]=null;
+        if(enemy)this.combatGate.hold(this.preparationEnemy(enemy));return value;});
+    }
+    for(const name of ['damageVital','damageVitalSlip'])hookMethod(lookup('snow.player.PlayerQuestBase',name),()=>
+      this.combatGate.blocksInput()?PRE_HOOK.SKIP_ORIGINAL:PRE_HOOK.CALL_ORIGINAL);
     hookMethod(questUpdate, () => PRE_HOOK.CALL_ORIGINAL, value => {
       this.finishInNativeUpdate();
       return value;

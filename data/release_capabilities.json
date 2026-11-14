@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "releaseStage": "multiplayer-playtest",
-  "protocols": { "http": 4, "entryRules": 6, "run": 4, "plugin": "0.4.2" },
+  "protocols": { "http": 4, "entryRules": 7, "run": 4, "plugin": "0.4.3" },
   "multiplayer": { "implemented": true, "stable": false, "maxPlayers": 4 },
   "verification": {
     "localNativeGameplayPlayers": [2, 3, 4],

@@ -192,7 +192,11 @@ export interface NativeWebconsole {
   steam_snapshot?(): { available: boolean; reason: string; lobbies: {
     id: string; owner: string; self: string; plan: string;
     config?: { control: string; payload: string; digest: string; complete: boolean };
-    members: { id: string; ack: string; configAck?: string }[] }[] };
+    messages?:Record<string,string>;
+    members: { id: string; ack: string; configAck?: string; messages?:Record<string,string> }[] }[] };
+  steam_subscribe?(channel:string):boolean;
+  steam_lobby_message?(lobby:string,channel:string,value:string):boolean;
+  steam_member_message?(lobby:string,channel:string,value:string):boolean;
   steam_plan?(lobby: string, value: string): boolean;
   steam_ack?(lobby: string, value: string): boolean;
   steam_config_payload?(lobby: string, value: string): boolean;
@@ -211,4 +215,12 @@ export interface NativeWebconsole {
 declare function require(this: void, name: string): unknown;
 export function loadWebconsole(): NativeWebconsole {
   return require("webconsole") as NativeWebconsole;
+}
+
+/** Trusted local effect modules receive an explicit native capability adapter.
+ * They cannot register permanent hooks, publish bridge state or access files. */
+export function loadEffectChunk(source: string, name: string): unknown {
+  const [chunk, errorMessage] = load(source, name, "t", { math, tonumber, tostring, pairs, ipairs, type, error, assert });
+  if (!chunk) throw new Error(`效果脚本无法加载：${errorMessage}`);
+  return chunk();
 }

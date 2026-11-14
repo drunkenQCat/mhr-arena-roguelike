@@ -12,6 +12,7 @@
       "lua-types/5.4"
     ],
     "strict": true,
+    "noEmitOnError": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "forceConsistentCasingInFileNames": true,

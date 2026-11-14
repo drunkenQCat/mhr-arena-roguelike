@@ -73,6 +73,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Cannot install Lua runtime test dependency' }
           npm run check:runtime
           if ($LASTEXITCODE -ne 0) { throw 'Compiled Lua runtime checks failed' }
+          npm run check:effects
+          if ($LASTEXITCODE -ne 0) { throw 'Compiled Lua effect and mailbox checks failed' }
           python scripts/check-multiplayer-process.py
           if ($LASTEXITCODE -ne 0) { throw 'Cross-process Lua multiplayer protocol checks failed' }
           npm run test:cli

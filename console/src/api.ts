@@ -7,6 +7,9 @@ export interface ShopEntry { id: string; name: string; category: string; price: 
 export interface Choice { index: number; label: string; monsters: string[]; mode?: string; hpMul: number; dmgMul: number; rewardPt: number; }
 export interface RunEquipmentInventory { version:string; canEdit:boolean; reason:string|null; items:{key:number;id:number;name:string;position:number;worn:boolean;inherited:boolean;slotLevels:number[]|null;sockets:number[]|null}[]|null; jewels:{id:number;name:string;level:number;count:number;available:number}[]|null }
 export interface ConsoleState {
+  economy?:{totalPt:number;availablePt:number;reservedPt:number};
+  nativePreparation?:{state:string;pending:boolean;reason:string;held:number;identity:{id:number;unique:number}|null};
+  designerEffects?: import('./EffectShop.vue').EffectSnapshot | null;
   equipment?:RunEquipmentInventory;
   ui?: { scene: string; sceneToken?: string; resultNode?: string | null;
     dialogs?: { token: string; kind: string; text: string; passive?: boolean; supported: boolean; buttons?: string[] | null }[] | null;
@@ -106,9 +109,9 @@ export async function postCommand(state: ConsoleState, cmd: string, extra: Recor
 }
 
 export async function waitForReceipt(id: string, bridge: string, options: {
-  purchase?: boolean; effect?: boolean; configuration?:boolean; alive?: () => boolean; onPacket?: (packet: ReceiptPacket) => void;
+  purchase?: boolean; effect?: boolean; effectOrder?:boolean;configuration?:boolean; alive?: () => boolean; onPacket?: (packet: ReceiptPacket) => void;
 } = {}): Promise<CommandResult> {
-  const deadline = performance.now() + (options.configuration?200000:options.effect ? 20000 : 12000);
+  const deadline = performance.now() + (options.configuration?200000:options.effectOrder?60000:options.effect ? 20000 : 12000);
   while ((options.alive?.() ?? true) && performance.now() < deadline) {
     let packet: ReceiptPacket | null = null;
     try { packet = await getJson<ReceiptPacket>("/api/results", AbortSignal.timeout(3000)); }
@@ -120,9 +123,9 @@ export async function waitForReceipt(id: string, bridge: string, options: {
     if (packet?.bridgeId) {
       if (packet.bridgeId !== bridge) throw new Error("脚本会话已更换，未确认操作不会自动重发");
       options.onPacket?.(packet);
-      const result = packet.last?.id === id ? packet.last : packet.history?.find((r) => r.id === id);
+      const result = packet.last?.id === id ? packet.last : null;
       if (result && ["applied", "rejected", "uncertain", "queued"].includes(result.status) &&
-        !((options.purchase || options.effect||options.configuration) && result.status === "queued")) return result;
+        !((options.purchase || options.effect||options.effectOrder||options.configuration) && result.status === "queued")) return result;
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }

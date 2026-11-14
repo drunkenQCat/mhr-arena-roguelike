@@ -32,6 +32,9 @@ export interface DeathReading { uid: number; typeId: number; kind: "kill" | "cap
 
 /** The session knows no REFramework globals. Tests drive the same event loop as the game. */
 export interface SessionPort {
+  prepareEffectWave?(): { ok: boolean; reason?: string };
+  effectPreparationBlocker?():string|null;
+  combatPreparation?(): { pending:boolean;reason:string };
   now?(): number;
   ready(): boolean;
   read(): RuntimeReading;
@@ -67,7 +70,7 @@ export interface SessionPort {
   canFinishLocal?(): boolean;
 }
 
-export type SessionStage = "Idle" | "Preparing" | "Selecting" | "AwaitQuest" | "Combat" | "Carve" | "Returning" | "Finished" | "Fault";
+export type SessionStage = "Idle" | "Preparing" | "PreparingCombat" | "Selecting" | "AwaitQuest" | "Combat" | "Carve" | "Returning" | "Finished" | "Fault";
 export const RUN_END_INTENTS=["cleared-all","carts-exhausted","stopped","fault","native-ended","quest-left","entry-cancelled"] as const;
 export type RunEndIntent=typeof RUN_END_INTENTS[number];
 export interface NativeEndObservation {
@@ -153,10 +156,14 @@ export class RunSession {
     const old = this.core.config;
     this.validateConfigForSession(config);
     const active = !["Idle", "Finished", "Fault"].includes(this.stage);
-    return active ? { ...config, maxCarts: old.maxCarts,
+    const effective=active ? { ...config, maxCarts: old.maxCarts,
       startPt: old.startPt, armorOptions: old.armorOptions, runtime: old.runtime,
-      armorSets:old.armorSets, startupRules:old.startupRules, gachaPools:old.gachaPools, buffAmounts:old.buffAmounts,
+      armorSets:old.armorSets, startupRules:old.startupRules, gachaPools:old.gachaPools, buffAmounts:old.buffAmounts, effectShop:old.effectShop,
       cartRestorePrice: old.cartRestorePrice, cartRestoreLimit: old.cartRestoreLimit } : config;
+    // Preserve absence too: canonical multiplayer hashes distinguish an omitted
+    // optional field from an explicitly undefined one.
+    if(active&&old.effectShop===undefined)delete effective.effectShop;
+    return effective;
   }
   configurationSnapshot(): { active:RogueConfig; next:RogueConfig|null } {
     return {active:this.core.config,next:this.nextRunConfig??null};
@@ -172,6 +179,7 @@ export class RunSession {
   }
   private requestedAt = 0;
   private progressAt = 0;
+  private beforeCombatPreparation:"AwaitQuest"|"Combat"|null=null;
   private clearAt = 0;
   private campSince: number | null = null;
   private camp: Position | null = null;
@@ -308,7 +316,7 @@ export class RunSession {
   private mirroredReward = 0;
   private mirroredClears: number[] = [];
   get multiplayerRole(): "host" | "guest" | null { return this.port.multiplayerRole?.() ?? null; }
-  canChoose(): boolean { return this.multiplayerRole !== "guest" && this.canShop() && (!this.multiplayerRole || this.port.multiplayerCanChoose?.() === true); }
+  canChoose(): boolean { return !this.port.effectPreparationBlocker?.()&&this.multiplayerRole !== "guest" && this.canShop() && (!this.multiplayerRole || this.port.multiplayerCanChoose?.() === true); }
   failMultiplayer(reason: string): void { this.fault(reason); }
   adoptMultiplayerEntry(plan: QuestPlan): Result {
     if (!this.multiplayerRole || !this.port.multiplayerValid?.()) return fail("Multiplayer identity unavailable");
@@ -526,6 +534,8 @@ export class RunSession {
       // Resolve IDs before changing the core phase; unknown names leave choices retryable.
       const plan = makeQuestPlan(this.core.config, this.catalog, wave, this.core.state.layer,
         ++this.token, this.testOnly || this.settings.spawnMode === "sequential");
+      const effects = this.port.prepareEffectWave?.();
+      if (effects && !effects.ok) return fail(effects.reason ?? "本波效果准备未通过，尚未出怪");
       this.port.publish(plan, inPlace);
       const result = this.core.pickChoice(index);
       if (!result.ok) return result;
@@ -540,6 +550,7 @@ export class RunSession {
   }
 
   private resetTracking(reading: RuntimeReading, inPlace: boolean): void {
+    this.beforeCombatPreparation=null;
     this.seen = [];
     this.resolved = [];
     this.excludedUids = inPlace ? reading.enemies.map((enemy) => enemy.uid) : [];
@@ -623,7 +634,7 @@ export class RunSession {
       // It must be observed before the guest/progression and scope early returns below.
       const pinned = this.questUnique !== null && this.plan !== null;
       const same = reading.quest?.id === this.plan?.questId && reading.quest?.unique === this.questUnique;
-      if ((this.multiplayerRole || this.stage === "Preparing") && ((this.stage === "Preparing" && reading.quest && reading.quest.id === this.plan?.questId &&
+      if ((this.multiplayerRole || this.stage === "Preparing" || this.stage === "PreparingCombat") && ((["Preparing","PreparingCombat"].includes(this.stage) && reading.quest && reading.quest.id === this.plan?.questId &&
             ["failed", "return", "success"].includes(reading.quest.status)) ||
           (pinned && (!same || !!reading.quest && ["failed", "return", "success"].includes(reading.quest?.status ?? ""))))) {
         this.markRunEnd(same?"native-ended":"quest-left");
@@ -684,6 +695,20 @@ export class RunSession {
         return;
       }
       if (this.stage === "Selecting") return;
+      if(["AwaitQuest","Combat","PreparingCombat"].includes(this.stage)){
+        const preparation=this.port.combatPreparation?.();
+        if(preparation?.pending&&reading.quest?.id===this.plan?.questId){
+          if(this.stage!=="PreparingCombat")this.beforeCombatPreparation=this.stage as "AwaitQuest"|"Combat";
+          this.questUnique=reading.quest!.unique;this.stage="PreparingCombat";this.message=preparation.reason;
+          // Deliberate safety hold is not a spawn/entry timeout. The player can
+          // resolve a known failure or stop; no automatic native reentry.
+          this.requestedAt=reading.time;this.progressAt=reading.time;return;
+        }
+        if(this.stage==="PreparingCombat"){
+          this.stage=this.beforeCombatPreparation??"AwaitQuest";this.beforeCombatPreparation=null;
+          this.requestedAt=reading.time;this.progressAt=reading.time;
+        }
+      }
       if (this.stage === "AwaitQuest") {
         if (reading.quest && this.plan && reading.quest.id === this.plan.questId && reading.quest.playing) {
           // During entry the engine can expose an uninitialised origin for one sample.

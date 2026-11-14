@@ -1,0 +1,133 @@
+{
+  "groups": {
+    "attack.flat": {
+      "policy": "add",
+      "cap": 30
+    },
+    "defense.flat": {
+      "policy": "add",
+      "cap": 60
+    },
+    "item.grant": {
+      "policy": "add",
+      "cap": 99
+    },
+    "equipment.roll": {
+      "policy": "add",
+      "cap": 99
+    }
+  },
+  "products": [
+    {
+      "id": "effect_attack_small",
+      "name": "下一波攻击 +10",
+      "price": 30,
+      "enabled": true,
+      "effect": {
+        "id": "attack.flat",
+        "version": "1",
+        "parameters": {
+          "amount": 10
+        }
+      },
+      "conditions": {
+        "phases": [
+          "Selecting"
+        ],
+        "fromLayer": 1,
+        "toLayer": 999,
+        "weapons": [],
+        "exclusiveGroups": []
+      }
+    },
+    {
+      "id": "effect_attack_large",
+      "name": "下一波攻击 +20",
+      "price": 50,
+      "enabled": true,
+      "effect": {
+        "id": "attack.flat",
+        "version": "1",
+        "parameters": {
+          "amount": 20
+        }
+      },
+      "conditions": {
+        "phases": [
+          "Selecting"
+        ],
+        "fromLayer": 1,
+        "toLayer": 999,
+        "weapons": [],
+        "exclusiveGroups": []
+      }
+    },
+    {
+      "id": "effect_defense",
+      "name": "下一波防御 +15",
+      "price": 20,
+      "enabled": true,
+      "effect": {
+        "id": "defense.flat",
+        "version": "1",
+        "parameters": {
+          "amount": 15
+        }
+      },
+      "conditions": {
+        "phases": [
+          "Selecting"
+        ],
+        "fromLayer": 1,
+        "toLayer": 999,
+        "weapons": [],
+        "exclusiveGroups": []
+      }
+    },
+    {
+      "id": "effect_potion",
+      "name": "回复药两件包",
+      "price": 15,
+      "enabled": true,
+      "effect": {
+        "id": "item.grant",
+        "version": "1",
+        "parameters": {
+          "itemId": 68157446,
+          "count": 2
+        }
+      },
+      "conditions": {
+        "phases": [
+          "Selecting"
+        ],
+        "fromLayer": 1,
+        "toLayer": 999,
+        "weapons": [],
+        "exclusiveGroups": []
+      }
+    },
+    {
+      "id": "effect_gacha",
+      "name": "基础装备抽取",
+      "price": 40,
+      "enabled": true,
+      "effect": {
+        "id": "equipment.roll",
+        "version": "1",
+        "parameters": {
+          "pool": 1
+        }
+      },
+      "conditions": {
+        "phases": [
+          "Selecting"
+        ],
+        "fromLayer": 1,
+        "toLayer": 999,
+        "weapons": [],
+        "exclusiveGroups": []
+      }
+    }
+  ]
+}

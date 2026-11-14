@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <string>
 #include <vector>
+#include <map>
 
 namespace webconsole {
 inline constexpr const char* STEAM_PLAN_KEY = "mhr_arena_entry_v2_plan";
@@ -11,9 +12,12 @@ inline constexpr const char* STEAM_CONFIG_CONTROL_KEY = "mhr_arena_config_v1_con
 inline constexpr const char* STEAM_CONFIG_MANIFEST_KEY = "mhr_arena_config_v1_manifest";
 inline constexpr const char* STEAM_CONFIG_ACK_KEY = "mhr_arena_config_v1_ack";
 inline constexpr std::size_t STEAM_CONFIG_MAX_BYTES = 65536;
+inline constexpr std::size_t STEAM_MESSAGE_MAX_BYTES = 2048;
+inline constexpr std::size_t STEAM_MESSAGE_MAX_CHANNELS = 8;
+using SteamMessages = std::map<std::string,std::string>;
 struct SteamConfig { std::string control, payload, digest; bool complete = false; };
-struct SteamMember { std::string id, ack, config_ack; };
-struct SteamLobby { std::string id, owner, self, plan; std::vector<SteamMember> members; SteamConfig config; };
+struct SteamMember { std::string id, ack, config_ack; SteamMessages messages; };
+struct SteamLobby { std::string id, owner, self, plan; std::vector<SteamMember> members; SteamConfig config; SteamMessages messages; };
 struct SteamSnapshot { bool available = false; std::string reason; std::vector<SteamLobby> lobbies; };
 // Called only from the host Lua thread. Steam callbacks only enqueue lobby IDs.
 SteamSnapshot steam_snapshot();
@@ -22,5 +26,10 @@ bool steam_write_ack(const std::string& lobby, const std::string& value);
 bool steam_write_config_payload(const std::string& lobby, const std::string& value);
 bool steam_write_config_control(const std::string& lobby, const std::string& value);
 bool steam_write_config_ack(const std::string& lobby, const std::string& value);
+// Namespaced, bounded application mailboxes. Latest value, not a reliable queue;
+// callers implement session fencing, receipts and replay protection in Lua.
+bool steam_subscribe(const std::string& channel);
+bool steam_write_lobby_message(const std::string& lobby, const std::string& channel, const std::string& value);
+bool steam_write_member_message(const std::string& lobby, const std::string& channel, const std::string& value);
 std::string steam_digest(const std::string& value);
 }

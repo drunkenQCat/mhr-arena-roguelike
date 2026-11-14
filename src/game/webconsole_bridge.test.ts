@@ -43,6 +43,7 @@ function fixture() {
     ...JSON.parse(readFileSync(new URL("../../data/monster_ids.json", import.meta.url), "utf8")) }, port);
   const tools = { invincible: false, message: "ok", toggleGod: vi.fn(() => { tools.invincible = !tools.invincible; }), requestKill: vi.fn() };
   const runtime = { ready: () => true, status: () => "ready", testTools: tools, teleportPlayer: vi.fn(),
+    combatPreparation:()=>({state:'inactive',pending:false,reason:'',held:0,identity:null}),continueCombatPreparation:()=>false,
     nearestAliveMonsterPosition: vi.fn(() => ({ x: 100, y: 5, z: 80 })) } as unknown as NativeRuntime;
   const shop = new ShopWindow(core, () => session.canShop(), () => session.shopQuest());
   const bridge = new WebConsoleBridge(session, runtime, shop);
@@ -122,6 +123,39 @@ it("publishes start/stop state before their receipts even within the same sample
  };
  send('startRun');expect(f.state().sessionStage).toBe('Selecting');
  send('stop');expect(f.state().sessionStage).toBe('Finished');expect(host.now).toBe(timestamp);
+});
+it("publishes failed-effect state before a rejected receipt within the same sampled second",()=>{
+ const f=fixture();let state="reserved";
+ f.bridge.designer={snapshot:()=>({orders:[{state}]}),command:()=>{state="failed";return {ok:false,message:"confirmed zero delivery",order:{state}};}} as any;
+ f.tick();expect(f.state().designerEffects.orders[0].state).toBe("reserved");const timestamp=host.now;
+ host.commands.push(JSON.stringify({id:"instant-effect-failure",bridgeId:f.bridge.bridgeId,cmd:"designerEffects",sub:"buy",questUnique:null,waveToken:null}));
+ for(let i=0;i<12;i++)f.bridge.tick();
+ expect(host.files['webconsole_results.json'].last.status).toBe('rejected');
+ expect(f.state().designerEffects.orders[0].state).toBe('failed');expect(host.now).toBe(timestamp);
+});
+it('keeps multiplayer purchases queued until host and buyer receipts settle, including cached replays',()=>{
+ const f=fixture();let result:any=null;const command=vi.fn(()=>({ok:true,pending:true,message:'waiting for owner permit'}));
+ f.bridge.designer={snapshot:()=>({orders:result?[result.order]:[]}),command,commandResult:()=>result} as any;
+ const id='async-effect';expect(f.command('designerEffects',{sub:'buy'},id).status).toBe('queued');
+ expect(f.command('designerEffects',{sub:'buy'},id).status).toBe('queued');expect(command).toHaveBeenCalledOnce();
+ result={ok:true,message:'frozen and reserved locally',order:{state:'reserved'}};f.tick();
+ expect(host.files['webconsole_results.json'].last).toMatchObject({id,status:'applied'});
+ expect(f.command('designerEffects',{sub:'buy'},id).status).toBe('applied');expect(command).toHaveBeenCalledOnce();
+});
+it('publishes an uncertain multiplayer execution without manufacturing an order or retrying it',()=>{
+ const f=fixture();let result:any=null;const command=vi.fn(()=>({ok:true,pending:true,message:'waiting'}));
+ f.bridge.designer={snapshot:()=>({orders:[]}),command,commandResult:()=>result} as any;
+ f.command('designerEffects',{sub:'buy'},'uncertain-network');result={ok:false,uncertain:true,message:'reply disappeared after native attempt'};f.tick();
+ expect(host.files['webconsole_results.json'].last.status).toBe('uncertain');expect(command).toHaveBeenCalledOnce();
+});
+it('keeps a completed native save visible before allowing business bridge retirement',()=>{
+ const f=fixture();let result:any=null;const request=vi.fn(()=>1);
+ f.bridge.nativeSave={request,requestResult:()=>result} as any;
+ expect(f.command('saveGame',{},'save-before-replacement').status).toBe('queued');expect(f.bridge.replacementReady()).toBe(false);
+ result={status:'applied',message:'actual character and callback verified',slot:0,characterSaved:true};f.tick();
+ expect(host.files['webconsole_results.json'].last).toMatchObject({id:'save-before-replacement',status:'applied',characterSaved:true});
+ expect(f.bridge.replacementReady()).toBe(false);host.now+=2;expect(f.bridge.replacementReady()).toBe(true);
+ expect(f.command('saveGame',{},'save-before-replacement').status).toBe('applied');expect(request).toHaveBeenCalledOnce();
 });
 
 it("rejects unsupported test layers before preparing the run", () => {

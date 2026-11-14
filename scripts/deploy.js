@@ -71,6 +71,14 @@ function main() {
   copyIfChanged(root, path.join("native", "webconsole", "webconsole.dll"), gameDir, path.join("reframework", "plugins", "webconsole.dll"), "游戏重启后生效（原生插件随启动加载）");
   copyIfChanged(root, path.join("console", "dist", "index.html"), gameDir, path.join("reframework", "plugins", "console.html"), "打开 http://127.0.0.1:11777/console");
 
+  // Declarative product effects are runtime assets, not autorun probes. Keep
+  // the manifest explicit; do not copy experimental scripts by directory glob.
+  const effectAssets = require("./release-files.json").filter(entry => entry.root === "repo" &&
+    (entry.destination === "reframework/data/rogue_effect_catalog.json" || entry.destination.startsWith("reframework/data/rogue_effects/")));
+  for (const asset of effectAssets) {
+    copyIfChanged(root, asset.source, gameDir, asset.destination);
+  }
+
   // Experimental probes are deliberately not deployed. Run one-shot Lua via the CLI when needed.
 
   // REFramework 字体开关：该文件存在 => 默认 imgui 字体切到内嵌百度字体（中文可渲染）。

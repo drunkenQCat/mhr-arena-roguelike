@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import ConfigEditor from "./ConfigEditor.vue";
+import EffectShop from "./EffectShop.vue";
 import RunEquipment from "./RunEquipment.vue";
 import PlayWorkspace from "./PlayWorkspace.vue";
 import MultiplayerEntry from "./MultiplayerEntry.vue";
@@ -65,7 +66,7 @@ async function send(cmd: string, extra: Record<string, unknown> = {}): Promise<C
       if (!(error instanceof SubmissionUncertain)) throw error;
       id = error.requestId; notice.value = error.message;
     }
-    const result = await waitForReceipt(id, bridge, { purchase: cmd === "buy", effect: cmd === "killAll" || cmd === "teleport", configuration:cmd==="submitConfig", alive: () => alive,
+    const result = await waitForReceipt(id, bridge, { purchase: cmd === "buy", effectOrder:cmd==='designerEffects',effect: cmd === "killAll" || cmd === "teleport", configuration:cmd==="submitConfig"||cmd==="saveGame", alive: () => alive,
       onPacket: (packet) => { results.value = packet.history ?? []; } });
     const labels: Record<string, string> = { startRun: '已开始本局', choose: '已选择波次', setRoute: '路线已更新', setInvincible: '无敌设置已更新', killAll: '目标状态已确认', teleport: '位置已确认', stop: '已停止，正在通过原生结算返回村庄', retryPost: '已提交出发请求', getConfig: '配置已读取', buy: '购买完成' };
     notice.value = result.status === 'applied' ? (cmd === 'buy' ? '购买完成，结果显示在商店中' : labels[cmd] ?? result.message ?? '操作完成') : `${result.status === 'queued' ? '游戏已排队，等待实际结果' : result.status === 'uncertain' ? '结果待核实，请勿重试' : '已拒绝'}：${result.message ?? '请检查当前条件'}`;
@@ -143,6 +144,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); window.removeEventListen
     </nav>
     <p v-if="!connected" class="notice" role="status">{{ state ? '暂不能操作游戏，显示的数据可能已过期。请回游戏查看是否正在加载；恢复同步后按钮会重新可用。' : '请启动游戏并进入村庄，页面会自动连接。首次使用可查看“帮助与连接”。' }}</p>
     <p v-if="notice" class="notice" role="status">{{ notice }}</p>
+    <div v-if="state?.control?.startup.restorePending && ['Idle','Finished','Fault'].includes(state.sessionStage)" class="notice" role="status"><p>{{state.control.startup.message}}</p><button :disabled="!connected || busy" @click="send('saveGame')">{{busy?'等待游戏完成…':'原生保存并确认恢复'}}</button><small>只在村庄、原装备和背包已恢复时执行；等待角色写入和原生完成回调。</small></div>
     <template v-if="page === 'help'">
       <ConnectionHelp v-model:developer="developerMode" />
       <SupportBar />
@@ -150,8 +152,9 @@ onUnmounted(() => { alive = false; clearTimeout(timer); window.removeEventListen
     </template>
     <MultiplayerEntry v-if="page === 'multiplayer'" :entry="state?.multiplayerEntry" :run="state?.multiplayerRun" :connected="connected" :busy="busy || !connected" @command="send" @play="page = 'play'" />
     <PlayWorkspace v-show="page === 'play'" :state="state" :connected="connected" :busy="busy" :notice="notice" :developer-mode="developerMode" @command="send" @multiplayer="page = 'multiplayer'" />
+    <EffectShop v-if="page === 'play'" :snapshot="state?.designerEffects" :preparation="state?.nativePreparation" :connected="connected" :busy="busy" @command="send" />
     <RunEquipment v-if="page === 'equipment'" :inventory="state?.equipment" :connected="connected" :busy="busy" :notice="notice" @command="send" />
-    <ConfigEditor v-show="page === 'design'" :config="config" :version="loadedVersion" :saved-version="savedConfigVersion" :server-version="state?.configVersion ?? loadedVersion" :session-changed="!!configBridgeId && configBridgeId !== state?.bridgeId" :busy="busy" :connected="connected" :message="configMessage" :blocked-reason="configBlockedReason" @load="loadConfig" @submit="submitConfig" />
+    <ConfigEditor v-show="page === 'design'" :config="config" :version="loadedVersion" :saved-version="savedConfigVersion" :server-version="state?.configVersion ?? loadedVersion" :session-changed="!!configBridgeId && configBridgeId !== state?.bridgeId" :busy="busy" :connected="connected" :message="configMessage" :blocked-reason="configBlockedReason" :effect-definitions="state?.designerEffects?.definitions ?? []" :effect-snapshot="state?.designerEffects" @load="loadConfig" @submit="submitConfig" />
     <section v-if="page === 'events'" class="panel"><div class="section-heading"><h2>命令记录</h2><button @click="downloadJson('console-results.json', results)">导出记录</button></div><label>筛选记录 <input v-model="filter" placeholder="状态 / 请求 ID / 消息" /></label><p class="muted">applied 表示命令已执行；queued 仍需等待游戏结果；rejected 表示未执行。</p><article v-for="r in recent" :key="r.id" class="event"><span :class="['badge', r.status === 'applied' ? 'live' : r.status === 'queued' ? 'pending' : 'warning']">{{ r.status }}</span><span>{{ r.message ?? (r.config ? '已读取游戏配置' : '') }}</span><small class="mono">{{ r.id }}</small></article></section>
   </main>
 </template>

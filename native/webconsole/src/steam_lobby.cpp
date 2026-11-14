@@ -49,7 +49,17 @@ struct Api {
     void (*set_member_data)(void*, Id, const char*, const char*) = nullptr;
     void (*register_callback)(CallbackAbi*, int) = nullptr;
     std::vector<Id> lobbies;
+    std::vector<std::string> channels;
 } api;
+
+bool valid_channel(const std::string& value) {
+    if (value.empty() || value.size() > 24 || value.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789_.-") != std::string::npos) return false;
+    return value.front() != '.' && value.front() != '_' && value.front() != '-';
+}
+bool subscribed(const std::string& channel) {
+    return valid_channel(channel) && std::find(api.channels.begin(), api.channels.end(), channel) != api.channels.end();
+}
+std::string message_key(const std::string& channel) { return "mhr_arena_bus_v1_" + channel; }
 
 template<class T> T symbol(HMODULE module, const char* name) {
     return reinterpret_cast<T>(GetProcAddress(module, name));
@@ -173,8 +183,11 @@ SteamSnapshot steam_snapshot() {
             const auto member = api.member(api.matchmaking, id, i);
             lobby.members.push_back({std::to_string(member), bounded(api.member_data(api.matchmaking, id, member, STEAM_ACK_KEY)),
                                     bounded(api.member_data(api.matchmaking, id, member, STEAM_CONFIG_ACK_KEY))});
+            for (const auto& channel : api.channels)
+                lobby.members.back().messages[channel] = bounded(api.member_data(api.matchmaking, id, member, message_key(channel).c_str()));
         }
         lobby.config = read_config(id);
+        for (const auto& channel : api.channels) lobby.messages[channel] = bounded(api.data(api.matchmaking, id, message_key(channel).c_str()));
         out.lobbies.push_back(std::move(lobby));
     }
     if (out.lobbies.empty()) out.reason = "No active lobby observed; create or rejoin the game lobby after the plugin loaded";
@@ -190,6 +203,24 @@ bool steam_write_ack(const std::string& text, const std::string& value) {
     if (!writable(text, value, lobby)) return false;
     api.set_member_data(api.matchmaking, lobby, STEAM_ACK_KEY, value.c_str());
     return true; // Local submission only. Peers must observe the matching value.
+}
+bool steam_subscribe(const std::string& channel) {
+    if (!valid_channel(channel)) return false;
+    if (subscribed(channel)) return true;
+    if (api.channels.size() >= STEAM_MESSAGE_MAX_CHANNELS) return false;
+    api.channels.push_back(channel);
+    return true;
+}
+bool steam_write_lobby_message(const std::string& text, const std::string& channel, const std::string& value) {
+    Id lobby = 0;
+    if (!subscribed(channel) || !writable(text, value, lobby) || api.owner(api.matchmaking, lobby) != api.self(api.user)) return false;
+    return api.set_data(api.matchmaking, lobby, message_key(channel).c_str(), value.c_str());
+}
+bool steam_write_member_message(const std::string& text, const std::string& channel, const std::string& value) {
+    Id lobby = 0;
+    if (!subscribed(channel) || !writable(text, value, lobby)) return false;
+    api.set_member_data(api.matchmaking, lobby, message_key(channel).c_str(), value.c_str());
+    return true; // Submission only; the observed member ID is the sender identity.
 }
 bool steam_write_config_control(const std::string& text, const std::string& value) {
     Id lobby = 0;

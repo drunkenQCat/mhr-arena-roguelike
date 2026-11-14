@@ -30,6 +30,7 @@ export class QuestTransport {
   private lastSelection: unknown = null;
   private hall = false;
   private counterType: number | null = null;
+  private counterReadyAddress:number|null=null;
   private history: { at: number; stage: PostStage; questId: number; hall: boolean }[] = [];
 
   private setStage(stage: PostStage): void {
@@ -43,7 +44,7 @@ export class QuestTransport {
   getDiagnostics(): Record<string, unknown> {
     const qm = questManager();
     const read = (name: string): unknown => { try { return qm?.call(name) ?? null; } catch { return null; } };
-    return { stage: this.stage, target: this.target, hall: this.hall, counterType: this.counterType,
+    return { stage: this.stage, target: this.target, hall: this.hall, counterType: this.counterType,counterReady:this.counterReadyAddress!==null,
       active: read("isActiveQuest"), activeQuest: read("get_ActiveQuestNo"),
       nativeHallQuest: read("isHallCounterQuest"), nativeSingleQuest: read("isSingleQuest"),
       error: this.error, history: this.history.slice() };
@@ -103,6 +104,7 @@ export class QuestTransport {
     this.lastSelection = null;
     this.deadline = clockSeconds() + (typeof this.timeout==="function" ? this.timeout() : this.timeout);
     this.counterType = null;
+    this.counterReadyAddress=null;
     this.setStage(getSingleton(COUNTER) ? "WaitCounter" : "Open");
   }
 
@@ -123,6 +125,7 @@ export class QuestTransport {
     for (const object of this.held) object.release();
     this.held = [];
     this.action = null;
+    this.counterReadyAddress=null;
   }
 
   tick(): void {
@@ -151,7 +154,10 @@ export class QuestTransport {
       }
       const counter = getSingleton(COUNTER);
       if (this.stage === "WaitCounter") {
-        if (!counter) return;
+        // Existence/awake precedes the native top action's initialization.
+        // Cold first-use start produced a caught native AV. Do not treat a
+        // published singleton as proof that its original initialization ran.
+        if (!counter||this.counterReadyAddress!==counter.get_address()) return;
         // The counter may already exist, in which case awake never runs for this
         // request. Set and read back the context immediately before native start.
         const expected = this.hall
@@ -246,16 +252,17 @@ export class QuestTransport {
     const update = lookup(top, "update(via.behaviortree.ActionArg)");
     hookMethod(selected, () => {}, (retval) => this.isActive() && this.currentQuest() ? toPtr(this.currentQuest()) : retval);
     hookMethod(awake, (args) => {
-      if (this.isActive()) toManagedObject(args[2]).call("set_QuestCounterType",
+      if (this.isActive()) {this.counterReadyAddress=null;toManagedObject(args[2]).call("set_QuestCounterType",
         this.hall ? snow_gui_fsm_questcounter_GuiQuestCounterFsmManager_QuestCounterAccessType.HallCounter
-          : snow_gui_fsm_questcounter_GuiQuestCounterFsmManager_QuestCounterAccessType.VillageCounter);
+          : snow_gui_fsm_questcounter_GuiQuestCounterFsmManager_QuestCounterAccessType.VillageCounter);}
       return PRE_HOOK.CALL_ORIGINAL;
     });
     hookMethod(input, () => {}, (retval) => this.isActive() ? toPtr(1) : retval);
     hookMethod(confirm, () => {}, (retval) => this.stage === "Confirm"
       ? toPtr(snow_gui_GuiManager_YNInfoResult.Yes) : retval);
-    hookMethod(start, () => this.isActive() ? PRE_HOOK.SKIP_ORIGINAL : PRE_HOOK.CALL_ORIGINAL);
-    hookMethod(update, () => this.isActive() ? PRE_HOOK.SKIP_ORIGINAL : PRE_HOOK.CALL_ORIGINAL);
+    const ready=()=>{if(this.isActive())this.counterReadyAddress=getSingleton(COUNTER)?.get_address()??null;};
+    hookMethod(start, () => PRE_HOOK.CALL_ORIGINAL,value=>{ready();return value;});
+    hookMethod(update, () => {ready();return this.isActive() ? PRE_HOOK.SKIP_ORIGINAL : PRE_HOOK.CALL_ORIGINAL;});
     this.hooks = true;
   }
 }

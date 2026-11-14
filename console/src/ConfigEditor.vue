@@ -8,8 +8,12 @@ import BalancePreview from "./BalancePreview.vue";
 import { renameArmor, emptyWeightedPools } from "./equipment-model";
 import { changes, editorConfig, monsters, parameterLabel, poolIssues, preview, validateConfig, type RogueConfig } from "./editor-model";
 import { downloadJson } from "./api";
+import EffectDesigner from "./EffectDesigner.vue";
+import type {EffectSnapshot} from "./EffectShop.vue";
+import {effectProductIssue} from "./effect-model";
+import type { EffectDefinition } from "../../src/core/effect_contract";
 
-const props = defineProps<{ config: unknown; version: number; savedVersion?: number | null; serverVersion: number; sessionChanged: boolean; busy: boolean; connected: boolean; message: string;blockedReason?:string }>();
+const props = defineProps<{ config: unknown; version: number; savedVersion?: number | null; serverVersion: number; sessionChanged: boolean; busy: boolean; connected: boolean; message: string;blockedReason?:string;effectDefinitions?:EffectDefinition[];effectSnapshot?:EffectSnapshot|null }>();
 const emit = defineEmits<{ load: []; submit: [config: RogueConfig, version: number] }>();
 const draft = ref<RogueConfig | null>(null);
 const baseline = ref<RogueConfig | null>(null);
@@ -85,7 +89,7 @@ const players = ref(1);
 const unlockAll = ref(false);
 const rawText = ref("");
 const importFile = ref<HTMLInputElement | null>(null);
-const tabs = [ ["rules", "开局与奖励"], ["equipment", "装备与成长"], ["scaling", "难度曲线"], ["pools", "怪物池与解锁"],
+const tabs = [ ["rules", "开局与奖励"], ["effects", "商品效果"], ["equipment", "装备与成长"], ["scaling", "难度曲线"], ["pools", "怪物池与解锁"],
   ["shop", "商店定价"], ["runtime", "流程节奏"], ["review", "预览与提交"] ];
 watch(() => props.config, (value) => {
   if (!value) return;
@@ -98,7 +102,9 @@ watch(() => props.config, (value) => {
 const diff = computed(() => baseline.value && draft.value ? changes(baseline.value, draft.value) : []);
 const error = computed(() => {
   if (!draft.value) return "尚未载入游戏配置";
-  try { validateConfig(draft.value); const issues = poolIssues(draft.value); const empty = emptyWeightedPools(draft.value); if (empty.length) issues.push(`抽装池权重不能全为 0：${empty.join('、')}`); return issues.join('；'); }
+  try { validateConfig(draft.value); const issues = poolIssues(draft.value); const empty = emptyWeightedPools(draft.value); if (empty.length) issues.push(`抽装池权重不能全为 0：${empty.join('、')}`);
+    for(const p of draft.value.effectShop?.products??[]){const reason=effectProductIssue(p,props.effectDefinitions??[],draft.value.effectShop!.groups);if(p.enabled&&reason)issues.push(`${p.name}：${reason}`);}
+    return issues.join('；'); }
   catch (e) { return parameterLabel(String(e).replace("Error: ", "").replace("rogue_config 缺失或非法: ", ""))
     .replace(" (gap or overlap)", "：层段必须连续，不能重叠") + "：请检查必填项、数值范围和层段设置"; }
 });
@@ -201,6 +207,7 @@ function submit() {
       <div class="design-layout"><nav class="design-nav" aria-label="策划编辑分组">
         <button v-for="t in tabs" :key="t[0]" :aria-pressed="tab === t[0]" :class="{ selected: tab === t[0] }" @click="tab = t[0]; search = ''">{{ t[1] }}</button>
       </nav><div class="design-main">
+      <EffectDesigner v-if="tab === 'effects'" v-model="draft.effectShop" :definitions="effectDefinitions ?? []" :live="effectSnapshot" />
       <div v-if="tab === 'rules'" class="editor-body">
         <nav class="toolbar"><button v-for="t in [['start','开局规则'],['base','基础奖励'],['combo','组合倍率']]" :key="t[0]" :aria-pressed="rulesTab===t[0]" :class="{selected:rulesTab===t[0]}" @click="rulesTab=t[0]">{{ t[1] }}</button></nav><section v-show="rulesTab==='start'"><h3>开局规则 <span class="badge">下一局生效</span></h3>
         <div class="fields">
@@ -317,7 +324,7 @@ function submit() {
       </div>
       </div><button class="preview-toggle" :aria-expanded="previewOpen" @click="previewOpen=!previewOpen">{{ previewOpen ? '收起预览' : '波次预览' }}</button><BalancePreview v-if="previewOpen" :draft="draft" :baseline="baseline" v-model:layer="previewLayer" v-model:players="players" v-model:unlocked="unlockAll" /></div>
       <details class="advanced"><summary @click="rawText = JSON.stringify(draft, null, 2)">高级：JSON 草稿</summary><textarea v-model="rawText" rows="12" aria-label="高级 JSON 草稿" spellcheck="false" /><button @click="applyRaw">将 JSON 应用到表单草稿</button></details>
-      <div class="submit-bar"><div class="submit-copy" role="status" aria-live="polite"><strong :class="{ 'submit-saved': submitState.saved }">{{ submitState.message }}</strong><small>价格下次交易生效；曲线和怪池下次生成生效；装备、抽装池与增益下一局生效</small></div>
+      <div class="submit-bar"><div class="submit-copy" role="status" aria-live="polite"><strong :class="{ 'submit-saved': submitState.saved }">{{ submitState.message }}</strong><small>原商店价格下次交易生效；曲线和怪池下次生成生效；商品效果、装备、抽装池与增益下一局生效</small></div>
         <button class="primary" :disabled="submitState.disabled" :title="submitState.message" @click="submit">{{ submitState.label }}</button></div>
     </template>
   </section>

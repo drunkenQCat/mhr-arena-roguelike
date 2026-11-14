@@ -50,7 +50,8 @@ inline bool write_document_atomic(const std::string& name, const std::string& bo
 
 inline bool write_recovery(const std::string& name, const std::string& body,
                            RecoveryWriteObserver observer = nullptr) noexcept {
-    if ((name != "mhw_rogue_startup_state.json" && name != "mhw_rogue_pouch_state.json") ||
+    if ((name != "mhw_rogue_startup_state.json" && name != "mhw_rogue_pouch_state.json" &&
+         name != "mhw_rogue_effect_orders.json" && name != "mhw_rogue_effect_network.json") ||
         body.empty() || body.size() > 2 * 1024 * 1024 || g_data_dir.empty()) return false;
     return write_document_atomic(name, body, observer);
 }

@@ -10,8 +10,11 @@ import { PartySession } from "./party_session";
 import { validateEquipmentConfig } from "./equipment_catalog";
 import { cancelEquipmentWork, enqueueEquipmentWork, inEquipmentUpdate } from "./equipment_update";
 import { runEquipmentSnapshot, wearRunEquipment, socketRunJewel } from "./equip_wear";
+import type { DesignerEffects } from "./designer_effects";
+import type { RecoverySave } from "./recovery_save";
 
 interface Command {
+  offerVersion?:string;orderId?:string;
   equipmentVersion?: string; equipmentKey?: number; socket?: number; jewelId?: number;
   id?: string; bridgeId?: string; cmd?: string; armor?: string; index?: number;
   value?: boolean; itemId?: string; route?: string; config?: unknown;
@@ -34,6 +37,15 @@ function commandFingerprint(text:string, transport:NativeWebconsole):string {
 }
 
 export class WebConsoleBridge {
+  designer: DesignerEffects | null = null;
+  nativeSave: RecoverySave | null = null;
+  private saveRequest:{id:string;serial:number}|null=null;
+  private designerRequest:string|null=null;
+  private asynchronousReceiptAt=-10;
+  /** Keep the old bridge alive through publication of a save/purchase receipt.
+   * Otherwise main can retire the restored business session in the same frame
+   * that native saving completes, before this bridge publishes its result. */
+  replacementReady():boolean{return this.saveRequest===null&&this.designerRequest===null&&this.pendingReceipt===null&&clockSeconds()-this.asynchronousReceiptAt>=2;}
   readonly bridgeId: string;
   private readonly transport: NativeWebconsole;
   private readonly nativeUi: NativeUi;
@@ -100,6 +112,18 @@ export class WebConsoleBridge {
         }
       }
       this.pollEffect();
+      if(this.designerRequest){
+        const result=this.designer?.commandResult(this.designerRequest) as {ok:boolean;message:string;uncertain?:boolean;order?:{state:string}}|null;
+        if(result){const id=this.designerRequest,old=this.results.find(r=>r.id===id);
+          const status=result.uncertain||['uncertain','recovery'].includes(result.order?.state??'')?'uncertain':result.ok?'applied':'rejected';
+          const receipt=Object.assign(old??{id},result,{status});
+          if(this.writeResults(receipt)){this.designerRequest=null;this.asynchronousReceiptAt=clockSeconds();}}
+      }
+      if(this.saveRequest){
+        const result=this.nativeSave?.requestResult(this.saveRequest.serial);
+        if(result){const id=this.saveRequest.id;const old=this.results.find(r=>r.id===id);const receipt=Object.assign(old??{id},result);
+          if(this.writeResults(receipt)){this.saveRequest=null;this.asynchronousReceiptAt=clockSeconds();}}
+      }
       const endedQuest = this.session.readingSnapshot?.quest;
       if (["Finished", "Fault"].includes(this.session.stage) && this.session.plan && endedQuest?.id === this.session.plan.questId && !endedQuest.playing)
         this.nativeUi.beginReturn(endedQuest.id, endedQuest.unique);
@@ -216,7 +240,7 @@ export class WebConsoleBridge {
     } else {
       try {
         if (staleBridge) throw new Error("连接会话已更换，请等待同步后重试");
-        if (["equipment", "choose", "buy", "killAll", "stop", "teleport", "submitConfig"].includes(cmd.cmd ?? "")) {
+        if (["equipment", "choose", "buy", "killAll", "stop", "teleport", "submitConfig", "designerEffects"].includes(cmd.cmd ?? "")) {
           if (cmd.questUnique !== this.session.readingSnapshot?.quest?.unique &&
             !(cmd.questUnique === null && !this.session.readingSnapshot?.quest))
             throw new Error("任务实例已变化，此操作已拒绝");
@@ -239,7 +263,10 @@ export class WebConsoleBridge {
       // CLI callers may immediately read state after a receipt, in the same
       // sampled second. Publish the resulting business state before acknowledging
       // every mutation, not only purchases. Retry publication without re-execution.
-      if (last.status === "applied" || last.status === "queued") this.publish();
+      // A rejected wave start can still have recorded a verified effect
+      // failure and released a reservation. Publish that state before the
+      // receipt too, rather than leaving the page on a stale reserved order.
+      this.publish();
       const text = rejson.dump_string({ bridgeId: this.bridgeId,
         configVersion: this.configVersion, lastId: last.id, last, history: this.results }, 0);
       if (!text) throw new Error("结果序列化失败");
@@ -293,6 +320,7 @@ export class WebConsoleBridge {
           runtime: s.settings }, configVersion: this.configVersion };
       }
       case "submitConfig": {
+        this.designer?.validate(validateConfig(cmd.config));
         const blocked=this.runtime.configurationRecoveryPending?.();if(blocked)throw new Error(blocked);
         if (s.stage === "Preparing") throw new Error("已准备的个人装备和开局规则不能改变；请先取消准备");
         if(this.configuration||this.runtime.multiplayerConfigBusy?.())throw new Error("联机配置仍在同步，请等待完整回执");
@@ -316,7 +344,7 @@ export class WebConsoleBridge {
         if (refFs.read("mhw_rogue_config.json") !== text) throw new Error("配置保存验证失败，未应用");
         s.applyConfig(cfg); this.configVersion++;
         return { status: "applied", configVersion: this.configVersion,
-          message: "已保存：商店下次交易、曲线与怪池下次生成选择时生效；开局装备、抽取池、增益数值与节奏下一局生效。当前波次保持原计划。" };
+          message: "已保存：原商店下次交易、曲线与怪池下次生成选择时生效；商品效果、开局装备、抽取池、增益数值与节奏下一局生效。当前波次保持原计划。" };
       }
       case "startRun": {
         if (!inEquipmentUpdate()) throw new Error("等待载入角色后再准备装备");
@@ -329,6 +357,7 @@ export class WebConsoleBridge {
         return { status: r.ok ? "applied" : "rejected", message: r.message };
       }
       case "choose": {
+        const effectBlocker=this.designer?.blockingReason?.();if(effectBlocker)throw new Error(effectBlocker);
         if (this.shop.busy || !s.canChoose()) throw new Error("请完成集结和未决交易，再选择波次");
         if (!Number.isInteger(cmd.index)) throw new Error("请选择有效波次");
         const r = s.choose(cmd.index!);
@@ -339,6 +368,20 @@ export class WebConsoleBridge {
         const r = this.shop.requestPurchase(cmd.itemId ?? "");
         if (r.ok) this.purchase = { id: cmd.id!, version: this.shop.transactionVersion };
         return { status: r.ok ? "queued" : "rejected", message: r.message };
+      }
+      case "saveGame": {
+        if(!this.nativeSave)throw new Error("原生保存入口未就绪");
+        if(this.saveRequest||this.shop.busy)throw new Error("保存或交易仍在处理中，请等待");
+        const serial=this.nativeSave.request();this.saveRequest={id:cmd.id!,serial};
+        return {status:"queued",message:"已排队原生保存；等待本角色写入及完成回调"};
+      }
+      case "designerEffects": {
+        if(!this.designer)throw new Error("策划效果实验未启用");
+        if(this.designerRequest&&['buy','cancel'].includes(cmd.sub??''))throw new Error('上一笔联机效果交易仍在核验，请先等待原回执');
+        const result=this.designer.command(cmd.sub??"",{itemId:cmd.itemId,offerVersion:cmd.offerVersion,orderId:cmd.orderId,requestId:cmd.id!}) as {ok:boolean;message:string;pending?:boolean;order?:{state:string}};
+        if(cmd.sub==="continue"&&!this.runtime.continueCombatPreparation())throw new Error("当前没有可重检的原生准备屏障");
+        if(result.pending){this.designerRequest=cmd.id!;return {...result,status:'queued'};}
+        return {status:["uncertain","recovery"].includes(result.order?.state??"")?"uncertain":result.ok?"applied":"rejected",...result};
       }
       case "setInvincible": {
         if (typeof cmd.value !== "boolean") throw new Error("value 必须是布尔值");
@@ -502,12 +545,15 @@ export class WebConsoleBridge {
       questId: r?.quest?.id ?? null, questUnique: r?.quest?.unique ?? null,
       quest: r?.quest ?? null, online: r?.online ?? false, route: s.route,
       layer: core.state.layer, pt: core.state.wallet.pt, cartsLeft: core.state.cartsLeft,
+      economy:this.shop.economy(),
       nativeDeaths: r?.deaths ?? null, maxCarts: core.config.maxCarts, armor: core.state.armor, armorOptions: s.configForEditing().armorOptions,
       nativeOnline: r?.online ?? null, businessParty: this.party.active ? this.party.summary() : null,
       entryHostTest,
       // 评审二轮 #1：party 会话身份直接发布在顶层，CLI 无需解析 businessParty。
       partyGeneration: this.party.active ? this.party.currentGeneration() : null,
       previousRun: this.previousRun(), runSummary: ["Finished","Fault"].includes(s.stage) ? s.runSummary() : null,
+      designerEffects: this.designer?.snapshot() ?? null,
+      nativePreparation:this.runtime.combatPreparation(),
       supplyLoot:s.supplyLoot, killedUltimates: core.state.killedUltimates,
       invincible: this.runtime.testTools.invincible,
       activeWave: core.state.activeWave?.label ?? null, preparation: s.preparation(),

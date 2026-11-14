@@ -66,6 +66,19 @@ beforeEach(() => {
   mock.storage = {}; mock.recoveryPending = false;
   mock.find.mockImplementation((type: string) => ({ get_method: (name: string) => ({ key: `${type}.${name}` }) }));
 });
+it('protects the validated first native entry before run adoption without enabling general online authority',()=>{
+ const f=fixture();f.runtime.effectNativeRequired=()=>true;f.runtime.effectEarlyPlan=()=>f.plan;
+ f.qm.call.mockImplementation((name:string)=>name==='isActiveQuest'||name==='isPlayQuest'?true:name==='get_ActiveQuestNo'?f.plan.questId:name==='getActiveQuestUniqueNo'?77:null);
+ mock.singleton.mockImplementation((name:string)=>name==='snow.stage.StageManager'?{call:()=>true}:null);
+ f.hooks('snow.QuestManager','questStart').pre();expect(f.runtime.combatPreparation().pending).toBe(true);
+ expect(f.runtime.multiplayerValid()).toBe(false);expect(f.hooks('snow.gui.GuiManager','IsPlayerAllInputDisable').post(0)).toBe(1);
+ let active=true;const enemy={get_address:()=>12,call:(name:string,value?:boolean)=>{
+  if(name==='get_EnemyType')return f.plan.monsterIds[0];if(name==='get_UniqueId')return 100;if(name==='isActivateUpdate')return active;
+  if(name==='isDieBehaviorActive'||name==='isCapture')return false;
+  if(name==='setActivateUpdateForPause')active=value!;return null;}};
+ const activation=f.hooks('snow.enemy.EnemyCharacterBase','activate');activation.pre({2:enemy});activation.post(0);expect(active).toBe(false);
+ f.runtime.effectEarlyPlan=()=>null;expect(f.hooks('snow.gui.GuiManager','IsPlayerAllInputDisable').post(0)).toBe(0);
+});
 
 it("uses the locked real party instead of a leftover offline mock when multiplayer attaches",()=>{
  const {runtime}=fixture();runtime.setPartySizeSource(()=>1);expect(runtime.partySize()).toBe(1);

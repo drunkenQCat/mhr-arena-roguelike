@@ -21,6 +21,18 @@ it("does not report queued configuration as saved and can wait beyond the ordina
  await vi.advanceTimersByTimeAsync(14000);expect(settled).toBe(false);
  fetchMock.mockResolvedValue(reply(receipt("applied")));await vi.advanceTimersByTimeAsync(250);expect((await pending).status).toBe("applied");
 });
+it('waits for multiplayer effect order acknowledgement beyond the native input deadline',async()=>{
+ fetchMock.mockResolvedValue(reply(receipt('queued')));let settled=false;
+ const result=waitForReceipt('request-1','current',{effectOrder:true}).then(r=>{settled=true;return r;});
+ await vi.advanceTimersByTimeAsync(25000);expect(settled).toBe(false);
+ fetchMock.mockResolvedValue(reply(receipt('applied')));await vi.advanceTimersByTimeAsync(250);expect((await result).status).toBe('applied');
+});
+it('does not reuse a historical receipt while another command is the current publication',async()=>{
+ fetchMock.mockResolvedValue(reply({bridgeId:'current',last:{id:'other',status:'applied'},history:[{id:'request-1',status:'applied'}]}));
+ let settled=false;const result=waitForReceipt('request-1','current',{purchase:true}).then(r=>{settled=true;return r;});
+ await vi.advanceTimersByTimeAsync(600);expect(settled).toBe(false);
+ fetchMock.mockResolvedValue(reply(receipt('rejected')));await vi.advanceTimersByTimeAsync(250);expect((await result).status).toBe('rejected');
+});
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });

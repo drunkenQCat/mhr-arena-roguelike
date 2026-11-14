@@ -30,7 +30,8 @@ export function drawHud(session: RunSession, runtime: NativeRuntime, shop: ShopW
     imguiApi.text(runtime.ready() ? "原生钩子就绪（仅单人）" : "等待中 / 未就绪");
     imguiApi.text(runtime.status());
     imguiApi.text(`会话: ${session.stage} / 核心: ${state.phase} / 层: ${state.layer}`);
-    imguiApi.text(`PT: ${state.wallet.pt} / 猫车: ${state.cartsLeft}/${core.config.maxCarts}`);
+    const economy=shop.economy();
+    imguiApi.text(`可用 ${economy.availablePt} PT · 预留 ${economy.reservedPt} PT / 猫车: ${state.cartsLeft}/${core.config.maxCarts}`);
     imguiApi.text(`路线: ${session.route} / 出怪: ${session.settings.spawnMode}`);
     imguiApi.text(session.message);
     if (state.activeWave) imguiApi.text(`本层: ${state.activeWave.label}`);

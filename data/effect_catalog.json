@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "modules": [
+    "rogue_effects/attack_flat.lua",
+    "rogue_effects/defense_flat.lua",
+    "rogue_effects/item_grant.lua",
+    "rogue_effects/equipment_roll.lua"
+  ]
+}

@@ -16,6 +16,8 @@ try {
   const { default: Balance } = await server.ssrLoadModule('/src/BalancePreview.vue');
   const { default: NativeNotice } = await server.ssrLoadModule('/src/NativeNotice.vue');
   const { default: ReleaseCapabilities } = await server.ssrLoadModule('/src/ReleaseCapabilities.vue');
+  const { default: EffectDesigner } = await server.ssrLoadModule('/src/EffectDesigner.vue');
+  const { default: EffectShop } = await server.ssrLoadModule('/src/EffectShop.vue');
   const { editorConfig } = await server.ssrLoadModule('/src/editor-model.ts');
   const render = (component, props) => renderToString(createSSRApp(component, props));
   const coverage = await render(ReleaseCapabilities, {});
@@ -34,6 +36,8 @@ try {
   };
   const props = { state, connected: true, busy: false, notice: '' };
   const guest = await render(Play, props);
+  const reservedBalance=await render(Play,{...props,state:{...state,economy:{totalPt:150,availablePt:119,reservedPt:31}}});
+  assert.match(reservedBalance,/119/);assert.match(reservedBalance,/待生效预留 31 PT/);assert.doesNotMatch(reservedBalance,/class="gold">150</);checked++;
   assert.match(guest, /等待房主选择下一波/);
   assert.match(guest, /购买 1 件/);
   assert.doesNotMatch(guest, /选择单怪并开始/);
@@ -115,6 +119,21 @@ try {
   assert.match(wardrobeLocked,/disabled/);assert.match(wardrobeLocked,/整备阶段调整/);checked++;
   const wardrobeEmpty=await render(Wardrobe,{inventory:{version:'',canEdit:false,reason:'当前没有可调整的局内装备箱',items:null,jewels:null},connected:true,busy:false,notice:''});
   assert.match(wardrobeEmpty,/当前没有可调整/);checked++;
+  const effectDefinition={id:'attack.flat',version:'1',implementation:'source',name:'下一波攻击',description:'读回属性字段',delivery:'nextWave',verification:'attribute',experimental:false,group:'attack.flat',quantityParameter:'amount',supportedPhases:['Preparing','Selecting'],parameters:{amount:{name:'攻击点数',description:'固定值',unit:'点',min:1,max:30,default:10}}};
+  const effectProduct={id:'effect_attack',name:'攻击强化',price:30,enabled:true,effect:{id:'attack.flat',version:'1',parameters:{amount:10}},conditions:{phases:['Selecting'],fromLayer:1,toLayer:99,weapons:[],exclusiveGroups:[]}};
+  const effectSettings={groups:{'attack.flat':{policy:'add',cap:30}},products:[effectProduct]};
+  const effectsEditor=await render(EffectDesigner,{modelValue:effectSettings,definitions:[effectDefinition]});
+  assert.match(effectsEditor,/允许购买的阶段/);assert.match(effectsEditor,/武器限制/);assert.match(effectsEditor,/太刀/);assert.match(effectsEditor,/互斥效果组/);assert.match(effectsEditor,/下一局生效/);assert.match(effectsEditor,/本组已生效/);checked++;
+  const missingEffect=await render(EffectDesigner,{modelValue:effectSettings,definitions:[]});
+  assert.match(missingEffect,/需要处理的商品/);assert.match(missingEffect,/上架商品会阻止提交/);assert.match(missingEffect,/效果或效果组不可用/);checked++;
+  const noArgument=await render(EffectDesigner,{modelValue:{...effectSettings,products:[{...effectProduct,effect:{...effectProduct.effect,parameters:{}}}]},definitions:[{...effectDefinition,quantityParameter:null,parameters:null}]});
+  assert.match(noArgument,/规则允许购买/);assert.doesNotMatch(noArgument,/需要处理的商品/);checked++;
+  const pendingEffect=await render(EffectShop,{connected:true,busy:false,snapshot:{offers:[],orders:[{id:'r1',offer:effectProduct,context:{layer:1,wave:'r1/w1'},state:'reserved',charged:false,message:'等待开战'}],availablePt:120,reservedPt:30,message:null,configuration:{nextRunPending:true}}});
+  assert.match(pendingEffect,/待生效预留 30 PT/);assert.match(pendingEffect,/等待生效 · 可取消/);assert.match(pendingEffect,/取消预订/);assert.match(pendingEffect,/本局仍/);assert.doesNotMatch(pendingEffect,/生效中/);checked++;
+  const suspendedEffect=await render(EffectShop,{connected:true,busy:false,snapshot:{offers:[],orders:[{id:'r2',offer:effectProduct,context:{layer:1,wave:'r1/w1'},state:'suspended',charged:true,message:'原生复活尚未完成'}],availablePt:120,reservedPt:0,message:null}});
+  assert.match(suspendedEffect,/等待复活后恢复/);assert.doesNotMatch(suspendedEffect,/生效中|取消预订/);checked++;
+  const lockedEffect=await render(EffectShop,{connected:true,busy:false,preparation:{state:'blocked',pending:true,reason:'订单未交付'},snapshot:{offers:[],orders:[{id:'r3',offer:effectProduct,context:{layer:1,wave:'r1/w1'},state:'locked',charged:false,message:'等待场地'}],availablePt:120,reservedPt:30,message:null}});
+  assert.match(lockedEffect,/已锁定 · 等待场地就绪/);assert.match(lockedEffect,/重新核验并继续/);assert.match(lockedEffect,/安全停止本局/);assert.doesNotMatch(lockedEffect,/取消预订/);checked++;
   console.log(`Vue component rendering: ${checked} scenarios passed.`);
 } finally {
   await server.close();
