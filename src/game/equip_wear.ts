@@ -5,6 +5,8 @@
 import { applyEquipmentIndices, applyEquipmentMySet, captureEquipmentMySet, equipmentMySetMatches, validateEquipmentMySet, verifyReferences, type EquipmentMySet } from "./native_equipment_myset";
 import { getSingleton, relog, createInstance, callNativeFunction, findTypeDefinition, clockSeconds, type REManagedObject, type RETypeDefinition } from "./sdk";
 import { requireEquipmentUpdate, retainEquipmentObject } from "./equipment_update";
+import { armorCopy, armorView, generateQurious, writeQurious, type QuriousCandidate } from './native_qurious';
+export const QURIOUS_PRICE=60;
 import type { StartupRules } from "../core/config";
 import { validArmorId, armorId } from "../core/equipment_id";
 export { armorId } from "../core/equipment_id";
@@ -255,6 +257,7 @@ export interface EquipWearPort {
 const STATE_FILE = "mhw_rogue_startup_state.json";
 
 interface PersistedState {
+  quriousPending?: {key:number;fingerprint:string;candidate:QuriousCandidate};
   wardrobeId?: string;
   wardrobeRevision?: number;
   inheritedWeapon?: number;
@@ -373,7 +376,8 @@ export function runEquipmentSnapshot() {
       const levels=socketLevels(object);
       return {key:e.boxIndex, id:e.idVal, position:equipPosition(e), name:object.call("getName") as string,
         worn:pack[equipPosition(e)]===e.boxIndex, inherited:false,
-        slotLevels:levels,sockets:levels.map((_,i) => object.call("getDecoId",i) as number)};
+        slotLevels:levels,sockets:levels.map((_,i) => object.call("getDecoId",i) as number),
+        qurious:e.idType===2 ? quriousInfo(object) : null};
     });
     const originalWeapon = state.inheritedWeapon;
     if (originalWeapon !== undefined && originalWeapon >= 0 && !items.some(e => e.position === 0 && e.key === originalWeapon)) {
@@ -381,13 +385,45 @@ export function runEquipmentSnapshot() {
       if (!weapon || equipmentFingerprint(weapon) !== state.originalBox!.entries[String(originalWeapon)])
         throw new Error("继承武器已变化，暂停装备操作");
       items.unshift({key:originalWeapon,id:weapon.get_field("_IdVal") as number,position:0,
-        name:weapon.call("getName") as string,worn:pack[0]===originalWeapon,inherited:true,slotLevels:[],sockets:[]});
+        name:weapon.call("getName") as string,worn:pack[0]===originalWeapon,inherited:true,slotLevels:[],sockets:[],qurious:null});
     }
     const used: Record<string,number> = {};
     for (const values of Object.values(state.runSockets ?? {})) for (const id of values) if (id > 0) used[String(id)] = (used[String(id)] ?? 0) + 1;
-    return {version:`${state.wardrobeId ?? state.owner?.process}:${state.wardrobeRevision??0}`,items,
+    return {version:`${state.wardrobeId ?? state.owner?.process}:${state.wardrobeRevision??0}`,items,quriousPending:state.quriousPending??null,quriousPrice:QURIOUS_PRICE,
       jewels:Object.entries(state.runJewels ?? {}).map(([id,count]) => ({id:Number(id),name:runJewelName(Number(id)),level:runJewelLevel(Number(id)),count,available:count-(used[id]??0)})),reason:null};
-  } catch (error) { return {version:"",items:[],jewels:[],reason:String(error)}; }
+  } catch (error) { return {version:"",items:[],jewels:[],quriousPending:null,quriousPrice:QURIOUS_PRICE,reason:String(error)}; }
+}
+function quriousInfo(object:REManagedObject) {
+ const armor=object.call('getArmorData') as REManagedObject|null;
+ if(!armor||armor.call('isEnableCustom')!==true)return {supported:false,view:null};
+ return {supported:true,view:armorView(object)};
+}
+export function rollRunQurious(index:number,mode:number):void {
+ requireEquipmentUpdate();const state=runState();
+ if(state.quriousPending)throw new Error('请先接受或放弃上一次炼化');
+ const {entry,object}=runEntry(state,index);if(entry.idType!==2)throw new Error('当前仅支持防具傀异炼化');
+ const candidate=generateQurious(object,mode);
+ state.quriousPending={key:index,fingerprint:equipmentFingerprint(object),candidate};
+ state.wardrobeRevision=(state.wardrobeRevision??0)+1;
+ if(!persistStartupState(state))throw new Error('炼化候选登记失败，未扣 PT');
+}
+export function resolveRunQurious(index:number,accept:boolean):void {
+ requireEquipmentUpdate();const state=runState(),pending=state.quriousPending;
+ if(!pending||pending.key!==index)throw new Error('没有此装备的待确认炼化');
+ if(!accept){state.quriousPending=undefined;state.wardrobeRevision=(state.wardrobeRevision??0)+1;if(!persistStartupState(state))throw new Error('放弃炼化登记失败');return;}
+ if(!pending.candidate.canAccept)throw new Error(pending.candidate.reason??'本次结果不能接受');
+ const {entry,object}=runEntry(state,index),edm=equipDataManager();if(!edm)throw new Error('装备管理器不可用');
+ if(equipmentFingerprint(object)!==pending.fingerprint)throw new Error('目标装备已经变化，请放弃并重新炼化');
+ const preview=armorCopy(object);writeQurious(preview,pending.candidate.rows,pending.candidate.mode);
+ const after=equipmentFingerprint(preview);entry.acceptedFingerprints=[pending.fingerprint,after];
+ if(!persistStartupState(state))throw new Error('炼化事务登记失败');
+ // Once registered, a native failure remains recoverable using either endpoint.
+ writeQurious(object,pending.candidate.rows,pending.candidate.mode);
+ if(equipmentFingerprint(object)!==after)throw new Error('炼化结果回读不一致，请停止操作并恢复本局');
+ const pack=readPack(edm);if(!pack)throw new Error('当前装备状态不可读');applyEquipmentIndices(edm,pack);
+ entry.fingerprint=after;entry.acceptedFingerprints=undefined;state.quriousPending=undefined;
+ state.wornPack=pack;state.wornMySet=captureEquipmentMySet(edm);state.wardrobeRevision=(state.wardrobeRevision??0)+1;
+ if(!persistStartupState(state))throw new Error('炼化结果登记失败，请恢复本局');
 }
 /** Personal wardrobe changes always execute in the native equipment update. */
 export function wearRunEquipment(index: number): void {

@@ -147,6 +147,12 @@ export class RunCore {
       cartRestoreUsed: this.state.cartRestoreUsed };
   }
 
+  spendQurious(price:number): void {
+    if(!Number.isInteger(price)||price<=0||this.state.wallet.pt<price)throw new Error('PT 不足');
+    this.state.wallet={...this.state.wallet,pt:this.state.wallet.pt-price,purchaseLog:[...this.state.wallet.purchaseLog,'qurious']};
+    this.state.log.push(`傀异炼化：-${price} PT`);
+  }
+
   rollbackPurchase(snapshot: PurchaseCheckpoint): void {
     this.state.wallet = snapshot.wallet; this.state.log = snapshot.log;
     this.state.cartsLeft = snapshot.cartsLeft; this.state.cartRestoreUsed = snapshot.cartRestoreUsed;

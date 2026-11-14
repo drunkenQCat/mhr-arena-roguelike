@@ -6,9 +6,10 @@ import { RunCore } from "../core/run_core";
 import { RunSession, type RuntimeReading, type SessionPort } from "../core/run_session";
 import type { NativeRuntime } from "./native_runtime";
 import { ShopWindow } from "./shop_window";
-const wardrobe=vi.hoisted(()=>({version:"run-1:0",wear:vi.fn(),socket:vi.fn()}));
+const wardrobe=vi.hoisted(()=>({version:"run-1:0",wear:vi.fn(),socket:vi.fn(),roll:vi.fn(),resolve:vi.fn()}));
 vi.mock("./equip_wear",()=>({runEquipmentSnapshot:()=>({version:wardrobe.version,items:[],jewels:[],reason:null}),
- wearRunEquipment:(...args:unknown[])=>wardrobe.wear(...args),socketRunJewel:(...args:unknown[])=>wardrobe.socket(...args)}));
+ wearRunEquipment:(...args:unknown[])=>wardrobe.wear(...args),socketRunJewel:(...args:unknown[])=>wardrobe.socket(...args),
+ QURIOUS_PRICE:60,rollRunQurious:(...args:unknown[])=>wardrobe.roll(...args),resolveRunQurious:(...args:unknown[])=>wardrobe.resolve(...args)}));
 
 const host = vi.hoisted(() => ({ now: 10, files: {} as Record<string, any>, count: 0, failWrite: "", commands: [] as string[], equipmentError:false, deferEquipment:false, nativeWork:[] as {key:object,run:()=>void}[] }));
 vi.mock("./equipment_update", () => ({
@@ -57,7 +58,27 @@ function fixture() {
   return { cfg, core, session, runtime, tools, shop, bridge, command, tick, state, reading };
 }
 beforeEach(() => { host.now = 10; host.files = {}; host.count = 0; host.failWrite = ""; host.commands = []; host.equipmentError=false; host.deferEquipment=false;host.nativeWork=[]; });
-beforeEach(()=>{wardrobe.version="run-1:0";wardrobe.wear.mockClear();wardrobe.socket.mockClear();});
+beforeEach(()=>{wardrobe.version="run-1:0";wardrobe.wear.mockClear();wardrobe.socket.mockClear();wardrobe.roll.mockClear();wardrobe.resolve.mockClear();});
+
+it('protects reserved effect PT when native qurious crafting is merged into the wardrobe',()=>{
+ const f=fixture();vi.spyOn(f.session,'canShop').mockReturnValue(true);f.core.state.wallet.pt=150;
+ f.bridge.designer={availablePt:()=>50,transactionBusy:()=>false,snapshot:()=>null} as any;
+ const request={sub:'quriousRoll',equipmentKey:21,equipmentVersion:wardrobe.version,quriousMode:0};
+ expect(f.command('equipment',request,'reserved-qurious').status).toBe('rejected');
+ expect(wardrobe.roll).not.toHaveBeenCalled();expect(f.core.state.wallet.pt).toBe(150);
+ f.bridge.designer={availablePt:()=>60,transactionBusy:()=>false,snapshot:()=>null} as any;
+ expect(f.command('equipment',request,'affordable-qurious').status).toBe('applied');
+ expect(wardrobe.roll).toHaveBeenCalledWith(21,0);expect(f.core.state.wallet.pt).toBe(90);
+});
+
+it('rechecks the effect transaction fence before a queued native qurious roll',()=>{
+ const f=fixture();vi.spyOn(f.session,'canShop').mockReturnValue(true);let busy=false;
+ f.bridge.designer={availablePt:()=>150,transactionBusy:()=>busy,snapshot:()=>null} as any;
+ host.deferEquipment=true;
+ f.command('equipment',{sub:'quriousRoll',equipmentKey:21,equipmentVersion:wardrobe.version,quriousMode:0},'delayed-qurious');
+ busy=true;host.nativeWork.shift()!.run();
+ expect(wardrobe.roll).not.toHaveBeenCalled();expect(host.files['webconsole_results.json'].last.status).toBe('rejected');
+});
 it("checks run wardrobe versions and personal preparation on the game side",()=>{
  const f=fixture();vi.spyOn(f.session,"canShop").mockReturnValue(true);
  expect(f.command("equipment",{sub:"wear",equipmentKey:21,equipmentVersion:"run-1:0"}).status).toBe("applied");

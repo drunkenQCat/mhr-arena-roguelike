@@ -5,7 +5,9 @@ export interface RunSummary {layer:number;clearedWaves:number;earnedPt:number;sp
 }
 export interface ShopEntry { id: string; name: string; category: string; price: number; cap: number; owned: number; mode: string; desc?: string; canBuy: boolean; reason?: string; }
 export interface Choice { index: number; label: string; monsters: string[]; mode?: string; hpMul: number; dmgMul: number; rewardPt: number; }
-export interface RunEquipmentInventory { version:string; canEdit:boolean; reason:string|null; items:{key:number;id:number;name:string;position:number;worn:boolean;inherited:boolean;slotLevels:number[]|null;sockets:number[]|null}[]|null; jewels:{id:number;name:string;level:number;count:number;available:number}[]|null }
+export interface ArmorView {defense:number;slots:number[]|null;skills:{id:number;name:string;level:number}[]|null;resistance:number[]|null}
+export interface QuriousCandidate {mode:number;before:ArmorView;after:ArmorView;changes:string[]|null;canAccept:boolean;reason:string|null}
+export interface RunEquipmentInventory { version:string; canEdit:boolean; reason:string|null; quriousPrice?:number;quriousPending?:{key:number;candidate:QuriousCandidate}|null;items:{key:number;id:number;name:string;position:number;worn:boolean;inherited:boolean;slotLevels:number[]|null;sockets:number[]|null;qurious?:{supported:boolean;view:ArmorView|null}|null}[]|null; jewels:{id:number;name:string;level:number;count:number;available:number}[]|null }
 export interface ConsoleState {
   economy?:{totalPt:number;availablePt:number;reservedPt:number};
   nativePreparation?:{state:string;pending:boolean;reason:string;held:number;identity:{id:number;unique:number}|null};

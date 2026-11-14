@@ -154,7 +154,11 @@ export function applyEquipmentIndices(manager: REManagedObject, indices: number[
   requireEquipmentUpdate();
   if (!ints(indices, 8, -1)) throw new Error("装备索引无效");
   const expected = preflightIndices(indices);
-  const pack = manager.call("get_PlEquipPack") as REManagedObject;
+  // applyEquipPack is a change request: resolve a detached desired pack before
+  // letting the native manager update its live references and player requests.
+  const pack = createInstance(PACK);
+  if(!pack)throw new Error('无法创建原生装备切换请求');
+  retainEquipmentObject(pack);native(pack,PACK,'.ctor');
   put(field(pack, "_InventoryIndexList"), indices);
   native(pack, PACK, "restoreVariableToRef");
   verifyReferences(pack, indices);
@@ -164,7 +168,9 @@ export function applyEquipmentIndices(manager: REManagedObject, indices: number[
     if (actual?.get_address() !== expected[i]?.get_address()) throw new Error(`装备实例不一致：${i}`);
   }
   native(pack, PACK, "applyEquipPack");
-  verifyReferences(pack, indices);
+  const live=manager.call('get_PlEquipPack') as REManagedObject;
+  native(live,PACK,'convertRefToVariable');
+  verifyReferences(live, indices);
 }
 export function verifyReferences(pack: REManagedObject, indices: number[], expected?: REManagedObject): void {
   if (!pack || !ints(indices, 8, -1)) throw new Error("装备引用不可读");
